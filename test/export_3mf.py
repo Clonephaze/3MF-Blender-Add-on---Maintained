@@ -54,12 +54,14 @@ class TestExport3MF(unittest.TestCase):
         self.exporter.use_mesh_modifiers = False
         self.exporter.coordinate_precision = 4
         self.exporter.export_hidden = False  # Initialize export_hidden property
+        self.exporter.use_orca_format = False  # Initialize Orca format property
 
         # Initialize state variables that are normally set in execute()
         self.exporter.next_resource_id = 1
         self.exporter.material_resource_id = -1
         self.exporter.num_written = 0
         self.exporter.material_name_to_index = {}
+        self.exporter.vertex_colors = {}  # Initialize vertex colors for Orca export
 
         self.mock_triangle_loop = unittest.mock.MagicMock()
         self.mock_triangle_loop.material_index = 0
@@ -788,7 +790,9 @@ class TestExport3MF(unittest.TestCase):
             mesh_element,
             original_triangles,
             0,
-            blender_object.material_slots)
+            blender_object.material_slots,
+            blender_object.to_mesh(),
+            blender_object)
 
     def test_write_object_resource_children(self):
         """
@@ -880,7 +884,9 @@ class TestExport3MF(unittest.TestCase):
             mesh_element,
             original_triangles,
             0,
-            blender_object.material_slots)
+            blender_object.material_slots,
+            blender_object.to_mesh(),
+            blender_object)
 
     def test_write_object_resource_metadata(self):
         """

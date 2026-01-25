@@ -415,8 +415,8 @@ class TestAnnotations(unittest.TestCase):
         defaults = root.findall("ct:Default", namespaces=CONTENT_TYPES_NAMESPACES)
         self.assertEqual(
             len(defaults),
-            2,
-            "There are two content types defined by the add-on itself, which are always present.")
+            3,
+            "There are three content types defined by the add-on: .rels, .model, and .config.")
         # Python doesn't support XPath expressions that match on multiple attributes, so we'll have to resort to two
         # checks here.
         rels_tags = root.findall("ct:Default[@Extension='rels']", namespaces=CONTENT_TYPES_NAMESPACES)
