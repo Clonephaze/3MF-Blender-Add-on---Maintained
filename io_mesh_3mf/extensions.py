@@ -1,4 +1,4 @@
-# Blender add-on to import and export 3MF files.
+﻿# Blender add-on to import and export 3MF files.
 # Copyright (C) 2020 Ghostkeeper
 # Copyright (C) 2025 Jack (modernization for Blender 4.2+)
 # This add-on is free software; you can redistribute it and/or modify it under the terms of the GNU General Public
@@ -31,7 +31,7 @@ class ExtensionType(Enum):
 class Extension:
     """
     Represents a 3MF extension with its metadata and capabilities.
-    
+
     Attributes:
         namespace: XML namespace URI for this extension
         prefix: Preferred XML namespace prefix
@@ -126,50 +126,50 @@ class ExtensionManager:
     """
     Manages active extensions for import/export operations.
     """
-    
+
     def __init__(self):
         """Initialize with no active extensions."""
         self._active_extensions: Set[str] = set()  # Set of namespace URIs
-    
+
     def activate(self, namespace: str) -> None:
         """
         Activate an extension by its namespace URI.
-        
+
         Args:
             namespace: The XML namespace URI of the extension to activate
-        
+
         Raises:
             ValueError: If the namespace is not registered
         """
         if namespace not in EXTENSION_REGISTRY:
             raise ValueError(f"Unknown extension namespace: {namespace}")
         self._active_extensions.add(namespace)
-    
+
     def deactivate(self, namespace: str) -> None:
         """Deactivate an extension."""
         self._active_extensions.discard(namespace)
-    
+
     def is_active(self, namespace: str) -> bool:
         """Check if an extension is currently active."""
         return namespace in self._active_extensions
-    
+
     def clear(self) -> None:
         """Deactivate all extensions."""
         self._active_extensions.clear()
-    
+
     def get_active_extensions(self) -> List[Extension]:
         """
         Get list of all active Extension objects.
-        
+
         Returns:
             List of Extension objects that are currently active
         """
         return [EXTENSION_REGISTRY[ns] for ns in self._active_extensions]
-    
+
     def get_required_extensions_string(self) -> str:
         """
         Build the requiredextensions attribute value for the model element.
-        
+
         Returns:
             Space-separated string of namespace URIs that require declaration,
             or empty string if no required extensions are active.
@@ -180,11 +180,11 @@ class ExtensionManager:
             if ext.required
         ]
         return " ".join(required)
-    
+
     def get_vendor_attributes(self) -> Dict[str, str]:
         """
         Get vendor-specific attributes to add to the model element.
-        
+
         Returns:
             Dictionary of {attribute_name: value} for active vendor extensions
         """
@@ -194,11 +194,11 @@ class ExtensionManager:
                 # For now, use "1" as default value for vendor version attributes
                 attrs[ext.vendor_attribute] = "1"
         return attrs
-    
+
     def register_namespaces(self, xml_module) -> None:
         """
         Register all active extension namespaces with ElementTree.
-        
+
         Args:
             xml_module: The xml.etree.ElementTree module to register with
         """
@@ -223,13 +223,13 @@ def get_extension_by_prefix(prefix: str) -> Optional[Extension]:
 
 def list_official_extensions() -> List[Extension]:
     """Get all registered official 3MF Consortium extensions."""
-    return [ext for ext in EXTENSION_REGISTRY.values() 
+    return [ext for ext in EXTENSION_REGISTRY.values()
             if ext.extension_type == ExtensionType.OFFICIAL]
 
 
 def list_vendor_extensions() -> List[Extension]:
     """Get all registered vendor-specific extensions."""
-    return [ext for ext in EXTENSION_REGISTRY.values() 
+    return [ext for ext in EXTENSION_REGISTRY.values()
             if ext.extension_type == ExtensionType.VENDOR]
 
 

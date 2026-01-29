@@ -485,7 +485,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         log.info(f"Wrote object model: {archive_path}")
 
     def write_orca_main_model(self, archive: zipfile.ZipFile, object_data: List[dict],
-                               build_uuid: str) -> None:
+                              build_uuid: str) -> None:
         """
         Write the main 3dmodel.model file with wrapper objects pointing to sub-models.
         """

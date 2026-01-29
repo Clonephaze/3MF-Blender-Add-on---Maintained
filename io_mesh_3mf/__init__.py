@@ -84,7 +84,7 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
     # Import behavior settings
     default_import_materials: bpy.props.BoolProperty(
         name="Import Materials",
-        description="Import material colors from 3MF files by default (includes standard basematerials and vendor color zones). "
+        description="Import material colors from 3MF files by default. "
                     "Disable to import geometry only",
         default=True,
     )
