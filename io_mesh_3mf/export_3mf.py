@@ -30,8 +30,6 @@ from .constants import (
     BAMBU_NAMESPACE,
     RELS_NAMESPACE,
     CORE_PROPERTIES_LOCATION,
-    CORE_PROPERTIES_REL,
-    CORE_PROPERTIES_MIMETYPE,
     CORE_PROPERTIES_NAMESPACE,
     DC_NAMESPACE,
     DCTERMS_NAMESPACE,
@@ -39,7 +37,6 @@ from .constants import (
 )
 from .extensions import (
     ExtensionManager,
-    MATERIALS_EXTENSION,
     PRODUCTION_EXTENSION,
     ORCA_EXTENSION,
 )
@@ -678,8 +675,8 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         root = xml.etree.ElementTree.Element(
             f"{{{CORE_PROPERTIES_NAMESPACE}}}coreProperties"
         )
-        root.set(f"xmlns:dc", DC_NAMESPACE)
-        root.set(f"xmlns:dcterms", DCTERMS_NAMESPACE)
+        root.set("xmlns:dc", DC_NAMESPACE)
+        root.set("xmlns:dcterms", DCTERMS_NAMESPACE)
 
         # dc:creator - who created this file
         creator = xml.etree.ElementTree.SubElement(root, f"{{{DC_NAMESPACE}}}creator")

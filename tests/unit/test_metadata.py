@@ -24,7 +24,7 @@ import bpy_extras.io_utils
 bpy.types.Operator = MockOperator
 bpy_extras.io_utils.ImportHelper = MockImportHelper
 bpy_extras.io_utils.ExportHelper = MockExportHelper
-import io_mesh_3mf.metadata  # Now finally we can import the unit under test.
+import io_mesh_3mf.metadata
 
 
 class TestMetadata(unittest.TestCase):
