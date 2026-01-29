@@ -1,19 +1,22 @@
 # Blender add-on to import and export 3MF files.
-# Copyright (C) 2020 Ghostkeeper
-# This add-on is free software; you can redistribute it and/or modify it under the terms of the GNU General Public
-# License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later
-# version.
-# This add-on is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
-# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License along with this program; if not, write to the Free
-# Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+# Copyright (C) 2020 Ghostkeeper, 2025 Clonephaze
+# This add-on is free software: you can redistribute it and/or modify it under the terms of the GNU General
+# Public License as published by the Free Software Foundation, either version 2 of the License, or (at your
+# option) any later version.
+# This add-on is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+# for more details.
+# You should have received a copy of the GNU General Public License along with this program. If not, see
+# <https://www.gnu.org/licenses/>.
 
-# Github action that performs the automated tests on every change and pull request using Python's Unittest module.
-name: Automated Tests
+# GitHub workflow that performs code style checks on every change and pull request.
+# Note: Unit and integration tests require Blender and must be run locally before commits.
+# Run all tests locally with: python tests/run_all_tests.py
+name: Code Style
 on: [push, pull_request]
 
 jobs:
-  test: # Performs the Unittest tests.
+  lint: # Performs code style checks.
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -23,8 +26,6 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dependencies
-        run: python3 -m pip install mathutils pycodestyle
-      - name: Test
-        run: python3 -m unittest test
+        run: python3 -m pip install pycodestyle
       - name: Code style
-        run: python3 -m pycodestyle --ignore=E402,W503 --max-line-length=120 . # W503 is ignored because it conflicts with PEP8's recommendation to break before binary operators.
+        run: python3 -m pycodestyle --ignore=E402,W503 --max-line-length=120 io_mesh_3mf/ # W503 is ignored because it conflicts with PEP8's recommendation to break before binary operators.
