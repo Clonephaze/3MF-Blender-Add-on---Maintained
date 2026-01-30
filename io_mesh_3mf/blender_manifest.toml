@@ -4,12 +4,11 @@ id = "ThreeMF_format"
 version = "1.2.1"
 name = "3MF format"
 tagline = "Import and export 3D Manufacturing Format (3MF) files"
-author = "Ghostkeeper"
 maintainer = "Clonephaze"
 
 type = "add-on"
 
-website = "https://github.com/Ghostkeeper/Blender3mfFormat"
+website = "https://github.com/Clonephaze/3MF-Blender-Add-on---Maintained"
 blender_version_min = "4.2.0"
 license = [
   "SPDX:GPL-3.0-or-later",
@@ -20,4 +19,4 @@ copyright = [
 ]
 
 [permissions]
-    "files" = "For import and export of 3MF files"
+files = "For import and export of 3MF files"
