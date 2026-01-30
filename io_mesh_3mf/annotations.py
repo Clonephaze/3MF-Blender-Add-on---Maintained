@@ -25,6 +25,7 @@ from .constants import (
     RELS_RELATIONSHIP_FIND,
     RELS_NAMESPACES,
     MODEL_REL,
+    THUMBNAIL_REL,
     RELS_MIMETYPE,
     MODEL_MIMETYPE,
     RELS_NAMESPACE,
@@ -246,6 +247,18 @@ class Annotations:
                 )
                 current_id += 1
 
+                # Add thumbnail relationship (will be written by export if viewport available)
+                xml.etree.ElementTree.SubElement(
+                    root,
+                    f"{{{RELS_NAMESPACE}}}Relationship",
+                    attrib={
+                        f"{{{RELS_NAMESPACE}}}Id": f"rel{current_id}",
+                        f"{{{RELS_NAMESPACE}}}Target": "/Metadata/thumbnail.png",
+                        f"{{{RELS_NAMESPACE}}}Type": THUMBNAIL_REL,
+                    },
+                )
+                current_id += 1
+
             document = xml.etree.ElementTree.ElementTree(root)
 
             # Write that XML document to a file.
@@ -286,6 +299,7 @@ class Annotations:
         most_common[".model"] = MODEL_MIMETYPE
         most_common[".config"] = "application/xml"  # For Orca Slicer metadata files
         most_common[".xml"] = CORE_PROPERTIES_MIMETYPE  # For Core Properties (docProps/core.xml)
+        most_common[".png"] = "image/png"  # For thumbnail
 
         # Write an XML file that contains the extension rules for the most common cases,
         # but specific overrides for the outliers.

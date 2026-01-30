@@ -33,6 +33,7 @@ __all__ = [
     "MODEL_MIMETYPE",
     "CORE_PROPERTIES_MIMETYPE",
     "MODEL_NAMESPACE",
+    "SLIC3RPE_NAMESPACE",
     "MODEL_NAMESPACES",
     "MODEL_DEFAULT_UNIT",
     "MATERIAL_NAMESPACE",
@@ -86,8 +87,10 @@ CORE_PROPERTIES_MIMETYPE: str = "application/vnd.openxmlformats-package.core-pro
 
 # Constants in the 3D model file.
 MODEL_NAMESPACE: str = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"
+SLIC3RPE_NAMESPACE: str = "http://schemas.slic3r.org/3mf/2017/06"  # PrusaSlicer/Slic3r vendor extension
 MODEL_NAMESPACES: Dict[str, str] = {
-    "3mf": MODEL_NAMESPACE
+    "3mf": MODEL_NAMESPACE,
+    "slic3rpe": SLIC3RPE_NAMESPACE
 }
 MODEL_DEFAULT_UNIT: str = "millimeter"  # If the unit is missing, it will be this.
 

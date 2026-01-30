@@ -40,6 +40,7 @@ from .constants import (
     MODEL_DEFAULT_UNIT,
     SUPPORTED_EXTENSIONS,
     PRODUCTION_NAMESPACE,
+    SLIC3RPE_NAMESPACE,
     CONTENT_TYPES_LOCATION,
     conflicting_mustpreserve_contents,
 )
@@ -1031,23 +1032,40 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
                 pid = attrib.get("pid", material_pid)
                 p1 = attrib.get("p1")
-                if p1 is None:
-                    material = default_material
-                else:
-                    try:
-                        material = self.resource_materials[pid][int(p1)]
-                    except KeyError as e:
-                        # Only warn if materials were supposed to be imported
-                        if self.import_materials:
+                material = None
+
+                if self.import_materials:
+                    # Check for multi-material paint attributes first
+                    # PrusaSlicer uses slic3rpe:mmu_segmentation, Orca uses paint_color
+                    paint_code = attrib.get("paint_color")
+                    if not paint_code:
+                        # ElementTree returns namespaced attrs as {namespace}localname
+                        paint_code = attrib.get(f"{{{SLIC3RPE_NAMESPACE}}}mmu_segmentation")
+                    if not paint_code:
+                        # Also check prefixed form (some parsers)
+                        paint_code = attrib.get("slic3rpe:mmu_segmentation")
+
+                    if paint_code:
+                        # Multi-material paint attribute found
+                        filament_index = parse_paint_color_to_index(paint_code)
+                        if filament_index > 0:
+                            material = self.get_or_create_paint_material(filament_index, paint_code)
+                    elif p1 is not None:
+                        # Standard 3MF material reference
+                        try:
+                            material = self.resource_materials[pid][int(p1)]
+                        except KeyError as e:
                             log.warning(f"Material {e} is missing.")
                             self.safe_report({'WARNING'}, f"Material {e} is missing")
-                        else:
-                            log.debug(f"Material {e} skipped (import_materials=False)")
+                            material = default_material
+                        except ValueError as e:
+                            log.warning(f"Material index is not an integer: {e}")
+                            self.safe_report({'WARNING'}, f"Material index is not an integer: {e}")
+                            material = default_material
+                    else:
                         material = default_material
-                    except ValueError as e:
-                        log.warning(f"Material index is not an integer: {e}")
-                        self.safe_report({'WARNING'}, f"Material index is not an integer: {e}")
-                        material = default_material
+                else:
+                    material = default_material
 
                 vertices.append((v1, v2, v3))
                 materials.append(material)
@@ -1230,22 +1248,31 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
                 vertices.append((v1, v2, v3))
 
-                # Handle paint_color attribute (Orca Slicer)
-                # Only triangles WITH paint_color get materials (filament_index 1+)
-                # Triangles without paint_color are unpainted (no material)
+                # Handle multi-material attributes (Orca/PrusaSlicer)
+                # Orca uses paint_color, PrusaSlicer uses slic3rpe:mmu_segmentation
+                # Both use the same hex code format ("4", "8", "0C", etc.)
                 material = None
-                if self.import_materials and hasattr(self, 'orca_filament_colors') and self.orca_filament_colors:
-                    paint_color = attrib.get("paint_color")  # None if not present
-                    if paint_color:  # Only process if paint_color attribute exists and is non-empty
-                        if paint_color not in paint_color_materials:
-                            # Create a material for this paint_color
-                            filament_index = parse_paint_color_to_index(paint_color)
+                if self.import_materials:
+                    # Try paint_color first (Orca), then mmu_segmentation (PrusaSlicer)
+                    paint_code = attrib.get("paint_color")
+                    if not paint_code:
+                        # Check for PrusaSlicer's attribute with namespace
+                        paint_code = attrib.get(f"{{{SLIC3RPE_NAMESPACE}}}mmu_segmentation")
+                        if not paint_code:
+                            # Also try without namespace (some files have it as plain attribute)
+                            paint_code = attrib.get("slic3rpe:mmu_segmentation")
+
+                    if paint_code:  # Found a multi-material attribute
+                        if paint_code not in paint_color_materials:
+                            # Create a material for this code
+                            filament_index = parse_paint_color_to_index(paint_code)
                             if filament_index > 0:  # Valid filament (1+)
-                                material = self.get_or_create_paint_material(filament_index, paint_color)
-                                paint_color_materials[paint_color] = material
-                                log.debug(f"Paint color '{paint_color}' -> filament {filament_index}")
+                                # Use fallback colors if no config file (PrusaSlicer case)
+                                material = self.get_or_create_paint_material(filament_index, paint_code)
+                                paint_color_materials[paint_code] = material
+                                log.debug(f"Multi-material code '{paint_code}' -> filament {filament_index}")
                         else:
-                            material = paint_color_materials[paint_color]
+                            material = paint_color_materials[paint_code]
 
                 materials.append(material)
 
@@ -1525,23 +1552,29 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                     triangle_material
                 ]
 
-        # Create an object.
-        blender_object = bpy.data.objects.new("3MF Object", mesh)
-        self.num_loaded += 1
-        if parent is not None:
-            blender_object.parent = parent
-        blender_object.matrix_world = transformation
-        bpy.context.collection.objects.link(blender_object)
-        bpy.context.view_layer.objects.active = blender_object
-        blender_object.select_set(True)
-        metadata.store(blender_object)
-        # Higher precedence for per-resource metadata
-        resource_object.metadata.store(blender_object)
-        if "3mf:object_type" in resource_object.metadata and resource_object.metadata[
-            "3mf:object_type"
-        ].value in {"solidsupport", "support"}:
-            # Don't render support meshes.
-            blender_object.hide_render = True
+        # Only create a Blender object if there's actual mesh data.
+        # Component-only objects (containers) don't need visible representation.
+        if mesh is not None:
+            blender_object = bpy.data.objects.new("3MF Object", mesh)
+            self.num_loaded += 1
+            if parent is not None:
+                blender_object.parent = parent
+            blender_object.matrix_world = transformation
+            bpy.context.collection.objects.link(blender_object)
+            bpy.context.view_layer.objects.active = blender_object
+            blender_object.select_set(True)
+            metadata.store(blender_object)
+            # Higher precedence for per-resource metadata
+            resource_object.metadata.store(blender_object)
+            if "3mf:object_type" in resource_object.metadata and resource_object.metadata[
+                "3mf:object_type"
+            ].value in {"solidsupport", "support"}:
+                # Don't render support meshes.
+                blender_object.hide_render = True
+        else:
+            # No mesh data - this is a component-only container.
+            # Don't create an Empty, just pass through to components.
+            blender_object = parent
 
         # Recurse for all components.
         for component in resource_object.components:

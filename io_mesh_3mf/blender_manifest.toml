@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "ThreeMF_format"
-version = "1.2.0"
+version = "1.2.1"
 name = "3MF format"
 tagline = "Import and export 3D Manufacturing Format (3MF) files"
 author = "Ghostkeeper"

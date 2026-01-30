@@ -26,9 +26,18 @@ For Blender versions **2.80–3.6**, use the [original repository releases](http
 - Import and export 3MF files
 - Correct handling of units and build structure
 - Material and color support compatible with modern Blender material APIs
+- **Thumbnail generation** - viewport snapshot embedded in exported 3MF files
 - Verified round-trip import/export
 - Scriptable import/export operators
 - Extensive automated testing
+
+### Slicer Compatibility
+
+| Slicer | Round-Trip Support | Notes |
+|--------|-------------------|-------|
+| **Orca Slicer / BambuStudio** | ✅ Full | Multi-color zones, materials, and metadata preserved |
+| **PrusaSlicer** | 🔶 Partial | Color zones preserved (colors may differ due to filament profile differences) |
+| **Standard 3MF** | ✅ Full | Geometry, materials, and metadata |
 
 ---
 
@@ -130,6 +139,7 @@ This add-on includes special support for **Orca Slicer** and **BambuStudio** mul
 - Writes per-triangle `paint_color` attributes for filament assignment
 - Generates `project_settings.config` with filament colors
 - Creates proper OPC relationships for slicer compatibility
+- Embeds viewport thumbnail for file preview
 
 **Round-trip Workflow:**
 1. Create a mesh in Blender with multiple materials (different colors per face)
@@ -139,6 +149,20 @@ This add-on includes special support for **Orca Slicer** and **BambuStudio** mul
 
 > **NOTE**  
 > The Orca color zone export uses vendor-specific attributes (`paint_color`) that are not part of the official 3MF specification. Standard 3MF consumers will still read the geometry correctly but may not display colors.
+
+#### PrusaSlicer Compatibility
+
+**Import:**
+- Reads `slic3rpe:mmu_segmentation` attributes for multi-material zones
+- Color zones are preserved and converted to Blender materials
+- Uses the same filament index encoding as Orca Slicer
+
+**Export:**
+- Standard 3MF export works with PrusaSlicer
+- Color zones exported via Orca format are compatible with PrusaSlicer's multi-material painting
+
+> **NOTE**  
+> PrusaSlicer does not embed actual RGB colors in 3MF files - it uses filament indices that reference your local filament profiles. When round-tripping through Blender, colors are generated based on zone indices and may not match your original filament colors exactly.
 
 See [EXTENSIONS.md](EXTENSIONS.md) for detailed documentation on extension support, vendor-specific features, and adding new extensions.
 

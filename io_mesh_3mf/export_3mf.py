@@ -112,9 +112,10 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         max=12,
     )
     use_orca_format: bpy.props.BoolProperty(
-        name="Orca Slicer Color Zones",
-        description="Export face colors as Orca Slicer color zones. Assign different materials to faces "
-                    "in Blender, and each color will become a separate filament in Orca",
+        name="Multi-Material Color Zones",
+        description="Export per-face materials as multi-material filament zones for Orca Slicer, "
+                    "BambuStudio, and PrusaSlicer. Each material color becomes a separate filament slot. "
+                    "Compatible with multi-material printing workflows",
         default=False,
     )
 
@@ -126,6 +127,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             self.export_hidden = prefs.preferences.default_export_hidden
             self.use_mesh_modifiers = prefs.preferences.default_apply_modifiers
             self.global_scale = prefs.preferences.default_global_scale
+            self.use_orca_format = prefs.preferences.default_multi_material_export
         return super().invoke(context, event)
 
     def draw(self, context):
@@ -134,16 +136,18 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         layout.use_property_split = True
         layout.use_property_decorate = False
 
-        # Orca Slicer section at the top (most important for multi-color printing)
+        # Multi-color printing section
         orca_box = layout.box()
+        orca_box.use_property_split = False
         orca_header = orca_box.row()
         orca_header.label(text="Multi-Color Printing", icon='COLORSET_01_VEC')
-        orca_box.prop(self, "use_orca_format")
+        orca_row = orca_box.row()
+        orca_row.prop(self, "use_orca_format")
         if self.use_orca_format:
             info_col = orca_box.column(align=True)
             info_col.scale_y = 0.7
             info_col.label(text="Tip: Assign different materials to faces in Edit Mode", icon='INFO')
-            info_col.label(text="Each unique color becomes a filament in Orca Slicer")
+            info_col.label(text="Each unique color becomes a filament slot in your slicer")
 
         layout.separator()
 
@@ -253,6 +257,9 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         # Write OPC Core Properties (Dublin Core metadata)
         self.write_core_properties(archive)
 
+        # Write thumbnail if available from .blend file
+        self.write_thumbnail(archive)
+
         try:
             archive.close()
         except EnvironmentError as e:
@@ -361,6 +368,9 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
 
         # Write Orca metadata files
         self.write_orca_metadata(archive, mesh_objects)
+
+        # Write thumbnail if available from .blend file
+        self.write_thumbnail(archive)
 
         try:
             archive.close()
@@ -699,6 +709,93 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             log.info("Wrote OPC Core Properties to docProps/core.xml")
         except Exception as e:
             log.error(f"Failed to write Core Properties: {e}")
+
+    def write_thumbnail(self, archive: zipfile.ZipFile) -> None:
+        """
+        Generate a thumbnail and save it to the 3MF archive.
+
+        Renders a small preview of the current viewport and saves it as
+        Metadata/thumbnail.png in the 3MF archive.
+
+        :param archive: The 3MF archive to write the thumbnail into.
+        """
+        import tempfile
+
+        try:
+            # Thumbnail dimensions (3MF spec recommends these sizes)
+            thumb_width = 256
+            thumb_height = 256
+
+            # Find a 3D viewport to render from
+            view3d_area = None
+            for window in bpy.context.window_manager.windows:
+                for area in window.screen.areas:
+                    if area.type == 'VIEW_3D':
+                        view3d_area = area
+                        break
+                if view3d_area:
+                    break
+
+            if not view3d_area:
+                log.info("No 3D viewport found for thumbnail generation")
+                return
+
+            # Create a temporary file for the render
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+                temp_path = tmp.name
+
+            # Store original render settings
+            scene = bpy.context.scene
+            original_res_x = scene.render.resolution_x
+            original_res_y = scene.render.resolution_y
+            original_res_percent = scene.render.resolution_percentage
+            original_file_format = scene.render.image_settings.file_format
+            original_filepath = scene.render.filepath
+
+            try:
+                # Set up for thumbnail render
+                scene.render.resolution_x = thumb_width
+                scene.render.resolution_y = thumb_height
+                scene.render.resolution_percentage = 100
+                scene.render.image_settings.file_format = 'PNG'
+                scene.render.filepath = temp_path
+
+                # Render viewport (much faster than full render)
+                # Use OpenGL render which captures the viewport
+                override = bpy.context.copy()
+                override['area'] = view3d_area
+                override['region'] = [r for r in view3d_area.regions if r.type == 'WINDOW'][0]
+
+                with bpy.context.temp_override(**override):
+                    bpy.ops.render.opengl(write_still=True)
+
+                # Read the rendered PNG
+                with open(temp_path, 'rb') as png_file:
+                    png_data = png_file.read()
+
+                # Write to 3MF archive
+                with archive.open("Metadata/thumbnail.png", "w") as f:
+                    f.write(png_data)
+
+                log.info(f"Wrote thumbnail.png ({thumb_width}x{thumb_height}) from viewport render")
+
+            finally:
+                # Restore original settings
+                scene.render.resolution_x = original_res_x
+                scene.render.resolution_y = original_res_y
+                scene.render.resolution_percentage = original_res_percent
+                scene.render.image_settings.file_format = original_file_format
+                scene.render.filepath = original_filepath
+
+                # Clean up temp file
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+
+        except Exception as e:
+            log.warning(f"Failed to write thumbnail: {e}")
+            # Non-critical, don't fail the export
 
     def write_orca_metadata(self, archive: zipfile.ZipFile, blender_objects: List[bpy.types.Object]) -> None:
         """

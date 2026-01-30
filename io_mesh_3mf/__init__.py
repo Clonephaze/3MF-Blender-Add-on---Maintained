@@ -89,6 +89,13 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         default=True,
     )
 
+    default_multi_material_export: bpy.props.BoolProperty(
+        name="Multi-Material Color Zones",
+        description="Export per-face materials as multi-material filament zones by default. "
+                    "Compatible with Orca Slicer, BambuStudio, and PrusaSlicer",
+        default=False,
+    )
+
     def draw(self, context):
         layout = self.layout
 
@@ -110,6 +117,7 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         col = export_box.column(align=True)
         col.prop(self, "default_export_hidden", icon='HIDE_OFF')
         col.prop(self, "default_apply_modifiers", icon='MODIFIER')
+        col.prop(self, "default_multi_material_export", icon='COLORSET_01_VEC')
 
         # Import behavior section
         import_box = layout.box()

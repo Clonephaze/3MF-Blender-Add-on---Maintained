@@ -1,186 +1,156 @@
-# Blender 3MF Format - Test Suite
+# Blender 3MF Format
 
-This directory contains all tests for the Blender 3MF addon, organized into two categories:
+> [!NOTE]  
+> This repository is an actively maintained fork of the original Blender 3MF add-on by [Ghosteeper](https://github.com/Ghostkeeper), updated for modern Blender versions (4.2+) and ongoing development.
 
-- **`unit/`** - Unit tests that test individual functions with mocked data
-- **`integration/`** - Integration tests that use the real Blender `bpy` API
+This is a Blender add-on for importing and exporting **3MF (3D Manufacturing Format)** files.
 
-All tests run through Blender's Python environment using `blender --background --python`.
+3MF is a modern interchange format for additive manufacturing. Unlike STL, it is designed to carry not only geometry, but also units, materials, colors, metadata, and other information relevant to real 3D printing workflows. In this context, Blender serves as a modeling and preparation tool upstream of slicers and manufacturing software.
 
-## 🚀 Quick Start
+The goal of this add-on is to make **Blender a practical and reliable tool in 3MF-based workflows**, with spec-aligned behavior and useful interoperability with modern slicers.
 
-### Run All Tests (185 tests)
-```powershell
-# Run ALL tests - unit + integration (recommended)
-python tests/run_all_tests.py
+---
 
-# Or run separately:
-blender --background --python tests/run_unit_tests.py    # Unit tests (130, ~0.5s)
-blender --background --python tests/run_tests.py         # Integration tests (55, ~3s)
-```
+## Status
 
-### Run Specific Test Modules
-```powershell
-# Smoke tests only (fast)
-blender --background --python tests/run_tests.py -- test_smoke
+- ✓ Compatible with **Blender 4.2+**
+- ✓ Actively maintained
+- ✓ Production-ready
+- ✓ 3mf Material spec ready
+- ✓ Orca/Bambu slicer specific color ready
 
-# Export tests only
-blender --background --python tests/run_tests.py -- test_export
+For Blender versions **2.80–3.6**, use the [original repository releases](https://github.com/Ghostkeeper/Blender3mfFormat/releases/latest).
 
-# Import tests only
-blender --background --python tests/run_tests.py -- test_import
+---
 
-# Unicode tests only
-blender --background --python tests/run_tests.py -- test_unicode
-```
+## Features
 
-## 📋 Test Coverage
+- Import and export 3MF files
+- Correct handling of units and build structure
+- Material and color support compatible with modern Blender material APIs
+- Verified round-trip import/export
+- Scriptable import/export operators
+- Extensive automated testing
 
-### Unit Tests (`tests/unit/`) - 130 tests
-- **`test_export_unit.py`** - Export logic (materials, transforms, vertices, triangles)
-- **`test_import_unit.py`** - Import logic (parsing, content types, materials)
-- **`test_metadata.py`** - Metadata storage and retrieval
-- **`test_preferences.py`** - Addon preferences handling
+---
 
-### Integration Tests (`tests/integration/`) - 55 tests
-- **`test_smoke.py`** - Fast sanity checks (8 tests)
-- **`test_export.py`** - Full export workflows (17 tests)
-- **`test_import.py`** - Import and roundtrips (11 tests)
-- **`test_unicode.py`** - Unicode handling (18 tests) - Chinese, Japanese, Korean, emoji
+## Installation
 
-**Total: 185 tests**
+### Blender 4.2+
 
-## 📁 Structure
+**Option 1: Drag & Drop (Recommended)**
+1. Download this repository as a ZIP
+2. Open Blender
+3. Drag the `io_mesh_3mf` folder into the Blender window
+4. Confirm installation and enable the add-on
 
-```
-tests/
-├── run_all_tests.py      # ⭐ Combined test runner (runs both suites)
-├── run_tests.py          # Integration test runner
-├── run_unit_tests.py     # Unit test runner
-├── README.md
-├── unit/                 # Unit tests
-│   ├── mock/             # Mock helpers
-│   │   └── bpy.py
-│   ├── test_export_unit.py
-│   ├── test_import_unit.py
-│   ├── test_metadata.py
-│   └── test_preferences.py
-├── integration/          # Integration tests
-│   ├── test_base.py      # Base test class
-│   ├── test_smoke.py
-│   ├── test_export.py
-│   ├── test_import.py
-│   └── test_unicode.py
-└── resources/            # Test data files
-    ├── only_3dmodel_file.3mf
-    ├── corrupt_archive.3mf
-    └── empty_archive.zip
-```
+**Option 2: Preferences**
+1. Extract the ZIP
+2. Open *Edit → Preferences → Add-ons*
+3. Click *Install…* and select the `io_mesh_3mf` folder
+4. Enable **Import-Export: 3MF format**
 
-## 🔧 Requirements
+Reload scripts and enable the add-on.
 
-1. **Blender 4.2+** installed
-2. **No external dependencies** - uses only Python/Blender built-ins (unittest)
+---
 
-## 🎯 Running Specific Tests
+## Usage
 
-```powershell
-# Run specific test file
-blender --background --python tests/run_tests.py -- test_export
+After installation, the following menu entries are available:
 
-# Run single test class
-python -m unittest tests.test_export.ExportMaterialTests
+- **Import**: File → Import → 3D Manufacturing Format (.3mf)
+- **Export**: File → Export → 3D Manufacturing Format (.3mf)
+- **Preferences**: Edit → Preferences → Add-ons → 3MF Format
 
-# Run single test method
-python -m unittest tests.test_export.ExportMaterialTests.test_export_with_none_material
+![Screenshot](screenshot.png)
 
-# Note: unittest discovery requires Blender in background mode
-```
+### Import Options
+- **Scale**: Uniform scale applied from the scene origin
+- **Import Materials**: Import material colors from the file, auto detects standard 3mf materials and slicer specific data from Orca/Bambu (disable for geometry-only import)
 
-## 🧪 Test Coverage
+### Export Options
+- **Selection Only**
+- **Scale**
+- **Apply Modifiers**
+- **Coordinate Precision**
+- **Export Hidden Objects**
+- **Orca/Bambu Slicer Color Zones**: Export face colors as Orca Slicer filament zones (vendor-specific, works with bambu slicer too)
 
-Current integration test coverage (36 tests):
+---
 
-### Smoke Tests (8 tests, <2s)
-- ✅ Blender version check
-- ✅ Addon import and registration
-- ✅ Operators available
-- ✅ Basic export/import
-- ✅ Scene cleanup
-- ✅ Material helpers
+## Testing
 
-### Export Tests (17 tests)
-- ✅ Basic export (cube, multiple objects, empty scene)
-- ✅ Materials (single, multiple, None slots, mixed)
-- ✅ Archive structure (valid ZIP, XML, vertices, triangles)
-- ✅ Transformations (location, rotation, scale, parent-child)
-- ✅ Edge cases (non-mesh objects, no faces)
-- ✅ Options (selection only, modifiers)
+This add-on includes comprehensive automated testing to ensure reliability.
 
-### Import & Roundtrip Tests (11 tests)
-- ✅ Basic import (valid files, errors, corrupt files)
-- ✅ Roundtrips (geometry, materials, dimensions preserved)
-- ✅ API compatibility (PrincipledBSDFWrapper, depsgraph, loop_triangles)
+See [`tests/README.md`](tests/README.md) for detailed testing information.
 
-## 📊 Test Philosophy
+---
 
-### Integration vs Unit
+## 3MF Specification Support
 
-**These tests (tests/)**: Validate **user-facing behavior**
-- Test through public Blender operators (`bpy.ops.export_mesh.threemf()`)
-- Verify end-to-end workflows work correctly
-- Catch regressions in real-world usage
-- Run slower (~1.5s) but always accurate
+This add-on targets the **3MF Core Specification v1.3.0**.
 
-**Legacy tests (test/)**: Validate **implementation details**
-- Test internal methods (`unit_scale()`, `read_content_types()`, etc.)
-- Use mocks because operators can't be directly instantiated
-- Verify edge cases in parsers/formatters
-- Run fast (<0.1s) but artificial
+### Behavior Notes
 
-### Why Both?
+> **NOTE**  
+> The 3MF specification requires consumers to fail hard on malformed files. In practice, this add-on favors recoverability in a DCC environment.
 
-Import3MF and Export3MF are Blender operators (bpy_struct) - they can't be instantiated like `Export3MF()` outside of Blender's operator system. Internal methods testing requires the legacy mock-based approach in `test/`.
+- Core requirements (ZIP/OPC structure, model XML, units, build definitions) are enforced on export.
+- On import, partially malformed files may load with warnings rather than failing entirely.
+- When conflicts arise while importing multiple 3MF files into a single scene, conflicting metadata may be skipped to preserve scene integrity.
 
-## 🐛 Debugging Failed Tests
+### Extensions
 
-```powershell
-# Run with verbose output and full tracebacks
-.\tests\run_pytest.ps1 -Verbose
+This add-on supports several 3MF extensions for enhanced interoperability with slicers and manufacturing software.
 
-# Run Blender in foreground to see graphics (if needed)
-blender --python tests/run_pytest.py -- -v -s tests/test_export.py::test_failing_test
-```
+#### Supported Extensions
 
-## 🔄 Relationship with Legacy Tests
+| Extension | Namespace | Support Level |
+|-----------|-----------|---------------|
+| **Core Materials** (`basematerials`) | Core Spec v1.3.0 | ✅ Full |
+| **Production Extension** | `http://schemas.microsoft.com/3dmanufacturing/production/2015/06` | ✅ Full |
+| **Materials Extension** | `http://schemas.microsoft.com/3dmanufacturing/material/2015/02` | 🔶 Partial |
 
-The `test/` directory (legacy unit tests) and `tests/` directory (integration tests) serve **complementary purposes**:
+#### Orca Slicer / BambuStudio Compatibility (Partial Support for PrusaSlicer)
 
-| Aspect | Legacy (`test/`) | Integration (`tests/`) |
-|--------|------------------|------------------------|
-| **What** | Internal implementation | User-facing functionality |
-| **How** | Mocked bpy | Real bpy in Blender |
-| **Speed** | Very fast (~0.5s total) | Slower (~1.5s total) |
-| **Coverage** | 158 tests, edge cases | 36 tests, workflows |
-| **When** | Algorithm development | Pre-commit validation |
+This add-on includes special support for **Orca Slicer** and **BambuStudio** multi-color workflows:
 
-**Use both**: Run legacy tests for quick iteration, integration tests before committing.
+**Import:**
+- Reads multi-file Production Extension structure (`3D/Objects/*.model`)
+- Imports `paint_color` attributes as Blender materials
+- Reads actual filament colors from `Metadata/project_settings.config`
+- Supports files exported from Orca Slicer, BambuStudio, and PrusaSlicer
 
-## 📚 Resources
+**Export (Orca Slicer Color Zones option):**
+- Exports using Production Extension multi-file structure
+- Writes per-triangle `paint_color` attributes for filament assignment
+- Generates `project_settings.config` with filament colors
+- Creates proper OPC relationships for slicer compatibility
 
-- [pytest documentation](https://docs.pytest.org/)
-- [Blender Python API](https://docs.blender.org/api/current/)
-- [pytest markers](https://docs.pytest.org/en/stable/example/markers.html)
-- [pytest fixtures](https://docs.pytest.org/en/stable/fixture.html)
+**Round-trip Workflow:**
+1. Create a mesh in Blender with multiple materials (different colors per face)
+2. Export with "Orca Slicer Color Zones" enabled
+3. Open in Orca Slicer - colors appear as filament zones
+4. Re-import into Blender - material colors are preserved
 
-## 🤝 Contributing
+> **NOTE**  
+> The Orca color zone export uses vendor-specific attributes (`paint_color`) that are not part of the official 3MF specification. Standard 3MF consumers will still read the geometry correctly but may not display colors.
 
-When adding new tests:
+See [EXTENSIONS.md](EXTENSIONS.md) for detailed documentation on extension support, vendor-specific features, and adding new extensions.
 
-1. Use descriptive test names: `test_export_with_empty_material_slots`
-2. Add appropriate markers: `@pytest.mark.material`
-3. Use fixtures for setup/teardown
-4. Write docstrings explaining what's being tested
-5. Test edge cases and error conditions
+---
 
-For questions or issues, check the main project README or open an issue.
+## Project History
+
+This project began as a modernization of the original Blender 3MF add-on by Ghostkeeper and has since continued as an independently maintained fork.
+
+- Original Author: Ghostkeeper (2020–2023)
+- Modernization & Ongoing Maintenance: Jack (2025–)
+
+Original authorship, attribution, and the **GPL v2+ license** are fully preserved.
+
+---
+
+## License
+
+GPL v2+

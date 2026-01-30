@@ -1,3 +1,20 @@
+1.2.1 — PrusaSlicer Compatibility & Thumbnails
+====
+This patch adds PrusaSlicer multi-material import support and automatic thumbnail generation.
+
+Features
+----
+* **PrusaSlicer Support:** Import multi-material color zones from PrusaSlicer files (`slic3rpe:mmu_segmentation` attributes)
+* **Thumbnails:** Automatic viewport snapshot embedded in exported 3MF files (256×256 PNG)
+* **Cross-Slicer Compatibility:** Color zones now work with both PrusaSlicer and Orca Slicer formats
+
+Bug Fixes
+----
+* Fixed PrusaSlicer imports not showing color zones/materials
+* Fixed thumbnails not displaying in file browsers due to missing content type declaration
+
+---
+
 1.2.0 — Production Extension & Orca Slicer Compatibility
 ====
 This release adds full support for the 3MF Production Extension and comprehensive Orca Slicer/BambuStudio compatibility, enabling multi-color workflows between Blender and modern slicers.
