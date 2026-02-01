@@ -333,7 +333,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                     "This may cause problems in slicers."
                 )
                 log.warning(f"Non-manifold geometry found in {len(non_manifold_objects)} object(s): "
-                           f"{', '.join(non_manifold_objects)}")
+                            f"{', '.join(non_manifold_objects)}")
 
         global_scale = self.unit_scale(context)
 

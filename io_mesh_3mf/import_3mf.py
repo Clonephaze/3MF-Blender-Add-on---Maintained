@@ -171,7 +171,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         box.label(text="Import Options:", icon='IMPORT')
         box.prop(self, "import_materials")
         box.prop(self, "reuse_materials")
-        
+
         layout.separator()
         placement_box = layout.box()
         placement_box.label(text="Placement:", icon='OBJECT_ORIGIN')
@@ -1532,7 +1532,8 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             result[row][col] = component_float
         return result
 
-    def find_existing_material(self, name: str, color: Tuple[float, float, float, float]) -> Optional[bpy.types.Material]:
+    def find_existing_material(self, name: str,
+                               color: Tuple[float, float, float, float]) -> Optional[bpy.types.Material]:
         """
         Find an existing Blender material that matches the given name and color.
 
@@ -1550,7 +1551,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 if all(abs(existing_color[i] - color[i]) < 0.001 for i in range(4)):
                     log.info(f"Reusing existing material: {name}")
                     return material
-        
+
         # Try to find any material with matching color (fuzzy name match)
         color_tolerance = 0.001
         for mat in bpy.data.materials:
@@ -1561,7 +1562,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                     # Found a material with matching color but different name
                     log.info(f"Reusing material '{mat.name}' for color match (requested name: '{name}')")
                     return mat
-        
+
         return None
 
     def build_items(self, root, scale_unit):
@@ -1647,12 +1648,12 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 if triangle_material not in self.resource_to_material:
                     # Cache material name to protect Unicode characters from garbage collection
                     material_name = str(triangle_material.name)
-                    
+
                     # Try to reuse existing material if enabled
                     material = None
                     if self.reuse_materials:
                         material = self.find_existing_material(material_name, triangle_material.color)
-                    
+
                     # Create new material if not found or reuse disabled
                     if material is None:
                         material = bpy.data.materials.new(material_name)
@@ -1662,7 +1663,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                         )
                         principled.base_color = triangle_material.color[:3]
                         principled.alpha = triangle_material.color[3]
-                    
+
                     self.resource_to_material[triangle_material] = material
                 else:
                     material = self.resource_to_material[triangle_material]
@@ -1690,26 +1691,26 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             self.num_loaded += 1
             if parent is not None:
                 blender_object.parent = parent
-            
+
             # Link to scene first so we can manipulate it
             bpy.context.collection.objects.link(blender_object)
             bpy.context.view_layer.objects.active = blender_object
             blender_object.select_set(True)
-            
+
             # Set origin to geometry BEFORE applying transformation
             if self.origin_to_geometry:
                 # Store current mode and switch to object mode
                 previous_mode = bpy.context.object.mode if bpy.context.object else 'OBJECT'
                 if previous_mode != 'OBJECT':
                     bpy.ops.object.mode_set(mode='OBJECT')
-                
+
                 # Set origin to geometry center
                 bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
-                
+
                 # Restore previous mode
                 if previous_mode != 'OBJECT':
                     bpy.ops.object.mode_set(mode=previous_mode)
-            
+
             # Now apply transformation and placement options
             if self.import_location == 'ORIGIN':
                 # Place at world origin - strip translation from transformation
@@ -1719,9 +1720,9 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 cursor_location = bpy.context.scene.cursor.location
                 transformation.translation = cursor_location
             # else 'KEEP' - use original transformation as-is
-            
+
             blender_object.matrix_world = transformation
-            
+
             metadata.store(blender_object)
             # Higher precedence for per-resource metadata
             resource_object.metadata.store(blender_object)

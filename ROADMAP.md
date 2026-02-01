@@ -145,6 +145,7 @@ Features and improvements organized by priority. Complexity ratings help with pl
 - [ ] Texture 2D support
 - [ ] Cura support
 - [ ] Collections → Components
+- [ ] Organize Properties Panel
 
 ### Research Needed
 *Requires investigation before committing*
