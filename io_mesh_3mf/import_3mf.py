@@ -208,7 +208,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         """
         # Show progress message
         self.report({'INFO'}, "Importing, please wait...")
-        
+
         # Reset state.
         self.resource_objects = {}
         self.resource_materials = {}
@@ -1396,7 +1396,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
                 with archive.open(metadata_path) as metadata_file:
                     content = metadata_file.read().decode('UTF-8')
-                    
+
                     # Parse paint_code=hex_color lines
                     for line in content.strip().split('\n'):
                         if '=' in line:
@@ -1407,9 +1407,10 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                                 # Store as 0-indexed (filament 1 -> index 0)
                                 array_index = filament_index - 1
                                 self.orca_filament_colors[array_index] = hex_color
-                    
+
                     log.info(f"Loaded {len(self.orca_filament_colors)} Prusa filament colors from metadata")
-                    self.safe_report({'INFO'}, f"Loaded {len(self.orca_filament_colors)} PrusaSlicer filament colors")
+                    self.safe_report({'INFO'},
+                                     f"Loaded {len(self.orca_filament_colors)} PrusaSlicer filament colors")
 
         except (zipfile.BadZipFile, IOError) as e:
             log.debug(f"Could not read Prusa filament colors from {archive_path}: {e}")
@@ -1418,7 +1419,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         """
         Convert sRGB color component to linear color space.
         Blender materials use linear color space internally.
-        
+
         :param value: sRGB value (0.0-1.0)
         :return: Linear value (0.0-1.0)
         """

@@ -118,12 +118,13 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                     "Compatible with multi-material printing workflows",
         default=False,
     )
-    
+
     mmu_slicer_format: bpy.props.EnumProperty(
         name="Slicer Format",
         description="Target slicer format for multi-material export",
         items=[
-            ('ORCA', "Orca Slicer / BambuStudio", "Use Production Extension with paint_color attributes (Orca Slicer, BambuStudio, Handy)"),
+            ('ORCA', "Orca Slicer / BambuStudio",
+             "Use Production Extension with paint_color attributes (Orca Slicer, BambuStudio, Handy)"),
             ('PRUSA', "PrusaSlicer / SuperSlicer", "Use mmu_segmentation attributes (PrusaSlicer, SuperSlicer)"),
         ],
         default='ORCA',
@@ -157,7 +158,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             # Slicer format dropdown
             format_row = orca_box.row()
             format_row.prop(self, "mmu_slicer_format", text="Slicer")
-            
+
             # Tips
             info_col = orca_box.column(align=True)
             info_col.scale_y = 0.7
@@ -187,9 +188,10 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
     def _finalize_export(self, archive: zipfile.ZipFile, format_name: str = "") -> Set[str]:
         """
         Finalize an export by closing the archive and reporting results.
-        
+
         :param archive: The 3MF archive to close.
-        :param format_name: Optional format suffix for log message (e.g., "Orca-compatible ", "PrusaSlicer-compatible ").
+        :param format_name: Optional format suffix for log message
+                            (e.g., "Orca-compatible ", "PrusaSlicer-compatible ").
         :return: {"FINISHED"} on success, {"CANCELLED"} on failure.
         """
         try:
@@ -224,7 +226,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         """
         # Show progress message
         self.report({'INFO'}, "Exporting, please wait...")
-        
+
         # Reset state.
         self.next_resource_id = 1  # Starts counting at 1 for some inscrutable reason.
         self.material_resource_id = -1
@@ -406,7 +408,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         return self._finalize_export(archive, "Orca-compatible ")
 
     def execute_prusa_export(self, context: bpy.types.Context, archive: zipfile.ZipFile,
-                            blender_objects, global_scale: float) -> Set[str]:
+                             blender_objects, global_scale: float) -> Set[str]:
         """
         PrusaSlicer export with mmu_segmentation attributes.
 
@@ -415,7 +417,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         # Register namespaces - empty string for default namespace
         xml.etree.ElementTree.register_namespace("", MODEL_NAMESPACE)
         xml.etree.ElementTree.register_namespace("slic3rpe", "http://schemas.slic3r.org/3mf/2017/06")
-        
+
         # Collect face colors
         self.safe_report({'INFO'}, "Collecting face colors for PrusaSlicer export...")
         self.vertex_colors = self.collect_face_colors(blender_objects)
@@ -426,23 +428,26 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             self.safe_report({'WARNING'},
                              "No face colors detected. Assign different materials to faces in Edit mode.")
         else:
-            self.safe_report({'INFO'}, f"Detected {len(self.vertex_colors)} color zones for PrusaSlicer export")
+            self.safe_report({'INFO'},
+                             f"Detected {len(self.vertex_colors)} color zones for PrusaSlicer export")
 
         # Create model root element - attributes must be namespace-qualified when using default_namespace
         root = xml.etree.ElementTree.Element(
             f"{{{MODEL_NAMESPACE}}}model"
         )
-        
+
         # Add attributes after creation to avoid namespace qualification issues
         root.set("unit", "millimeter")
         root.set("{http://www.w3.org/XML/1998/namespace}lang", "en-US")
-        
+
         # Add PrusaSlicer metadata
-        metadata_version = xml.etree.ElementTree.SubElement(root, f"{{{MODEL_NAMESPACE}}}metadata", attrib={"name": "slic3rpe:Version3mf"})
+        metadata_version = xml.etree.ElementTree.SubElement(
+            root, f"{{{MODEL_NAMESPACE}}}metadata", attrib={"name": "slic3rpe:Version3mf"})
         metadata_version.text = "1"
-        metadata_painting = xml.etree.ElementTree.SubElement(root, f"{{{MODEL_NAMESPACE}}}metadata", attrib={"name": "slic3rpe:MmPaintingVersion"})
+        metadata_painting = xml.etree.ElementTree.SubElement(
+            root, f"{{{MODEL_NAMESPACE}}}metadata", attrib={"name": "slic3rpe:MmPaintingVersion"})
         metadata_painting.text = "1"
-        
+
         # Add scene metadata
         scene_metadata = Metadata()
         scene_metadata.retrieve(bpy.context.scene)
@@ -458,7 +463,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
 
         # Write objects - mmu_segmentation attributes are handled in write_triangles()
         self.write_objects(root, resources_element, blender_objects, global_scale)
-        
+
         # Write filament colors to metadata for round-trip import
         self.write_prusa_filament_colors(archive)
 
@@ -808,17 +813,17 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
     def write_prusa_filament_colors(self, archive: zipfile.ZipFile) -> None:
         """
         Write filament color mapping for PrusaSlicer MMU export.
-        
+
         Stores colors in Metadata/blender_filament_colors.txt for round-trip import.
         Format: paint_code=hex_color (one per line)
         """
         if not self.vertex_colors:
             return
-            
+
         try:
             # Sort by colorgroup index to maintain order
             sorted_colors = sorted(self.vertex_colors.items(), key=lambda x: x[1])
-            
+
             # Build color map: colorgroup_id -> hex_color
             color_lines = []
             for hex_color, colorgroup_id in sorted_colors:
@@ -827,7 +832,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                     paint_code = ORCA_FILAMENT_CODES[colorgroup_id]
                     if paint_code:  # Skip empty (default)
                         color_lines.append(f"{paint_code}={hex_color}")
-            
+
             if color_lines:
                 color_data = "\n".join(color_lines)
                 with archive.open("Metadata/blender_filament_colors.txt", "w") as f:
@@ -1344,7 +1349,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         """
         Convert linear color component to sRGB color space.
         Blender materials use linear color space, but 3MF hex colors are sRGB.
-        
+
         :param value: Linear value (0.0-1.0)
         :return: sRGB value (0.0-1.0)
         """
@@ -1356,19 +1361,19 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
     def _material_to_hex_color(self, material: bpy.types.Material) -> Optional[str]:
         """
         Extract hex color string from a Blender material.
-        
+
         Tries Principled BSDF first (for node-based materials), falls back to diffuse_color.
         Skips default gray (0.8, 0.8, 0.8) from Principled BSDF.
         Converts from linear (Blender) to sRGB (3MF hex) color space.
-        
+
         :param material: The Blender material to extract color from.
         :return: Hex color string like "#RRGGBB" or None if no material.
         """
         if material is None:
             return None
-            
+
         color = None
-        
+
         # Try Principled BSDF first for materials with node setup
         if material.use_nodes and material.node_tree:
             principled = bpy_extras.node_shader_utils.PrincipledBSDFWrapper(
@@ -1621,8 +1626,8 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
 
                     if material_indices and blender_object.material_slots:
                         counter = collections.Counter(material_indices)
-                        # most_common_material_object_index is an index from the MeshLoopTriangle, referring to the list of
-                        # materials attached to the Blender object.
+                        # most_common_material_object_index is an index from the MeshLoopTriangle,
+                        # referring to the list of materials attached to the Blender object.
                         most_common_material_object_index = counter.most_common(1)[0][0]
                         most_common_material = blender_object.material_slots[
                             most_common_material_object_index
@@ -1805,15 +1810,17 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                 triangle_color = self.get_triangle_color(mesh, triangle, blender_object)
                 if triangle_color and triangle_color in self.vertex_colors:
                     colorgroup_id = self.vertex_colors[triangle_color]
-                    
+
                     if self.mmu_slicer_format == 'PRUSA':
                         # PrusaSlicer format: use mmu_segmentation attribute with Orca paint codes
                         # PrusaSlicer uses the same paint code system as Orca Slicer
                         if colorgroup_id < len(ORCA_FILAMENT_CODES):
                             paint_code = ORCA_FILAMENT_CODES[colorgroup_id]
-                            if paint_code:  # Only write if not default extruder (empty string = extruder 0)
+                            # Only write if not default extruder (empty string = extruder 0)
+                            if paint_code:
                                 # Use slic3rpe namespace for the attribute
-                                triangle_element.attrib["{http://schemas.slic3r.org/3mf/2017/06}mmu_segmentation"] = paint_code
+                                ns_attr = "{http://schemas.slic3r.org/3mf/2017/06}mmu_segmentation"
+                                triangle_element.attrib[ns_attr] = paint_code
                     else:
                         # Orca format: use pid/p1 + paint_color
                         triangle_element.attrib[pid_name] = str(colorgroup_id)
