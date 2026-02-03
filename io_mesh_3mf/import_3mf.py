@@ -79,7 +79,7 @@ ResourceMaterial = collections.namedtuple(
         "metallic",       # 0.0 (dielectric) to 1.0 (metal)
         "roughness",      # 0.0 (smooth) to 1.0 (rough)
         # PBR Specular workflow (pbspeculardisplayproperties)
-        "specular_color", # RGB tuple for specular reflectance at normal incidence
+        "specular_color",  # RGB tuple for specular reflectance at normal incidence
         "glossiness",     # 0.0 (rough) to 1.0 (smooth) - inverse of roughness
         # Translucent materials (translucentdisplayproperties)
         "ior",            # Index of refraction (typically ~1.45 for glass)
@@ -348,8 +348,8 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                         self.safe_report({'ERROR'}, f"3MF document in {path} is malformed: {str(e)}")
                         continue
                     if document is None:
-                        # This file is corrupt or we can't read it. There is no error code to communicate this to Blender
-                        # though.
+                        # This file is corrupt or we can't read it.
+                        # No error code to communicate this to Blender.
                         continue  # Leave the scene empty / skip this file.
                     root = document.getroot()
 
@@ -1013,7 +1013,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 del self.resource_materials[colorgroup_id]  # Don't leave empty groups
 
     def _read_pbr_metallic_properties(self, root: xml.etree.ElementTree.Element,
-                                       material_ns: Dict[str, str]) -> Dict[str, List[Dict]]:
+                                      material_ns: Dict[str, str]) -> Dict[str, List[Dict]]:
         """
         Parse <m:pbmetallicdisplayproperties> elements from the 3MF document.
 
@@ -1068,7 +1068,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         return props
 
     def _read_pbr_specular_properties(self, root: xml.etree.ElementTree.Element,
-                                       material_ns: Dict[str, str]) -> Dict[str, List[Dict]]:
+                                      material_ns: Dict[str, str]) -> Dict[str, List[Dict]]:
         """
         Parse <m:pbspeculardisplayproperties> elements from the 3MF document.
 
@@ -1124,7 +1124,8 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
                 prop_dict["name"] = pbspecular.attrib.get("name", "")
                 material_props.append(prop_dict)
-                log.debug(f"Parsed specular PBR: glossiness={prop_dict['glossiness']}, specular={prop_dict['specular_color']}")
+                log.debug(f"Parsed specular PBR: glossiness={prop_dict['glossiness']}, "
+                          f"specular={prop_dict['specular_color']}")
 
             if material_props:
                 props[props_id] = material_props
@@ -1133,7 +1134,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         return props
 
     def _read_pbr_translucent_properties(self, root: xml.etree.ElementTree.Element,
-                                          material_ns: Dict[str, str]) -> Dict[str, List[Dict]]:
+                                         material_ns: Dict[str, str]) -> Dict[str, List[Dict]]:
         """
         Parse <m:translucentdisplayproperties> elements from the 3MF document.
 
@@ -1209,7 +1210,8 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
                 prop_dict["name"] = translucent.attrib.get("name", "")
                 material_props.append(prop_dict)
-                log.debug(f"Parsed translucent PBR: ior={prop_dict['ior']}, roughness={prop_dict['roughness']}, attenuation={prop_dict['attenuation']}")
+                log.debug(f"Parsed translucent PBR: ior={prop_dict['ior']}, "
+                          f"roughness={prop_dict['roughness']}, attenuation={prop_dict['attenuation']}")
 
             if material_props:
                 props[props_id] = material_props
@@ -1887,8 +1889,8 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         return (0.8, 0.8, 0.8, 1.0)  # Default gray
 
     def _apply_pbr_to_principled(self, principled: bpy_extras.node_shader_utils.PrincipledBSDFWrapper,
-                                  material: bpy.types.Material,
-                                  resource_material: ResourceMaterial) -> None:
+                                 material: bpy.types.Material,
+                                 resource_material: ResourceMaterial) -> None:
         """
         Apply PBR properties from a 3MF ResourceMaterial to a Blender Principled BSDF material.
 
@@ -1931,7 +1933,8 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             specular_level = specular_intensity / 0.44  # Normalize around 0.5
             principled.specular = min(1.0, max(0.0, specular_level))
             has_pbr = True
-            log.debug(f"Applied specular_level={principled.specular} (from color {resource_material.specular_color}) to material '{resource_material.name}'") 
+            log.debug(f"Applied specular_level={principled.specular} (from color "
+                      f"{resource_material.specular_color}) to material '{resource_material.name}'")
 
         # Apply translucent/glass properties
         if resource_material.transmission is not None and resource_material.transmission > 0:

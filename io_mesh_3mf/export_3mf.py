@@ -330,7 +330,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
     def write_materials(self, resources_element, blender_objects) -> Dict[str, int]:
         """
         Write materials to the 3MF document. Backward-compatible wrapper.
-        
+
         Returns just the name_to_index dict for backward compatibility.
         Updates self.next_resource_id and self.material_resource_id internally.
         """

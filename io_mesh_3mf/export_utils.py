@@ -540,7 +540,7 @@ def write_materials(resources_element: xml.etree.ElementTree.Element,
 
 
 def _extract_pbr_from_material(material: bpy.types.Material,
-                                principled: bpy_extras.node_shader_utils.PrincipledBSDFWrapper) -> Dict:
+                               principled: bpy_extras.node_shader_utils.PrincipledBSDFWrapper) -> Dict:
     """
     Extract PBR properties from a Blender material's Principled BSDF.
 
@@ -674,10 +674,10 @@ def _extract_pbr_from_material(material: bpy.types.Material,
 
 
 def _write_pbr_display_properties(resources_element: xml.etree.ElementTree.Element,
-                                   basematerials_element: xml.etree.ElementTree.Element,
-                                   basematerials_id: str,
-                                   pbr_materials: List[Tuple[str, Dict]],
-                                   next_resource_id: int) -> int:
+                                  basematerials_element: xml.etree.ElementTree.Element,
+                                  basematerials_id: str,
+                                  pbr_materials: List[Tuple[str, Dict]],
+                                  next_resource_id: int) -> int:
     """
     Write PBR display properties for materials.
 
@@ -699,13 +699,13 @@ def _write_pbr_display_properties(resources_element: xml.etree.ElementTree.Eleme
         return next_resource_id
 
     # Check if any material has meaningful PBR data (not just defaults)
-    has_pbr_data = any(
-        pbr.get("metallic", 0) > 0.01 or
-        pbr.get("roughness", 1) < 0.99 or
-        pbr.get("transmission", 0) > 0.01 or
-        pbr.get("specular_ior_level", 0.5) != 0.5  # Non-default specular
-        for _, pbr in pbr_materials
-    )
+    def has_meaningful_pbr(pbr):
+        metallic_check = pbr.get("metallic", 0) > 0.01
+        roughness_check = pbr.get("roughness", 1) < 0.99
+        transmission_check = pbr.get("transmission", 0) > 0.01
+        specular_check = pbr.get("specular_ior_level", 0.5) != 0.5
+        return metallic_check or roughness_check or transmission_check or specular_check
+    has_pbr_data = any(has_meaningful_pbr(pbr) for _, pbr in pbr_materials)
 
     if not has_pbr_data:
         log.debug("No meaningful PBR data to export, skipping display properties")
