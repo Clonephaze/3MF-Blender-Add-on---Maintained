@@ -154,6 +154,206 @@ CUBE_MESH = '''
     </object>
 '''
 
+# Cube mesh that references basematerials id="1" index 0
+CUBE_MESH_WITH_MATERIAL = '''
+    <object id="100" type="model" pid="1" pindex="0">
+      <mesh>
+        <vertices>
+          <vertex x="0" y="0" z="0" />
+          <vertex x="10" y="0" z="0" />
+          <vertex x="10" y="10" z="0" />
+          <vertex x="0" y="10" z="0" />
+          <vertex x="0" y="0" z="10" />
+          <vertex x="10" y="0" z="10" />
+          <vertex x="10" y="10" z="10" />
+          <vertex x="0" y="10" z="10" />
+        </vertices>
+        <triangles>
+          <triangle v1="0" v2="1" v3="2" />
+          <triangle v1="0" v2="2" v3="3" />
+          <triangle v1="4" v2="6" v3="5" />
+          <triangle v1="4" v2="7" v3="6" />
+          <triangle v1="0" v2="4" v3="5" />
+          <triangle v1="0" v2="5" v3="1" />
+          <triangle v1="1" v2="5" v3="6" />
+          <triangle v1="1" v2="6" v3="2" />
+          <triangle v1="2" v2="6" v3="7" />
+          <triangle v1="2" v2="7" v3="3" />
+          <triangle v1="3" v2="7" v3="4" />
+          <triangle v1="3" v2="4" v3="0" />
+        </triangles>
+      </mesh>
+    </object>
+'''
+
+
+# =============================================================================
+# Test: Active PBR Material Rendering (values applied to Blender materials)
+# =============================================================================
+class TestActivePBRMaterials(MaterialsExtensionTestCase):
+    """Test that PBR display properties are actually applied to Blender materials."""
+    
+    def _get_principled_node(self, material):
+        """Get the Principled BSDF node from a material."""
+        if not material.use_nodes:
+            return None
+        for node in material.node_tree.nodes:
+            if node.type == 'BSDF_PRINCIPLED':
+                return node
+        return None
+    
+    def test_metallic_properties_applied(self):
+        """Metallic properties should be applied to Principled BSDF."""
+        model_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="{NS_CORE}" xmlns:m="{NS_MATERIAL}" unit="millimeter">
+  <resources>
+    <basematerials id="1" displaypropertiesid="2">
+      <base name="Gold" displaycolor="#FFD700" />
+    </basematerials>
+    <m:pbmetallicdisplayproperties id="2">
+      <m:pbmetallic name="GoldMetal" metallicness="0.95" roughness="0.1" />
+    </m:pbmetallicdisplayproperties>
+    {CUBE_MESH_WITH_MATERIAL}
+  </resources>
+  <build>
+    <item objectid="100" />
+  </build>
+</model>'''
+        
+        input_path = self.create_test_3mf(model_xml)
+        self.assertTrue(self.import_3mf(input_path), "Import failed")
+        
+        # Find the Gold material
+        gold_mat = None
+        for mat in bpy.data.materials:
+            if mat.name == "Gold":
+                gold_mat = mat
+                break
+        
+        self.assertIsNotNone(gold_mat, "Gold material not found")
+        
+        node = self._get_principled_node(gold_mat)
+        self.assertIsNotNone(node, "Principled BSDF not found")
+        
+        # Check metallic value (should be 0.95)
+        metallic = node.inputs['Metallic'].default_value
+        self.assertAlmostEqual(metallic, 0.95, places=2,
+                              msg=f"Metallic should be 0.95, got {metallic}")
+        
+        # Check roughness value (should be 0.1)
+        roughness = node.inputs['Roughness'].default_value
+        self.assertAlmostEqual(roughness, 0.1, places=2,
+                              msg=f"Roughness should be 0.1, got {roughness}")
+    
+    def test_per_base_displaypropertiesid(self):
+        """Per-base displaypropertiesid should override group-level."""
+        # Define a mesh that uses both materials (Metal=index 0, Plastic=index 1)
+        two_material_mesh = '''
+    <object id="100" type="model" pid="1" pindex="0">
+      <mesh>
+        <vertices>
+          <vertex x="0" y="0" z="0" />
+          <vertex x="10" y="0" z="0" />
+          <vertex x="10" y="10" z="0" />
+          <vertex x="0" y="10" z="0" />
+          <vertex x="0" y="0" z="10" />
+          <vertex x="10" y="0" z="10" />
+        </vertices>
+        <triangles>
+          <triangle v1="0" v2="1" v3="2" pid="1" p1="0" />
+          <triangle v1="0" v2="2" v3="3" pid="1" p1="1" />
+          <triangle v1="4" v2="5" v3="1" pid="1" p1="0" />
+          <triangle v1="4" v2="1" v3="0" pid="1" p1="1" />
+        </triangles>
+      </mesh>
+    </object>
+'''
+        model_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="{NS_CORE}" xmlns:m="{NS_MATERIAL}" unit="millimeter">
+  <resources>
+    <basematerials id="1">
+      <base name="Metal" displaycolor="#C0C0C0" displaypropertiesid="2" />
+      <base name="Plastic" displaycolor="#FF0000" />
+    </basematerials>
+    <m:pbmetallicdisplayproperties id="2">
+      <m:pbmetallic name="MetalProp" metallicness="1.0" roughness="0.2" />
+    </m:pbmetallicdisplayproperties>
+    {two_material_mesh}
+  </resources>
+  <build>
+    <item objectid="100" />
+  </build>
+</model>'''
+        
+        input_path = self.create_test_3mf(model_xml)
+        self.assertTrue(self.import_3mf(input_path), "Import failed")
+        
+        # Find materials
+        metal_mat = plastic_mat = None
+        for mat in bpy.data.materials:
+            if mat.name == "Metal":
+                metal_mat = mat
+            elif mat.name == "Plastic":
+                plastic_mat = mat
+        
+        self.assertIsNotNone(metal_mat, "Metal material not found")
+        self.assertIsNotNone(plastic_mat, "Plastic material not found")
+        
+        # Metal should have metallic=1.0, roughness=0.2
+        metal_node = self._get_principled_node(metal_mat)
+        self.assertIsNotNone(metal_node, "Principled BSDF not found for Metal")
+        self.assertAlmostEqual(metal_node.inputs['Metallic'].default_value, 1.0, places=2)
+        self.assertAlmostEqual(metal_node.inputs['Roughness'].default_value, 0.2, places=2)
+        
+        # Plastic should have default metallic=0
+        plastic_node = self._get_principled_node(plastic_mat)
+        self.assertIsNotNone(plastic_node, "Principled BSDF not found for Plastic")
+        self.assertAlmostEqual(plastic_node.inputs['Metallic'].default_value, 0.0, places=2)
+    
+    def test_translucent_properties_applied(self):
+        """Translucent properties should be applied to Principled BSDF."""
+        model_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="{NS_CORE}" xmlns:m="{NS_MATERIAL}" unit="millimeter">
+  <resources>
+    <basematerials id="1" displaypropertiesid="2">
+      <base name="Glass" displaycolor="#FFFFFF" />
+    </basematerials>
+    <m:translucentdisplayproperties id="2">
+      <m:translucent name="GlassProp" attenuation="#FFFFFF80" refractiveindex="1.5" roughness="0.05" />
+    </m:translucentdisplayproperties>
+    {CUBE_MESH_WITH_MATERIAL}
+  </resources>
+  <build>
+    <item objectid="100" />
+  </build>
+</model>'''
+        
+        input_path = self.create_test_3mf(model_xml)
+        self.assertTrue(self.import_3mf(input_path), "Import failed")
+        
+        # Find the Glass material
+        glass_mat = None
+        for mat in bpy.data.materials:
+            if mat.name == "Glass":
+                glass_mat = mat
+                break
+        
+        self.assertIsNotNone(glass_mat, "Glass material not found")
+        
+        node = self._get_principled_node(glass_mat)
+        self.assertIsNotNone(node, "Principled BSDF not found")
+        
+        # Check IOR (should be 1.5)
+        ior = node.inputs['IOR'].default_value
+        self.assertAlmostEqual(ior, 1.5, places=2,
+                              msg=f"IOR should be 1.5, got {ior}")
+        
+        # Check transmission (should be > 0 since we have translucent properties)
+        # Blender 4.0+ uses 'Transmission Weight', earlier uses 'Transmission'
+        trans_input = 'Transmission Weight' if 'Transmission Weight' in node.inputs else 'Transmission'
+        transmission = node.inputs[trans_input].default_value
+        self.assertGreater(transmission, 0, "Transmission should be set for translucent material")
+
 
 # =============================================================================
 # Test: Colorgroup
@@ -473,6 +673,89 @@ class TestMultiproperties(MaterialsExtensionTestCase):
         self.assertEqual(len(exp_multi), 1)
         exp_attrs = self.get_element_attribs(exp_multi[0])
         self.assertEqual(exp_attrs.get('blendmethods'), 'multiply')
+
+    def test_multiproperties_resolves_to_basematerial(self):
+        """Triangles referencing multiproperties should get the underlying basematerial."""
+        # This test mimics the 3MF Consortium multiprop-metallic.3mf structure
+        model_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="{NS_CORE}" xmlns:m="{NS_MATERIAL}" unit="millimeter">
+  <resources>
+    <basematerials id="1">
+      <base name="Metal" displaycolor="#C0C0C0" displaypropertiesid="9" />
+    </basematerials>
+    <m:texture2d id="2" path="/3D/Texture/star.png" contenttype="image/png" />
+    <m:texture2dgroup id="4" texid="2">
+      <m:tex2coord u="0" v="0" />
+      <m:tex2coord u="1" v="0" />
+      <m:tex2coord u="0" v="1" />
+      <m:tex2coord u="1" v="1" />
+    </m:texture2dgroup>
+    <m:multiproperties id="6" pids="1 4">
+      <m:multi pindices="0 0" />
+      <m:multi pindices="0 1" />
+      <m:multi pindices="0 2" />
+      <m:multi pindices="0 3" />
+    </m:multiproperties>
+    <m:pbmetallicdisplayproperties id="9">
+      <m:pbmetallic name="MetalProp" metallicness="1" roughness="0.2" />
+    </m:pbmetallicdisplayproperties>
+    <object id="100" type="model">
+      <mesh>
+        <vertices>
+          <vertex x="0" y="0" z="0" />
+          <vertex x="10" y="0" z="0" />
+          <vertex x="10" y="10" z="0" />
+          <vertex x="0" y="10" z="0" />
+          <vertex x="0" y="0" z="10" />
+          <vertex x="10" y="0" z="10" />
+        </vertices>
+        <triangles>
+          <triangle v1="0" v2="1" v3="2" pid="6" p1="0" p2="1" p3="2" />
+          <triangle v1="0" v2="2" v3="3" pid="6" p1="0" p2="2" p3="3" />
+          <triangle v1="4" v2="5" v3="1" pid="6" p1="0" />
+          <triangle v1="4" v2="1" v3="0" pid="6" p1="1" />
+        </triangles>
+      </mesh>
+    </object>
+  </resources>
+  <build>
+    <item objectid="100" />
+  </build>
+</model>'''
+        
+        input_path = self.create_test_3mf(model_xml, {'3D/Texture/star.png': MINIMAL_PNG})
+        self.assertTrue(self.import_3mf(input_path), "Import failed")
+        
+        # Find the Metal material - it should exist because multiproperties resolved
+        metal_mat = None
+        for mat in bpy.data.materials:
+            if mat.name == "Metal":
+                metal_mat = mat
+                break
+        
+        self.assertIsNotNone(metal_mat, 
+            "Metal material not found - multiproperties should resolve to basematerial")
+        
+        # The material should have PBR properties applied (metallic=1, roughness=0.2)
+        node = self._get_principled_node(metal_mat)
+        self.assertIsNotNone(node, "Principled BSDF not found")
+        
+        metallic = node.inputs['Metallic'].default_value
+        roughness = node.inputs['Roughness'].default_value
+        
+        self.assertAlmostEqual(metallic, 1.0, places=2,
+            msg=f"Metal should have metallic=1.0 from displaypropertiesid, got {metallic}")
+        self.assertAlmostEqual(roughness, 0.2, places=2,
+            msg=f"Metal should have roughness=0.2 from displaypropertiesid, got {roughness}")
+    
+    def _get_principled_node(self, material):
+        """Get the Principled BSDF node from a material."""
+        if not material.use_nodes:
+            return None
+        for node in material.node_tree.nodes:
+            if node.type == 'BSDF_PRINCIPLED':
+                return node
+        return None
 
 
 # =============================================================================
