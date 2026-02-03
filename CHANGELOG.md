@@ -1,3 +1,51 @@
+1.2.7 — Full PBR Materials Extension Support
+====
+Complete implementation of all three PBR workflows from the 3MF Materials and Properties Extension, bringing the add-on 1 step closer to full Material Extension support. 
+
+Features
+----
+* **Metallic Workflow:** Import/export `<pbmetallicdisplayproperties>` with metallicness and roughness
+* **Specular Workflow:** Import/export `<pbspeculardisplayproperties>` with specular color and glossiness
+* **Translucent Workflow:** Import/export `<translucentdisplayproperties>` with IOR, attenuation color, and roughness
+* **Transmission Preservation:** Custom `blender_transmission` attribute preserves Blender's transmission value through translucent workflow round-trips
+
+Technical
+----
+* Implements PBR display properties from 3MF Materials Extension specification
+* Workflow selection is automatic based on material properties (metallic → specular → translucent priority)
+* Note: 3MF PBR workflows are mutually exclusive per spec — materials using multiple workflows will use the highest-priority workflow that applies
+* Export_3mf has been refactored into 3 separated files for better maintainability:
+
+---
+
+1.2.6 — Triangle Sets Extension
+====
+Full implementation of the 3MF Triangle Sets extension for grouping triangles.
+
+Features
+----
+* **Triangle Sets Import:** Parse `<triangleset>` elements including `<ref>` and `<refrange>` children
+* **Triangle Sets Export:** Export triangle sets with name/identifier attributes and `<refrange>` optimization
+* **Selection Workflows:** Triangle sets enable selection grouping for property assignment
+
+User Interface
+----
+* Added "Export Triangle Sets" checkbox to export operator (disabled when Multi-Material is active)
+* Added preference setting for default Triangle Sets export behavior
+* Triangle sets stored as integer face attributes with mesh custom property for names
+
+Bug Fixes
+----
+* Fixed "please wait" messages not displaying before UI freeze during import/export
+
+Technical
+----
+* Implements Triangle Sets extension from 3MF Core Spec v1.3+
+* Uses Blender 4.x custom face attributes (face maps removed in Blender 4.0)
+* Consecutive triangle indices exported as `<refrange>` to reduce XML size
+
+---
+
 1.2.5 — Quality of Life Improvements
 ====
 Export validation, smart material reuse, and flexible import placement options.

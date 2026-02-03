@@ -40,6 +40,7 @@ class TestPreferences(unittest.TestCase):
         Tests that invoke() loads default values from addon preferences.
         """
         exporter = io_mesh_3mf.export_3mf.Export3MF()
+        exporter.report = unittest.mock.MagicMock()  # Mock the report method
 
         # Create mock context with preferences
         mock_prefs = unittest.mock.MagicMock()
@@ -75,6 +76,7 @@ class TestPreferences(unittest.TestCase):
         Tests that invoke() handles missing preferences gracefully.
         """
         exporter = io_mesh_3mf.export_3mf.Export3MF()
+        exporter.report = unittest.mock.MagicMock()  # Mock the report method
 
         # Set initial values
         exporter.coordinate_precision = 4
@@ -107,6 +109,7 @@ class TestPreferences(unittest.TestCase):
         Tests that import invoke() loads default scale from addon preferences.
         """
         importer = io_mesh_3mf.import_3mf.Import3MF()
+        importer.report = unittest.mock.MagicMock()  # Mock the report method
 
         # Create mock context with preferences
         mock_prefs = unittest.mock.MagicMock()
@@ -136,6 +139,7 @@ class TestPreferences(unittest.TestCase):
         Tests that import invoke() handles missing preferences gracefully.
         """
         importer = io_mesh_3mf.import_3mf.Import3MF()
+        importer.report = unittest.mock.MagicMock()  # Mock the report method
         importer.global_scale = 1.0
 
         # Create mock context without addon preferences

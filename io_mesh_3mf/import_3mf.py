@@ -60,12 +60,34 @@ __all__ = ["Import3MF"]
 log = logging.getLogger(__name__)
 
 ResourceObject = collections.namedtuple(
-    "ResourceObject", ["vertices", "triangles", "materials", "components", "metadata"]
+    "ResourceObject", ["vertices", "triangles", "materials", "components", "metadata", "triangle_sets"],
+    defaults=[None]  # triangle_sets is optional (Python 3.7+)
 )
 # Component with optional path field for Production Extension support
 # Using defaults parameter (Python 3.7+) to make path optional
 Component = collections.namedtuple("Component", ["resource_object", "transformation", "path"], defaults=[None])
-ResourceMaterial = collections.namedtuple("ResourceMaterial", ["name", "color"])
+
+# PBR Material data structure for 3MF Materials Extension
+# Stores all properties from pbmetallicdisplayproperties, pbspeculardisplayproperties, and translucentdisplayproperties
+# All PBR fields are optional (defaults to None) for backward compatibility
+ResourceMaterial = collections.namedtuple(
+    "ResourceMaterial",
+    [
+        "name",           # Material name
+        "color",          # RGBA tuple (0-1 range)
+        # PBR Metallic workflow (pbmetallicdisplayproperties)
+        "metallic",       # 0.0 (dielectric) to 1.0 (metal)
+        "roughness",      # 0.0 (smooth) to 1.0 (rough)
+        # PBR Specular workflow (pbspeculardisplayproperties)
+        "specular_color", # RGB tuple for specular reflectance at normal incidence
+        "glossiness",     # 0.0 (rough) to 1.0 (smooth) - inverse of roughness
+        # Translucent materials (translucentdisplayproperties)
+        "ior",            # Index of refraction (typically ~1.45 for glass)
+        "attenuation",    # RGB attenuation coefficients for volume absorption
+        "transmission",   # 0.0 (opaque) to 1.0 (fully transparent)
+    ],
+    defaults=[None, None, None, None, None, None, None]  # All PBR fields optional
+)
 
 # Orca Slicer paint_color decoding - maps paint codes to filament indices
 # This is the reverse of ORCA_FILAMENT_CODES in export_3mf.py
@@ -186,6 +208,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             self.reuse_materials = prefs.preferences.default_reuse_materials
             self.import_location = prefs.preferences.default_import_location
             self.origin_to_geometry = prefs.preferences.default_origin_to_geometry
+        self.report({'INFO'}, "Importing, please wait...")
         return super().invoke(context, event)
 
     def safe_report(self, level: Set[str], message: str) -> None:
@@ -198,6 +221,41 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         if hasattr(self, 'report') and callable(getattr(self, 'report', None)):
             self.report(level, message)
         # If report is not available, the message has already been logged via the log module
+
+    def _progress_begin(self, context: bpy.types.Context, message: str) -> None:
+        self._progress_context = context
+        self._progress_value = 0
+        window_manager = getattr(context, "window_manager", None)
+        if window_manager:
+            if hasattr(window_manager, "progress_begin"):
+                window_manager.progress_begin(0, 100)
+            if hasattr(window_manager, "status_text_set"):
+                window_manager.status_text_set(message)
+
+    def _progress_update(self, value: int, message: Optional[str] = None) -> None:
+        context = getattr(self, "_progress_context", None)
+        if not context:
+            return
+        current_value = getattr(self, "_progress_value", 0)
+        new_value = max(current_value, value)
+        self._progress_value = new_value
+        window_manager = getattr(context, "window_manager", None)
+        if window_manager and hasattr(window_manager, "progress_update"):
+            window_manager.progress_update(new_value)
+        if message and window_manager and hasattr(window_manager, "status_text_set"):
+            window_manager.status_text_set(message)
+
+    def _progress_end(self) -> None:
+        context = getattr(self, "_progress_context", None)
+        if not context:
+            return
+        window_manager = getattr(context, "window_manager", None)
+        if window_manager:
+            if hasattr(window_manager, "progress_end"):
+                window_manager.progress_end()
+            if hasattr(window_manager, "status_text_set"):
+                window_manager.status_text_set(None)
+        self._progress_context = None
 
     def detect_vendor(self, root: xml.etree.ElementTree.Element) -> Optional[str]:
         """
@@ -236,179 +294,186 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         :param context: The Blender context.
         :return: A set of status flags to indicate whether the operation succeeded or not.
         """
-        # Show progress message
-        self.report({'INFO'}, "Importing, please wait...")
+        self._progress_begin(context, "Importing 3MF...")
+        try:
+            # Reset state.
+            self.resource_objects = {}
+            self.resource_materials = {}
+            self.resource_to_material = {}
+            self.num_loaded = 0
+            self.vendor_format = None  # Will be set when we detect vendor-specific format
+            self.extension_manager = ExtensionManager()  # Track active extensions
+            scene_metadata = Metadata()
+            # If there was already metadata in the scene, combine that with this file.
+            scene_metadata.retrieve(bpy.context.scene)
+            # Don't load the title from the old scene. If there is a title in the imported 3MF, use that.
+            # Else, we'll not override the scene title and it gets retained.
+            del scene_metadata["Title"]
+            annotations = Annotations()
+            annotations.retrieve()  # If there were already annotations in the scene, combine that with this file.
 
-        # Reset state.
-        self.resource_objects = {}
-        self.resource_materials = {}
-        self.resource_to_material = {}
-        self.num_loaded = 0
-        self.vendor_format = None  # Will be set when we detect vendor-specific format
-        self.extension_manager = ExtensionManager()  # Track active extensions
-        scene_metadata = Metadata()
-        # If there was already metadata in the scene, combine that with this file.
-        scene_metadata.retrieve(bpy.context.scene)
-        # Don't load the title from the old scene. If there is a title in the imported 3MF, use that.
-        # Else, we'll not override the scene title and it gets retained.
-        del scene_metadata["Title"]
-        annotations = Annotations()
-        annotations.retrieve()  # If there were already annotations in the scene, combine that with this file.
+            # Preparation of the input parameters.
+            paths = [os.path.join(self.directory, name.name) for name in self.files]
+            if not paths:
+                paths.append(self.filepath)
 
-        # Preparation of the input parameters.
-        paths = [os.path.join(self.directory, name.name) for name in self.files]
-        if not paths:
-            paths.append(self.filepath)
+            if bpy.ops.object.mode_set.poll():
+                bpy.ops.object.mode_set(
+                    mode="OBJECT"
+                )  # Switch to object mode to view the new file.
+            if bpy.ops.object.select_all.poll():
+                bpy.ops.object.select_all(action="DESELECT")  # Deselect other files.
 
-        if bpy.ops.object.mode_set.poll():
-            bpy.ops.object.mode_set(
-                mode="OBJECT"
-            )  # Switch to object mode to view the new file.
-        if bpy.ops.object.select_all.poll():
-            bpy.ops.object.select_all(action="DESELECT")  # Deselect other files.
+            for path in paths:
+                # Store current archive path for Production Extension support
+                self.current_archive_path = path
+                self._progress_update(5, f"Reading {os.path.basename(path)}...")
 
-        for path in paths:
-            # Store current archive path for Production Extension support
-            self.current_archive_path = path
+                files_by_content_type = self.read_archive(
+                    path
+                )  # Get the files from the archive.
 
-            files_by_content_type = self.read_archive(
-                path
-            )  # Get the files from the archive.
+                # File metadata.
+                for rels_file in files_by_content_type.get(RELS_MIMETYPE, []):
+                    annotations.add_rels(rels_file)
+                annotations.add_content_types(files_by_content_type)
+                self.must_preserve(files_by_content_type, annotations)
 
-            # File metadata.
-            for rels_file in files_by_content_type.get(RELS_MIMETYPE, []):
-                annotations.add_rels(rels_file)
-            annotations.add_content_types(files_by_content_type)
-            self.must_preserve(files_by_content_type, annotations)
+                # Read the model data.
+                for model_file in files_by_content_type.get(MODEL_MIMETYPE, []):
+                    try:
+                        document = xml.etree.ElementTree.ElementTree(file=model_file)
+                    except xml.etree.ElementTree.ParseError as e:
+                        log.error(f"3MF document in {path} is malformed: {str(e)}")
+                        self.safe_report({'ERROR'}, f"3MF document in {path} is malformed: {str(e)}")
+                        continue
+                    if document is None:
+                        # This file is corrupt or we can't read it. There is no error code to communicate this to Blender
+                        # though.
+                        continue  # Leave the scene empty / skip this file.
+                    root = document.getroot()
 
-            # Read the model data.
-            for model_file in files_by_content_type.get(MODEL_MIMETYPE, []):
-                try:
-                    document = xml.etree.ElementTree.ElementTree(file=model_file)
-                except xml.etree.ElementTree.ParseError as e:
-                    log.error(f"3MF document in {path} is malformed: {str(e)}")
-                    self.safe_report({'ERROR'}, f"3MF document in {path} is malformed: {str(e)}")
-                    continue
-                if document is None:
-                    # This file is corrupt or we can't read it. There is no error code to communicate this to Blender
-                    # though.
-                    continue  # Leave the scene empty / skip this file.
-                root = document.getroot()
+                    # Detect vendor-specific format (if materials are enabled)
+                    if self.import_materials:
+                        self.vendor_format = self.detect_vendor(root)
+                        if self.vendor_format:
+                            self.safe_report({'INFO'}, f"Detected {self.vendor_format.upper()} Slicer format")
+                            log.info(f"Will import {self.vendor_format} specific color data")
+                    else:
+                        self.vendor_format = None
+                        log.info("Material import disabled: importing geometry only")
 
-                # Detect vendor-specific format (if materials are enabled)
-                if self.import_materials:
-                    self.vendor_format = self.detect_vendor(root)
-                    if self.vendor_format:
-                        self.safe_report({'INFO'}, f"Detected {self.vendor_format.upper()} Slicer format")
-                        log.info(f"Will import {self.vendor_format} specific color data")
-                else:
-                    self.vendor_format = None
-                    log.info("Material import disabled: importing geometry only")
+                    # Activate extensions based on what's declared in the file
+                    required_ext = root.attrib.get("requiredextensions", "")
+                    if required_ext:
+                        resolved_namespaces = self.resolve_extension_prefixes(root, required_ext)
+                        for ns in resolved_namespaces:
+                            if ns in SUPPORTED_EXTENSIONS:
+                                self.extension_manager.activate(ns)
+                                log.info(f"Activated required extension: {ns}")
 
-                # Activate extensions based on what's declared in the file
-                required_ext = root.attrib.get("requiredextensions", "")
-                if required_ext:
-                    resolved_namespaces = self.resolve_extension_prefixes(root, required_ext)
-                    for ns in resolved_namespaces:
-                        if ns in SUPPORTED_EXTENSIONS:
-                            self.extension_manager.activate(ns)
-                            log.info(f"Activated required extension: {ns}")
-
-                # Validate required extensions
-                if not self.is_supported(root.attrib.get("requiredextensions", ""), root):
-                    unsupported = root.attrib.get("requiredextensions", "")
-                    resolved = self.resolve_extension_prefixes(root, unsupported)
-                    # Only show warning for truly unsupported extensions
-                    truly_unsupported = resolved - SUPPORTED_EXTENSIONS
-                    if truly_unsupported:
-                        # Try to get human-readable extension names
-                        ext_names = []
-                        for ns in truly_unsupported:
-                            ext = get_extension_by_namespace(ns)
-                            if ext:
-                                ext_names.append(f"{ext.name} ({ext.extension_type.value})")
-                            else:
-                                ext_names.append(ns)
-
-                        ext_list = ", ".join(ext_names) if ext_names else ", ".join(truly_unsupported)
-                        log.warning(f"3MF document in {path} requires unsupported extensions: {ext_list}")
-                        self.safe_report({'WARNING'}, f"3MF document requires unsupported extensions: {ext_list}")
-                    # Still continue processing even though the spec says not to. Our aim is to retrieve whatever
-                    # information we can.
-
-                # Check for recommended extensions (v1.3.0 spec addition)
-                recommended = root.attrib.get("recommendedextensions", "")
-                if recommended:
-                    resolved_recommended = self.resolve_extension_prefixes(root, recommended)
-                    for ns in resolved_recommended:
-                        if ns in SUPPORTED_EXTENSIONS:
-                            self.extension_manager.activate(ns)
-                            log.info(f"Activated recommended extension: {ns}")
-
-                    if not self.is_supported(recommended, root):
-                        truly_unsupported = resolved_recommended - SUPPORTED_EXTENSIONS
+                    # Validate required extensions
+                    if not self.is_supported(root.attrib.get("requiredextensions", ""), root):
+                        unsupported = root.attrib.get("requiredextensions", "")
+                        resolved = self.resolve_extension_prefixes(root, unsupported)
+                        # Only show warning for truly unsupported extensions
+                        truly_unsupported = resolved - SUPPORTED_EXTENSIONS
                         if truly_unsupported:
                             # Try to get human-readable extension names
-                            rec_names = []
+                            ext_names = []
                             for ns in truly_unsupported:
                                 ext = get_extension_by_namespace(ns)
                                 if ext:
-                                    rec_names.append(f"{ext.name} ({ext.extension_type.value})")
+                                    ext_names.append(f"{ext.name} ({ext.extension_type.value})")
                                 else:
-                                    rec_names.append(ns)
+                                    ext_names.append(ns)
 
-                            rec_list = ", ".join(rec_names) if rec_names else ", ".join(truly_unsupported)
-                            log.info(f"3MF document in {path} recommends extensions not fully supported: {rec_list}")
-                            self.safe_report(
-                                {'INFO'},
-                                f"Document recommends extensions not fully supported: {rec_list}"
-                            )
+                            ext_list = ", ".join(ext_names) if ext_names else ", ".join(truly_unsupported)
+                            log.warning(f"3MF document in {path} requires unsupported extensions: {ext_list}")
+                            self.safe_report({'WARNING'}, f"3MF document requires unsupported extensions: {ext_list}")
+                        # Still continue processing even though the spec says not to. Our aim is to retrieve whatever
+                        # information we can.
 
-                scale_unit = self.unit_scale(context, root)
-                self.resource_objects = {}
-                self.resource_materials = {}
-                self.orca_filament_colors = {}  # Maps filament index -> hex color
+                    # Check for recommended extensions (v1.3.0 spec addition)
+                    recommended = root.attrib.get("recommendedextensions", "")
+                    if recommended:
+                        resolved_recommended = self.resolve_extension_prefixes(root, recommended)
+                        for ns in resolved_recommended:
+                            if ns in SUPPORTED_EXTENSIONS:
+                                self.extension_manager.activate(ns)
+                                log.info(f"Activated recommended extension: {ns}")
 
-                # Try to read filament colors from metadata
-                self.read_orca_filament_colors(path)  # Orca project_settings.config
-                self.read_prusa_filament_colors(path)  # Blender's PrusaSlicer metadata
+                        if not self.is_supported(recommended, root):
+                            truly_unsupported = resolved_recommended - SUPPORTED_EXTENSIONS
+                            if truly_unsupported:
+                                # Try to get human-readable extension names
+                                rec_names = []
+                                for ns in truly_unsupported:
+                                    ext = get_extension_by_namespace(ns)
+                                    if ext:
+                                        rec_names.append(f"{ext.name} ({ext.extension_type.value})")
+                                    else:
+                                        rec_names.append(ns)
 
-                scene_metadata = self.read_metadata(root, scene_metadata)
-                self.read_materials(root)
-                self.read_objects(root)
-                self.build_items(root, scale_unit)
+                                rec_list = ", ".join(rec_names) if rec_names else ", ".join(truly_unsupported)
+                                log.info(
+                                    f"3MF document in {path} recommends extensions not fully supported: {rec_list}"
+                                )
+                                self.safe_report(
+                                    {'INFO'},
+                                    f"Document recommends extensions not fully supported: {rec_list}"
+                                )
 
-        scene_metadata.store(bpy.context.scene)
-        annotations.store()
+                    scale_unit = self.unit_scale(context, root)
+                    self.resource_objects = {}
+                    self.resource_materials = {}
+                    self.orca_filament_colors = {}  # Maps filament index -> hex color
 
-        # Zoom the camera to view the imported objects.
-        for area in bpy.context.screen.areas:
-            if area.type == "VIEW_3D":
-                for region in area.regions:
-                    if region.type == "WINDOW":
-                        try:
-                            # Since Blender 3.2:
-                            context = bpy.context.copy()
-                            context["area"] = area
-                            context["region"] = region
-                            context["edit_object"] = bpy.context.edit_object
-                            with bpy.context.temp_override(**context):
-                                bpy.ops.view3d.view_selected()
-                        except (
-                            AttributeError
-                        ):  # temp_override doesn't exist before Blender 3.2.
-                            # Before Blender 3.2:
-                            override = {
-                                "area": area,
-                                "region": region,
-                                "edit_object": bpy.context.edit_object,
-                            }
-                            bpy.ops.view3d.view_selected(override)
+                    # Try to read filament colors from metadata
+                    self.read_orca_filament_colors(path)  # Orca project_settings.config
+                    self.read_prusa_filament_colors(path)  # Blender's PrusaSlicer metadata
 
-        log.info(f"Imported {self.num_loaded} objects from 3MF files.")
-        self.safe_report({'INFO'}, f"Imported {self.num_loaded} objects from 3MF files")
+                    self._progress_update(25, "Reading materials and objects...")
+                    scene_metadata = self.read_metadata(root, scene_metadata)
+                    self.read_materials(root)
+                    self.read_objects(root)
+                    self._progress_update(60, "Building objects...")
+                    self.build_items(root, scale_unit)
 
-        return {"FINISHED"}
+            scene_metadata.store(bpy.context.scene)
+            annotations.store()
+
+            # Zoom the camera to view the imported objects.
+            for area in bpy.context.screen.areas:
+                if area.type == "VIEW_3D":
+                    for region in area.regions:
+                        if region.type == "WINDOW":
+                            try:
+                                # Since Blender 3.2:
+                                context = bpy.context.copy()
+                                context["area"] = area
+                                context["region"] = region
+                                context["edit_object"] = bpy.context.edit_object
+                                with bpy.context.temp_override(**context):
+                                    bpy.ops.view3d.view_selected()
+                            except (
+                                AttributeError
+                            ):  # temp_override doesn't exist before Blender 3.2.
+                                # Before Blender 3.2:
+                                override = {
+                                    "area": area,
+                                    "region": region,
+                                    "edit_object": bpy.context.edit_object,
+                                }
+                                bpy.ops.view3d.view_selected(override)
+
+            self._progress_update(100, "Finalizing import...")
+            log.info(f"Imported {self.num_loaded} objects from 3MF files.")
+            self.safe_report({'INFO'}, f"Imported {self.num_loaded} objects from 3MF files")
+
+            return {"FINISHED"}
+        finally:
+            self._progress_end()
 
     # The rest of the functions are in order of when they are called.
 
@@ -753,6 +818,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         Supports:
         - Core spec <basematerials> (standard 3MF)
         - Materials extension <m:colorgroup> (Orca/BambuStudio vendor format)
+        - PBR display properties (metallic, specular, translucent workflows)
 
         The materials will be stored in `self.resource_materials` until it gets used to build the items.
         :param root: The root of an XML document that may contain materials.
@@ -761,6 +827,24 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         if not self.import_materials:
             log.info("Material import disabled, skipping all material data")
             return
+
+        from .constants import MATERIAL_NAMESPACE
+        material_ns = {"m": MATERIAL_NAMESPACE}
+
+        # First, parse all PBR display properties into lookup dictionaries
+        # These are referenced by basematerials via displaypropertiesid attribute
+        pbr_metallic_props = self._read_pbr_metallic_properties(root, material_ns)
+        pbr_specular_props = self._read_pbr_specular_properties(root, material_ns)
+        pbr_translucent_props = self._read_pbr_translucent_properties(root, material_ns)
+
+        # Merge all display properties by ID
+        display_properties = {}
+        display_properties.update(pbr_metallic_props)
+        display_properties.update(pbr_specular_props)
+        display_properties.update(pbr_translucent_props)
+
+        if display_properties:
+            log.info(f"Parsed {len(display_properties)} PBR display property groups")
 
         # Import core spec basematerials
         for basematerials_item in root.iterfind(
@@ -776,6 +860,10 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 log.warning(f"Duplicate material ID: {material_id}")
                 self.safe_report({'WARNING'}, f"Duplicate material ID: {material_id}")
                 continue
+
+            # Check for PBR display properties reference
+            display_props_id = basematerials_item.attrib.get("displaypropertiesid")
+            pbr_props_list = display_properties.get(display_props_id, []) if display_props_id else []
 
             # Use a dictionary mapping indices to resources, because some indices may be skipped due to being invalid.
             self.resource_materials[material_id] = {}
@@ -821,10 +909,25 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                                          f"Invalid color for material {name} of resource {material_id}: {color}")
                         color = None  # Don't add a color for this material.
 
-                # Input is valid. Create a resource.
+                # Get PBR properties for this material index (if available)
+                pbr_data = pbr_props_list[index] if index < len(pbr_props_list) else {}
+
+                # Input is valid. Create a resource with PBR data.
                 self.resource_materials[material_id][index] = ResourceMaterial(
-                    name=name, color=color
+                    name=name,
+                    color=color,
+                    metallic=pbr_data.get("metallic"),
+                    roughness=pbr_data.get("roughness"),
+                    specular_color=pbr_data.get("specular_color"),
+                    glossiness=pbr_data.get("glossiness"),
+                    ior=pbr_data.get("ior"),
+                    attenuation=pbr_data.get("attenuation"),
+                    transmission=pbr_data.get("transmission"),
                 )
+
+                if pbr_data:
+                    log.debug(f"Material '{name}' has PBR properties: {pbr_data}")
+
                 index += 1
 
             if len(self.resource_materials[material_id]) == 0:
@@ -835,9 +938,6 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         # Import Materials extension colorgroups (vendor-specific: Orca/BambuStudio)
         # These are imported automatically when import_materials=True
         # Namespace: http://schemas.microsoft.com/3dmanufacturing/material/2015/02
-        from .constants import MATERIAL_NAMESPACE
-        material_ns = {"m": MATERIAL_NAMESPACE}
-
         for colorgroup_item in root.iterfind(
             "./3mf:resources/m:colorgroup",
             {**MODEL_NAMESPACES, **material_ns}
@@ -853,6 +953,10 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 log.warning(f"Duplicate material ID: {colorgroup_id}")
                 self.safe_report({'WARNING'}, f"Duplicate material ID: {colorgroup_id}")
                 continue
+
+            # Check for PBR display properties on colorgroups too
+            display_props_id = colorgroup_item.attrib.get("displaypropertiesid")
+            pbr_props_list = display_properties.get(display_props_id, []) if display_props_id else []
 
             # Colorgroups in Orca format: each group has one or more colors
             # We'll treat this as a material group with index 0 for the first color
@@ -879,11 +983,21 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                             self.safe_report({'WARNING'}, f"Invalid color: #{color}")
                             continue
 
-                        # Store as ResourceMaterial for compatibility
+                        # Get PBR properties for this color index
+                        pbr_data = pbr_props_list[index] if index < len(pbr_props_list) else {}
+
+                        # Store as ResourceMaterial with PBR data
                         mat_color = (red, green, blue, alpha)
                         self.resource_materials[colorgroup_id][index] = ResourceMaterial(
                             name=f"Orca Color {index}",
-                            color=mat_color
+                            color=mat_color,
+                            metallic=pbr_data.get("metallic"),
+                            roughness=pbr_data.get("roughness"),
+                            specular_color=pbr_data.get("specular_color"),
+                            glossiness=pbr_data.get("glossiness"),
+                            ior=pbr_data.get("ior"),
+                            attenuation=pbr_data.get("attenuation"),
+                            transmission=pbr_data.get("transmission"),
                         )
                         index += 1
 
@@ -897,6 +1011,211 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                     self.safe_report({'INFO'}, f"Imported Orca color zone: {index} color(s)")
             elif colorgroup_id in self.resource_materials:
                 del self.resource_materials[colorgroup_id]  # Don't leave empty groups
+
+    def _read_pbr_metallic_properties(self, root: xml.etree.ElementTree.Element,
+                                       material_ns: Dict[str, str]) -> Dict[str, List[Dict]]:
+        """
+        Parse <m:pbmetallicdisplayproperties> elements from the 3MF document.
+
+        The metallic workflow defines materials by:
+        - metallicness: 0.0 (dielectric) to 1.0 (pure metal)
+        - roughness: 0.0 (smooth/glossy) to 1.0 (rough/matte)
+
+        These map directly to Blender's Principled BSDF Metallic and Roughness inputs.
+
+        :param root: XML root element
+        :param material_ns: Namespace dict for materials extension
+        :return: Dict mapping displaypropertiesid -> list of property dicts (one per material index)
+        """
+        props = {}
+        for display_props in root.iterfind(
+            "./3mf:resources/m:pbmetallicdisplayproperties",
+            {**MODEL_NAMESPACES, **material_ns}
+        ):
+            try:
+                props_id = display_props.attrib["id"]
+            except KeyError:
+                continue
+
+            material_props = []
+            for pbmetallic in display_props.iterfind("./m:pbmetallic", material_ns):
+                prop_dict = {"type": "metallic"}
+
+                # Parse metallicness (0-1, default 0)
+                try:
+                    metallicness = float(pbmetallic.attrib.get("metallicness", "0"))
+                    prop_dict["metallic"] = max(0.0, min(1.0, metallicness))
+                except ValueError:
+                    prop_dict["metallic"] = 0.0
+
+                # Parse roughness (0-1, default 1)
+                try:
+                    roughness = float(pbmetallic.attrib.get("roughness", "1"))
+                    prop_dict["roughness"] = max(0.0, min(1.0, roughness))
+                except ValueError:
+                    prop_dict["roughness"] = 1.0
+
+                # Get material name if specified
+                prop_dict["name"] = pbmetallic.attrib.get("name", "")
+
+                material_props.append(prop_dict)
+                log.debug(f"Parsed metallic PBR: metallic={prop_dict['metallic']}, roughness={prop_dict['roughness']}")
+
+            if material_props:
+                props[props_id] = material_props
+                log.info(f"Imported {len(material_props)} metallic display properties (ID: {props_id})")
+
+        return props
+
+    def _read_pbr_specular_properties(self, root: xml.etree.ElementTree.Element,
+                                       material_ns: Dict[str, str]) -> Dict[str, List[Dict]]:
+        """
+        Parse <m:pbspeculardisplayproperties> elements from the 3MF document.
+
+        The specular workflow defines materials by:
+        - specularcolor: sRGB color for specular reflectance at normal incidence (default #383838 = 4%)
+        - glossiness: 0.0 (rough) to 1.0 (smooth) - this is the INVERSE of roughness
+
+        For Blender's Principled BSDF:
+        - glossiness converts to roughness = 1.0 - glossiness
+        - specularcolor influences the Specular IOR Level (simplified mapping)
+
+        :param root: XML root element
+        :param material_ns: Namespace dict for materials extension
+        :return: Dict mapping displaypropertiesid -> list of property dicts
+        """
+        props = {}
+        for display_props in root.iterfind(
+            "./3mf:resources/m:pbspeculardisplayproperties",
+            {**MODEL_NAMESPACES, **material_ns}
+        ):
+            try:
+                props_id = display_props.attrib["id"]
+            except KeyError:
+                continue
+
+            material_props = []
+            for pbspecular in display_props.iterfind("./m:pbspecular", material_ns):
+                prop_dict = {"type": "specular"}
+
+                # Parse specular color (default #383838 = 4% reflectance for dielectrics)
+                specular_color_hex = pbspecular.attrib.get("specularcolor", "#383838")
+                specular_color_hex = specular_color_hex.lstrip("#")
+                try:
+                    if len(specular_color_hex) >= 6:
+                        sr = int(specular_color_hex[0:2], 16) / 255.0
+                        sg = int(specular_color_hex[2:4], 16) / 255.0
+                        sb = int(specular_color_hex[4:6], 16) / 255.0
+                        prop_dict["specular_color"] = (sr, sg, sb)
+                    else:
+                        prop_dict["specular_color"] = (0.22, 0.22, 0.22)  # ~4% in linear
+                except ValueError:
+                    prop_dict["specular_color"] = (0.22, 0.22, 0.22)
+
+                # Parse glossiness (0-1, default 0) - will be converted to roughness
+                try:
+                    glossiness = float(pbspecular.attrib.get("glossiness", "0"))
+                    prop_dict["glossiness"] = max(0.0, min(1.0, glossiness))
+                    # Convert glossiness to roughness for Blender
+                    prop_dict["roughness"] = 1.0 - prop_dict["glossiness"]
+                except ValueError:
+                    prop_dict["glossiness"] = 0.0
+                    prop_dict["roughness"] = 1.0
+
+                prop_dict["name"] = pbspecular.attrib.get("name", "")
+                material_props.append(prop_dict)
+                log.debug(f"Parsed specular PBR: glossiness={prop_dict['glossiness']}, specular={prop_dict['specular_color']}")
+
+            if material_props:
+                props[props_id] = material_props
+                log.info(f"Imported {len(material_props)} specular display properties (ID: {props_id})")
+
+        return props
+
+    def _read_pbr_translucent_properties(self, root: xml.etree.ElementTree.Element,
+                                          material_ns: Dict[str, str]) -> Dict[str, List[Dict]]:
+        """
+        Parse <m:translucentdisplayproperties> elements from the 3MF document.
+
+        Translucent materials are defined by:
+        - attenuation: RGB coefficients for light absorption (reciprocal meters)
+        - refractiveindex: IOR per RGB channel (typically ~1.45 for glass)
+        - roughness: Surface roughness for blurry refractions
+
+        For Blender's Principled BSDF:
+        - Maps to Transmission = 1.0 (fully transmissive)
+        - IOR from refractiveindex (uses average of RGB)
+        - Roughness as-is
+        - Attenuation can inform volume absorption color
+
+        :param root: XML root element
+        :param material_ns: Namespace dict for materials extension
+        :return: Dict mapping displaypropertiesid -> list of property dicts
+        """
+        props = {}
+        for display_props in root.iterfind(
+            "./3mf:resources/m:translucentdisplayproperties",
+            {**MODEL_NAMESPACES, **material_ns}
+        ):
+            try:
+                props_id = display_props.attrib["id"]
+            except KeyError:
+                continue
+
+            material_props = []
+            for translucent in display_props.iterfind("./m:translucent", material_ns):
+                prop_dict = {"type": "translucent", "transmission": 1.0}
+
+                # Check for custom blender_transmission attribute (for round-trip)
+                # 3MF spec doesn't have transmission - it's assumed 1.0 for translucent
+                blender_transmission = translucent.attrib.get("blender_transmission")
+                if blender_transmission:
+                    try:
+                        prop_dict["transmission"] = float(blender_transmission)
+                    except ValueError:
+                        pass
+
+                # Parse attenuation (RGB coefficients, space-separated)
+                attenuation_str = translucent.attrib.get("attenuation", "0 0 0")
+                try:
+                    attenuation_values = [float(x) for x in attenuation_str.split()]
+                    if len(attenuation_values) >= 3:
+                        prop_dict["attenuation"] = tuple(attenuation_values[:3])
+                    else:
+                        prop_dict["attenuation"] = (0.0, 0.0, 0.0)
+                except ValueError:
+                    prop_dict["attenuation"] = (0.0, 0.0, 0.0)
+
+                # Parse refractive index (RGB values, space-separated, default "1 1 1")
+                ior_str = translucent.attrib.get("refractiveindex", "1 1 1")
+                try:
+                    ior_values = [float(x) for x in ior_str.split()]
+                    if len(ior_values) >= 3:
+                        # Use average IOR for Blender (it doesn't support per-channel IOR)
+                        prop_dict["ior"] = sum(ior_values[:3]) / 3.0
+                    elif len(ior_values) == 1:
+                        prop_dict["ior"] = ior_values[0]
+                    else:
+                        prop_dict["ior"] = 1.45  # Default glass IOR
+                except ValueError:
+                    prop_dict["ior"] = 1.45
+
+                # Parse roughness (0-1, default 0 for perfectly smooth glass)
+                try:
+                    roughness = float(translucent.attrib.get("roughness", "0"))
+                    prop_dict["roughness"] = max(0.0, min(1.0, roughness))
+                except ValueError:
+                    prop_dict["roughness"] = 0.0
+
+                prop_dict["name"] = translucent.attrib.get("name", "")
+                material_props.append(prop_dict)
+                log.debug(f"Parsed translucent PBR: ior={prop_dict['ior']}, roughness={prop_dict['roughness']}, attenuation={prop_dict['attenuation']}")
+
+            if material_props:
+                props[props_id] = material_props
+                log.info(f"Imported {len(material_props)} translucent display properties (ID: {props_id})")
+
+        return props
 
     def read_objects(self, root: xml.etree.ElementTree.Element) -> None:
         """
@@ -990,12 +1309,16 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 value=object_node.attrib.get("type", "model"),
             )
 
+            # Read triangle sets if present
+            triangle_sets = self.read_triangle_sets(object_node)
+
             self.resource_objects[objectid] = ResourceObject(
                 vertices=vertices,
                 triangles=triangles,
                 materials=materials,
                 components=components,
                 metadata=metadata,
+                triangle_sets=triangle_sets,
             )
 
     def read_vertices(self, object_node: xml.etree.ElementTree.Element) -> List[Tuple[float, float, float]]:
@@ -1112,6 +1435,80 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 self.safe_report({'WARNING'}, f"Vertex reference is not an integer: {e}")
                 continue  # No fallback this time. Leave out the entire triangle.
         return vertices, materials
+
+    def read_triangle_sets(self, object_node: xml.etree.ElementTree.Element) -> Dict[str, List[int]]:
+        """
+        Reads triangle sets from an XML node of an object.
+
+        Triangle sets are groups of triangles with a name and unique identifier.
+        They are used for selection workflows and property assignment.
+        Introduced in 3MF Core Spec v1.3.0.
+
+        Supports both <ref index="N"/> and <refrange startindex="N" endindex="M"/> elements.
+
+        :param object_node: An <object> element from the 3dmodel.model file.
+        :return: Dictionary mapping triangle set names to lists of triangle indices.
+        """
+        triangle_sets = {}
+
+        # Look for triangle sets under <mesh><trianglesets>
+        for triangleset in object_node.iterfind(
+            "./3mf:mesh/t:trianglesets/t:triangleset", MODEL_NAMESPACES
+        ):
+            attrib = triangleset.attrib
+
+            # Per spec: both name and identifier are required, but we gracefully handle missing
+            set_name = attrib.get("name")
+            if not set_name:
+                # Fall back to identifier if name missing
+                set_name = attrib.get("identifier")
+            if not set_name:
+                log.warning("Triangle set missing name attribute, skipping")
+                self.safe_report({'WARNING'}, "Triangle set missing name attribute")
+                continue
+
+            # Cache set name to protect Unicode characters
+            set_name = str(set_name)
+
+            # Parse triangle indices from child <ref> and <refrange> elements
+            triangle_indices = []
+
+            # Handle <ref index="N"/> elements
+            for ref in triangleset.iterfind("t:ref", MODEL_NAMESPACES):
+                try:
+                    index = int(ref.attrib.get("index", "-1"))
+                    if index < 0:
+                        log.warning(f"Triangle set '{set_name}' contains negative triangle index")
+                        continue
+                    triangle_indices.append(index)
+                except (KeyError, ValueError) as e:
+                    log.warning(f"Triangle set '{set_name}' contains invalid ref: {e}")
+                    continue
+
+            # Handle <refrange startindex="N" endindex="M"/> elements (inclusive range)
+            for refrange in triangleset.iterfind("t:refrange", MODEL_NAMESPACES):
+                try:
+                    start_index = int(refrange.attrib.get("startindex", "-1"))
+                    end_index = int(refrange.attrib.get("endindex", "-1"))
+                    if start_index < 0 or end_index < 0:
+                        log.warning(f"Triangle set '{set_name}' contains invalid refrange indices")
+                        continue
+                    if end_index < start_index:
+                        log.warning(f"Triangle set '{set_name}' has refrange with end < start")
+                        continue
+                    # Per spec: range is inclusive on both ends
+                    triangle_indices.extend(range(start_index, end_index + 1))
+                except (KeyError, ValueError) as e:
+                    log.warning(f"Triangle set '{set_name}' contains invalid refrange: {e}")
+                    continue
+
+            if triangle_indices:
+                # Remove duplicates per spec: "A consumer MUST ignore duplicate references"
+                triangle_indices = list(dict.fromkeys(triangle_indices))
+                triangle_sets[set_name] = triangle_indices
+                log.info(f"Loaded triangle set '{set_name}' with {len(triangle_indices)} triangles")
+
+        return triangle_sets
 
     def read_components(self, object_node: xml.etree.ElementTree.Element) -> List[Component]:
         """
@@ -1236,12 +1633,16 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 value=object_node.attrib.get("type", "model"),
             )
 
+            # Read triangle sets if present
+            triangle_sets = self.read_triangle_sets(object_node)
+
             self.resource_objects[objectid] = ResourceObject(
                 vertices=vertices,
                 triangles=triangles,
                 materials=materials,
                 components=components,
                 metadata=metadata,
+                triangle_sets=triangle_sets,
             )
             log.info(
                 f"Loaded object {objectid} from {source_path} "
@@ -1354,7 +1755,9 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             self.resource_materials[material_id] = {
                 0: ResourceMaterial(
                     name=color_name,
-                    color=color
+                    color=color,
+                    metallic=None, roughness=None, specular_color=None,
+                    glossiness=None, ior=None, attenuation=None, transmission=None
                 )
             }
             log.info(f"Created paint material for filament {filament_index} (code: {paint_code})")
@@ -1483,6 +1886,113 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         log.warning(f"Could not parse hex color: {hex_color}")
         return (0.8, 0.8, 0.8, 1.0)  # Default gray
 
+    def _apply_pbr_to_principled(self, principled: bpy_extras.node_shader_utils.PrincipledBSDFWrapper,
+                                  material: bpy.types.Material,
+                                  resource_material: ResourceMaterial) -> None:
+        """
+        Apply PBR properties from a 3MF ResourceMaterial to a Blender Principled BSDF material.
+
+        This handles:
+        - Metallic workflow (metallicness, roughness) -> Metallic, Roughness
+        - Specular workflow (specularcolor, glossiness) -> Specular IOR Level, Roughness
+        - Translucent materials (IOR, attenuation, transmission) -> IOR, Transmission, Volume absorption
+
+        :param principled: PrincipledBSDFWrapper for the material
+        :param material: The Blender material being configured
+        :param resource_material: The ResourceMaterial with PBR data from 3MF
+        """
+        has_pbr = False
+
+        # Apply metallic workflow properties
+        if resource_material.metallic is not None:
+            principled.metallic = resource_material.metallic
+            has_pbr = True
+            log.debug(f"Applied metallic={resource_material.metallic} to material '{resource_material.name}'")
+
+        # Apply roughness (from either metallic or specular workflow)
+        if resource_material.roughness is not None:
+            principled.roughness = resource_material.roughness
+            has_pbr = True
+            log.debug(f"Applied roughness={resource_material.roughness} to material '{resource_material.name}'")
+
+        # Apply specular workflow properties
+        if resource_material.specular_color is not None:
+            # Store original specular color as custom property for perfect round-trip
+            material["3mf_specular_color"] = list(resource_material.specular_color)
+
+            # Map specular color to Principled BSDF's Specular IOR Level
+            # The specular color intensity approximates the specular level
+            # Default dielectric is ~4% reflectance (#383838 = 0.22 linear)
+            spec_r, spec_g, spec_b = resource_material.specular_color
+            # Calculate approximate specular level from color intensity
+            # Principled BSDF expects 0.0-1.0 where 0.5 = default 4% Fresnel
+            specular_intensity = (spec_r + spec_g + spec_b) / 3.0
+            # Scale: 0.22 (4% default) maps to 0.5, scale accordingly
+            specular_level = specular_intensity / 0.44  # Normalize around 0.5
+            principled.specular = min(1.0, max(0.0, specular_level))
+            has_pbr = True
+            log.debug(f"Applied specular_level={principled.specular} (from color {resource_material.specular_color}) to material '{resource_material.name}'") 
+
+        # Apply translucent/glass properties
+        if resource_material.transmission is not None and resource_material.transmission > 0:
+            # Store transmission as custom property for round-trip preservation
+            # (3MF translucent workflow assumes full transmission, so we preserve actual value)
+            material["3mf_transmission"] = resource_material.transmission
+
+            # Enable transmission (glass-like behavior)
+            # Access the node tree directly for transmission since wrapper may not expose it
+            if material.node_tree:
+                for node in material.node_tree.nodes:
+                    if node.type == 'BSDF_PRINCIPLED':
+                        # Blender 4.0+ uses 'Transmission Weight' instead of 'Transmission'
+                        if 'Transmission Weight' in node.inputs:
+                            node.inputs['Transmission Weight'].default_value = resource_material.transmission
+                        elif 'Transmission' in node.inputs:
+                            node.inputs['Transmission'].default_value = resource_material.transmission
+                        break
+            has_pbr = True
+            log.debug(f"Applied transmission={resource_material.transmission} to material '{resource_material.name}'")
+
+        # Apply IOR for translucent materials
+        if resource_material.ior is not None:
+            principled.ior = resource_material.ior
+            has_pbr = True
+            log.debug(f"Applied IOR={resource_material.ior} to material '{resource_material.name}'")
+
+        # Apply attenuation as volume absorption (for translucent materials)
+        if resource_material.attenuation is not None:
+            att_r, att_g, att_b = resource_material.attenuation
+            if att_r > 0 or att_g > 0 or att_b > 0:
+                # Convert attenuation to absorption color
+                # Higher attenuation = more absorption = darker color for that channel
+                # Use inverse relationship: low attenuation = bright color pass-through
+                # Clamp to avoid division issues
+                max_att = max(att_r, att_g, att_b, 0.001)
+                # Normalize and invert: high attenuation -> low color value
+                abs_r = 1.0 - min(1.0, att_r / (max_att * 2))
+                abs_g = 1.0 - min(1.0, att_g / (max_att * 2))
+                abs_b = 1.0 - min(1.0, att_b / (max_att * 2))
+
+                # Store attenuation as custom property for round-trip preservation
+                material["3mf_attenuation"] = list(resource_material.attenuation)
+
+                # For visual representation, tint the base color based on attenuation
+                # This gives a rough approximation of the absorption effect
+                if resource_material.transmission and resource_material.transmission > 0.5:
+                    # For highly transmissive materials, use attenuation to tint
+                    current_color = list(principled.base_color)
+                    principled.base_color = (
+                        current_color[0] * abs_r,
+                        current_color[1] * abs_g,
+                        current_color[2] * abs_b,
+                    )
+
+                has_pbr = True
+                log.debug(f"Applied attenuation={resource_material.attenuation} to material '{resource_material.name}'")
+
+        if has_pbr:
+            log.info(f"Applied PBR properties to material '{resource_material.name}'")
+
     def parse_transformation(self, transformation_str: str) -> mathutils.Matrix:
         """
         Parses a transformation matrix as written in the 3MF files.
@@ -1571,7 +2081,12 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         :return: A sequence of Blender Objects that need to be placed in the
         scene. Each mesh gets transformed appropriately.
         """
-        for build_item in root.iterfind("./3mf:build/3mf:item", MODEL_NAMESPACES):
+        build_items = list(root.iterfind("./3mf:build/3mf:item", MODEL_NAMESPACES))
+        total_items = len(build_items)
+        for idx, build_item in enumerate(build_items):
+            if total_items > 0:
+                progress = 60 + int(((idx + 1) / total_items) * 35)
+                self._progress_update(progress, f"Building {idx + 1}/{total_items} objects...")
             try:
                 objectid = build_item.attrib["objectid"]
                 resource_object = self.resource_objects[objectid]
@@ -1633,7 +2148,10 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             resource_object.metadata.store(mesh)
 
             # Mapping resource materials to indices in the list of materials for this specific mesh.
+            # Build material index array for batch assignment (much faster than per-face assignment)
             materials_to_index = {}
+            material_indices = [0] * len(resource_object.materials)  # Pre-allocate
+
             for triangle_index, triangle_material in enumerate(
                 resource_object.materials
             ):
@@ -1660,6 +2178,9 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                         principled.base_color = triangle_material.color[:3]
                         principled.alpha = triangle_material.color[3]
 
+                        # Apply PBR properties from 3MF Materials Extension
+                        self._apply_pbr_to_principled(principled, material, triangle_material)
+
                     self.resource_to_material[triangle_material] = material
                 else:
                     material = self.resource_to_material[triangle_material]
@@ -1675,10 +2196,45 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                     mesh.materials.append(material)
                     materials_to_index[triangle_material] = new_index
 
-                # Assign the material to the correct triangle.
-                mesh.polygons[triangle_index].material_index = materials_to_index[
-                    triangle_material
-                ]
+                # Store material index for batch assignment
+                material_indices[triangle_index] = materials_to_index[triangle_material]
+
+            # Batch assign material indices using foreach_set (much faster than per-face loop)
+            if materials_to_index:  # Only if we have materials to assign
+                mesh.polygons.foreach_set("material_index", material_indices)
+
+            # Apply triangle sets as integer face attributes
+            # Face maps were removed in Blender 4.0, use custom attributes instead
+            if resource_object.triangle_sets:
+                # Create an integer attribute to store triangle set membership
+                # Each face gets the index of its triangle set (0 = no set, 1+ = set index)
+                # Also store set names as a custom property on the mesh
+                set_names = list(resource_object.triangle_sets.keys())
+                if set_names:
+                    # Store triangle set names as mesh custom property
+                    mesh["3mf_triangle_set_names"] = set_names
+
+                    # Create integer attribute for face->set mapping
+                    attr_name = "3mf_triangle_set"
+                    if attr_name not in mesh.attributes:
+                        mesh.attributes.new(name=attr_name, type='INT', domain='FACE')
+
+                    # Build array of set indices for bulk assignment
+                    # This is much faster than per-face loops for large meshes
+                    num_faces = len(mesh.polygons)
+                    set_values = [0] * num_faces  # Pre-allocate list, 0 = no set
+
+                    # Assign faces to their triangle sets (1-indexed to reserve 0 for "no set")
+                    triangle_set_items = resource_object.triangle_sets.items()
+                    for set_idx, (set_name, triangle_indices) in enumerate(triangle_set_items, start=1):
+                        for tri_idx in triangle_indices:
+                            if 0 <= tri_idx < num_faces:
+                                set_values[tri_idx] = set_idx
+
+                    # Bulk assign using foreach_set (much faster than individual assignments)
+                    mesh.attributes[attr_name].data.foreach_set("value", set_values)
+
+                    log.info(f"Applied {len(resource_object.triangle_sets)} triangle sets as face attributes")
 
         # Only create a Blender object if there's actual mesh data.
         # Component-only objects (containers) don't need visible representation.

@@ -71,6 +71,8 @@ class TestImport3MF(unittest.TestCase):
         # Initialize import options (new properties added for extension framework)
         self.importer.import_materials = True
         self.importer.vendor_format = None
+        self.importer.origin_to_geometry = False  # Initialize origin to geometry option
+        self.importer.import_location = 'ORIGIN'  # Initialize import location option
 
         self.single_triangle = io_mesh_3mf.import_3mf.ResourceObject(  # A model with just a single triangle.
             vertices=[(0.0, 0.0, 0.0), (5.0, 0.0, 1.0), (0.0, 5.0, 1.0)],

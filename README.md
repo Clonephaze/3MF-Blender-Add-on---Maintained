@@ -1,85 +1,81 @@
 # Blender 3MF Format
 
-> [!NOTE]  
-> This repository is an actively maintained fork of the original Blender 3MF add-on, updated for modern Blender versions (4.2+) and ongoing development.
+> **Note**  
+> This is an actively maintained fork of the [original Blender 3MF add-on](https://github.com/Ghostkeeper/Blender3mfFormat), updated for modern Blender versions (4.2+) and ongoing development.
 
-This is a Blender add-on for importing and exporting **3MF (3D Manufacturing Format)** files.
+This is an add-on for Blender for importing and exporting **3MF (3D Manufacturing Format)** files.
 
-3MF is a modern interchange format for additive manufacturing. Unlike STL, it is designed to carry not only geometry, but also units, materials, colors, metadata, and other information relevant to real 3D printing workflows. In this context, Blender serves as a modeling and preparation tool upstream of slicers and manufacturing software.
+3MF is a modern format for 3D printing. Unlike STL, it carries more than geometry: units, materials, colors, metadata, and slicer-relevant information. Blender sits upstream of slicers in many workflows, and this add-on helps make that process smooth and predictable.
 
-The goal of this add-on is to make **Blender a practical and reliable tool in 3MF-based workflows**, with spec-aligned behavior and useful interoperability with modern slicers.
+The goal is simple: make **Blender a reliable, spec-compliant tool in real 3MF workflows**, with solid behavior and interoperability with modern slicers.
 
 ---
 
 ## Status
 
-- ✅ Compatible with **Blender 4.2+**
-- ✅ Actively maintained
-- ✅ Production-ready
+- Compatible with **Blender 4.2+**
+- Actively maintained
 
-For Blender versions **2.80–3.6**, use the [original repository releases](https://github.com/Ghostkeeper/Blender3mfFormat/releases/latest).
+For Blender versions **2.80–3.6**, see the [original releases](https://github.com/Ghostkeeper/Blender3mfFormat/releases/latest).
 
 ---
 
 ## Features
 
 - Import and export 3MF files
+- Material and color support using modern Blender material APIs
+- Embedded viewport thumbnails in exported 3MF files
 - Correct handling of units and build structure
-- Material and color support compatible with modern Blender material APIs
-- **Thumbnail generation** - viewport snapshot embedded in exported 3MF files
-- Verified round-trip import/export
-- Scriptable import/export operators
-- Extensive automated testing
+- Multiple 3MF spec-compliant extensions:
+  - Core Materials (basematerials)
+  - Production Extension (multi-object builds, color zones)
+  - Vendor extensions for Orca Slicer, BambuStudio, and PrusaSlicer
 
 ### Slicer Compatibility
 
-| Slicer | Round-Trip Support | Notes |
-|--------|-------------------|-------|
-| **Orca Slicer / BambuStudio** | ✅ Full | Multi-color zones, materials, and metadata preserved |
-| **PrusaSlicer** | ✅ Full | Multi-material zones and colors fully preserved with MMU export format |
-| **Standard 3MF** | ✅ Full | Geometry, materials, and metadata |
+| Slicer                        | Round-Trip Support | Notes                                                                                          |
+| ----------------------------- | ----------------- | ---------------------------------------------------------------------------------------------- |
+| **Orca Slicer / BambuStudio** | Partial           | Per-triangle material/color zones preserved. Does **not** reproduce slicer paint workflows    |
+| **PrusaSlicer**               | Partial           | Per-triangle material/color zones preserved. No Blender paint-mode support                     |
+| **Standard 3MF**              | Full              | Geometry, materials, metadata                                                                  |
 
 ---
 
 ## Installation
 
+> **Note**  
+> This add-on is under review for inclusion on the official Blender Extensions platform: [Approval Queue](https://extensions.blender.org/approval-queue/threemf-io/)
+
 ### Blender 4.2+
 
-**Option 1: Drag & Drop (Recommended)**
-1. Download this repository as a ZIP
+**Option 1: Drag & Drop (recommended)**
+1. Download the ZIP
 2. Open Blender
-3. Drag the `io_mesh_3mf` folder into the Blender window
-4. Confirm installation and enable the add-on
+3. Drag the `io_mesh_3mf` folder into Blender
+4. Enable the add-on
 
 **Option 2: Preferences**
-1. Extract the ZIP
+1. Extract ZIP
 2. Open *Edit → Preferences → Add-ons*
-3. Click *Install…* and select the `io_mesh_3mf` folder
+3. Click *Install…* and select `io_mesh_3mf`
 4. Enable **Import-Export: 3MF format**
-
-**Option 3: Development Setup**
-Symlink or copy `io_mesh_3mf` into Blender’s add-ons directory:
-- Windows: `%APPDATA%\\Blender Foundation\\Blender\\4.5\\scripts\\addons\\`
-- macOS: `~/Library/Application Support/Blender/4.5/scripts/addons/`
-- Linux: `~/.config/blender/4.5/scripts/addons/`
-
-Reload scripts and enable the add-on.
 
 ---
 
 ## Usage
 
-After installation, the following menu entries are available:
-
+Menus after installation:
 - **File → Import → 3D Manufacturing Format (.3mf)**
 - **File → Export → 3D Manufacturing Format (.3mf)**
 
-![Screenshot](screenshot.png)
-
 ### Import Options
-- **Scale**: Uniform scale applied from the scene origin
-- **Import Materials**: Import material colors from the file (disable for geometry-only import)
-- **Import Vendor Extensions**: Import vendor-specific data like Orca Slicer color zones (disable for standard-only import)
+- **Scale** – Uniform scale applied from the scene origin
+- **Import Materials** – Import material colors (disable for geometry-only)
+- **Placement** – Choose object placement:
+  - **Keep** – Keep positions from the 3MF file
+  - **World Origin** – Move to scene origin
+  - **3D Cursor** – Place at the current 3D cursor
+- **Reset Object Origins** – Reset each object’s origin before placement
 
 ### Export Options
 - **Selection Only**
@@ -87,110 +83,86 @@ After installation, the following menu entries are available:
 - **Apply Modifiers**
 - **Coordinate Precision**
 - **Export Hidden Objects**
-- **Multi-Material Format**: Choose between Standard 3MF, Orca Slicer, or PrusaSlicer MMU export formats
-  - **Orca Slicer**: Production Extension with paint_color attributes
-  - **PrusaSlicer**: slic3rpe:mmu_segmentation attributes with color metadata for perfect round-trips
+- **Multi-Material Format** – Per-triangle material assignment using Standard 3MF, Orca/Bambu Slicer, or PrusaSlicer MMU
+  - **Orca Slicer** – `Production Extension` with `paint_color` attributes
+  - **PrusaSlicer** – `slic3rpe:mmu_segmentation` attributes for color metadata and round-trip fidelity
 
 ---
 
 ## Development & Contributing
 
-For detailed feature status, upcoming improvements, and contribution opportunities, see the **[Development Roadmap](ROADMAP.md)**.
+Current features and roadmap are in **[ROADMAP.md](ROADMAP.md)**
 
-Key areas:
-- **Completed**: PrusaSlicer MMU export, Orca Slicer compatibility, automatic thumbnails
-- **In Progress**: Triangle Sets Extension, texture support
-- **Help Wanted**: Testing with different slicers, documenting vendor formats
-
----
-
-## Testing
-
-This add-on includes comprehensive automated testing to ensure reliability.
-
-See [`tests/README.md`](tests/README.md) for detailed testing information.
+- Completed: PrusaSlicer MMU export, Orca Slicer compatibility, automatic thumbnails
+- In progress: Triangle Sets Extension
 
 ---
 
 ## 3MF Specification Support
 
-This add-on targets the **3MF Core Specification v1.3.0**.
+This add-on targets **3MF Core Specification v1.3.0** but is ready for v1.4.0. It includes checks to warn or stop on 1.4-specific conditions, which currently pass since 1.3.0 does not enforce them.
 
 ### Behavior Notes
 
-> **NOTE**  
-> The 3MF specification requires consumers to fail hard on malformed files. In practice, this add-on favors recoverability in a DCC environment.
-
-- Core requirements (ZIP/OPC structure, model XML, units, build definitions) are enforced on export.
-- On import, partially malformed files may load with warnings rather than failing entirely.
-- When conflicts arise while importing multiple 3MF files into a single scene, conflicting metadata may be skipped to preserve scene integrity.
+The 3MF spec requires consumers to fail hard on malformed files. In Blender, this is often impractical, so the add-on handles recoverable issues gracefully:
+- Core requirements (ZIP/OPC structure, model XML, units, build definitions) are enforced on export
+- Partial or malformed files may import with warnings instead of failing
+- Conflicting metadata from multiple files may be skipped to preserve scene integrity
 
 ### Extensions
 
-This add-on supports several 3MF extensions for enhanced interoperability with slicers and manufacturing software.
+Supported 3MF extensions for improved slicer interoperability:
+| Extension                        | Namespace                                                         | Support |
+| -------------------------------- | ----------------------------------------------------------------- | ------- |
+| Core Materials (`basematerials`) | Core Spec v1.3.0                                                  | Full    |
+| Production Extension             | `http://schemas.microsoft.com/3dmanufacturing/production/2015/06` | Full    |
+| Materials Extension              | `http://schemas.microsoft.com/3dmanufacturing/material/2015/02`   | Partial |
 
-#### Supported Extensions
+---
 
-| Extension | Namespace | Support Level |
-|-----------|-----------|---------------|
-| **Core Materials** (`basematerials`) | Core Spec v1.3.0 | ✅ Full |
-| **Production Extension** | `http://schemas.microsoft.com/3dmanufacturing/production/2015/06` | ✅ Full |
-| **Materials Extension** | `http://schemas.microsoft.com/3dmanufacturing/material/2015/02` | 🔶 Partial |
+## Orca Slicer / BambuStudio
 
-#### Orca Slicer / BambuStudio Compatibility
+Per-triangle material handling for Orca Slicer and BambuStudio files. Does **not** include slicer paint-mode workflows.
 
-This add-on includes special support for **Orca Slicer** and **BambuStudio** multi-color workflows:
-
-**Import:**
+**Import**
 - Reads multi-file Production Extension structure (`3D/Objects/*.model`)
 - Imports `paint_color` attributes as Blender materials
-- Reads actual filament colors from `Metadata/project_settings.config`
-- Supports files exported from Orca Slicer, BambuStudio, and PrusaSlicer
+- Loads filament colors from `Metadata/project_settings.config`
+- Supports Orca, BambuStudio, and PrusaSlicer files
 
-**Export (Orca Slicer Color Zones option):**
-- Exports using Production Extension multi-file structure
-- Writes per-triangle `paint_color` attributes for filament assignment
+**Export**
+- Writes multi-file Production Extension structure
+- Exports per-triangle `paint_color` attributes
 - Generates `project_settings.config` with filament colors
-- Creates proper OPC relationships for slicer compatibility
-- Embeds viewport thumbnail for file preview
+- Creates correct OPC relationships
+- Embeds viewport thumbnail previews
 
-**Automatically loads filament colors from metadata for accurate material recreation
-- Compatible with files exported from both Blender and PrusaSlicer
+Filament colors reload automatically from metadata for accurate material recreation.
 
-**Export (PrusaSlicer MMU Format):**
-- Exports face colors with `slic3rpe:mmu_segmentation` attributes
-- Stores actual RGB colors in `Metadata/blender_filament_colors.txt`
-- Perfect round-trip: Blender → PrusaSlicer → Blender maintains exact colors
-- Compatible with PrusaSlicer's multi-material painting tools
+---
 
-> **NOTE**  
-> Previous versions could not preserve colors on round-trip. Version 1.2.4+ now includes color metadata export, enabling full-fidelity workflows between Blender and PrusaSlicer MMU painting
-#### PrusaSlicer Compatibility
+## PrusaSlicer Compatibility
 
-**Import:**
-- Reads `slic3rpe:mmu_segmentation` attributes for multi-material zones
-- Color zones are preserved and converted to Blender materials
-- Uses the same filament index encoding as Orca Slicer
+**Import**
+- Reads `slic3rpe:mmu_segmentation` attributes
+- Preserves multi-material zones as Blender materials
 
-**Export:**
-- Standard 3MF export works with PrusaSlicer
-- Color zones exported via Orca format are compatible with PrusaSlicer's multi-material painting
+**Export**
+- Standard 3MF export works
+- Orca-format color zones compatible with PrusaSlicer painting tools
 
-> **NOTE**  
-> PrusaSlicer does not embed actual RGB colors in 3MF files - it uses filament indices that reference your local filament profiles. When round-tripping through Blender, colors are generated based on zone indices and may not match your original filament colors exactly.
-
-See [EXTENSIONS.md](EXTENSIONS.md) for detailed documentation on extension support, vendor-specific features, and adding new extensions.
+PrusaSlicer does not embed actual RGB colors in 3MF files; it uses filament indices referencing local profiles. Round-tripping through Blender generates colors based on zone indices and may not match original filament colors exactly.
 
 ---
 
 ## Project History
 
-This project began as a modernization of the original Blender 3MF add-on by Ghostkeeper and has since continued as an independently maintained fork.
+Forked from Ghostkeeper’s original Blender 3MF add-on and modernized by Jack (2025–).
 
-- Original Author: Ghostkeeper (2020–2023)
-- Modernization & Ongoing Maintenance: Jack (2025–)
+- Original author: Ghostkeeper (2020–2023)
+- Fork & maintenance: Jack (2025–)
 
-Original authorship, attribution, and the **GPL v2+ license** are fully preserved.
+All original attribution and **GPL v2+ license** are preserved.
 
 ---
 

@@ -98,6 +98,7 @@ MODEL_NAMESPACES: Dict[str, str] = {
     "3mf": MODEL_NAMESPACE,
     "slic3rpe": SLIC3RPE_NAMESPACE,
     "t": TRIANGLE_SETS_NAMESPACE,  # Triangle sets extension (Core Spec v1.3+)
+    "m": MATERIAL_NAMESPACE,  # Materials and Properties extension (PBR support)
 }
 MODEL_DEFAULT_UNIT: str = "millimeter"  # If the unit is missing, it will be this.
 

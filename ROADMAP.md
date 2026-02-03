@@ -32,8 +32,8 @@ Features and improvements organized by priority. Complexity ratings help with pl
 
 | Status | Feature | Complexity | Description |
 |--------|---------|------------|-------------|
-| 📋 | Import Triangle Sets | 🟡 | Map to Blender face maps |
-| 📋 | Export Triangle Sets | 🟡 | Export face maps as triangle sets |
+| ✅ | Import Triangle Sets | 🟡 | Map to Blender face maps |
+| ✅ | Export Triangle Sets | 🟡 | Export face maps as triangle sets |
 
 ---
 
@@ -141,11 +141,11 @@ Features and improvements organized by priority. Complexity ratings help with pl
 ### Lower Priority
 *Nice to have*
 
-- [ ] Triangle Sets full support
 - [ ] Texture 2D support
 - [ ] Cura support
 - [ ] Collections → Components
 - [ ] Organize Properties Panel
+- [ ] Better Progress Indicators
 
 ### Research Needed
 *Requires investigation before committing*

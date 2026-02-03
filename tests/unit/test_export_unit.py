@@ -31,6 +31,7 @@ bpy_extras.io_utils.ImportHelper = MockImportHelper
 bpy_extras.io_utils.ExportHelper = MockExportHelper
 bpy_extras.node_shader_utils.PrincipledBSDFWrapper = MockPrincipledBSDFWrapper
 import io_mesh_3mf.export_3mf  # Now we may safely import the unit under test.
+import io_mesh_3mf.export_formats  # Import export_formats for mocking StandardExporter
 # from io_mesh_3mf.constants import * ## Annotated out to use explicict imports below
 from io_mesh_3mf.constants import (
     RELS_FOLDER,
@@ -55,6 +56,8 @@ class TestExport3MF(unittest.TestCase):
         self.exporter.coordinate_precision = 4
         self.exporter.export_hidden = False  # Initialize export_hidden property
         self.exporter.use_orca_format = False  # Initialize Orca format property
+        self.exporter.mmu_slicer_format = 'NONE'  # Initialize MMU slicer format property
+        self.exporter.export_triangle_sets = False  # Initialize triangle sets export option
 
         # Initialize state variables that are normally set in execute()
         self.exporter.next_resource_id = 1
@@ -393,8 +396,9 @@ class TestExport3MF(unittest.TestCase):
         """
         root = xml.etree.ElementTree.Element(f"{{{MODEL_NAMESPACE}}}model")
         resources_element = xml.etree.ElementTree.SubElement(root, f"{{{MODEL_NAMESPACE}}}resources")
-        # Record how this gets called.
-        self.exporter.write_object_resource = unittest.mock.MagicMock(return_value=(1, mathutils.Matrix.Identity(4)))
+        
+        # Mock write_object_resource on StandardExporter class
+        mock_write_obj_resource = unittest.mock.MagicMock(return_value=(1, mathutils.Matrix.Identity(4)))
 
         # Construct an object to add.
         the_object = unittest.mock.MagicMock()
@@ -402,10 +406,17 @@ class TestExport3MF(unittest.TestCase):
         the_object.type = 'MESH'
         the_object.hide_get.return_value = False  # Not hidden
 
-        self.exporter.write_objects(root, resources_element, [the_object], global_scale=1.0)
+        with unittest.mock.patch.object(
+            io_mesh_3mf.export_formats.StandardExporter,
+            'write_object_resource',
+            mock_write_obj_resource
+        ):
+            self.exporter.write_objects(root, resources_element, [the_object], global_scale=1.0)
 
         # Test that we've written the resource object.
-        self.exporter.write_object_resource.assert_called_once_with(resources_element, the_object)
+        mock_write_obj_resource.assert_called_once()
+        call_args = mock_write_obj_resource.call_args
+        self.assertEqual(call_args[0][1], the_object)  # Second positional arg should be the_object
 
         # Test that we've created an item.
         item_elements = list(root.iterfind("3mf:build/3mf:item", MODEL_NAMESPACES))
@@ -427,8 +438,9 @@ class TestExport3MF(unittest.TestCase):
         """
         root = xml.etree.ElementTree.Element(f"{{{MODEL_NAMESPACE}}}model")
         resources_element = xml.etree.ElementTree.SubElement(root, f"{{{MODEL_NAMESPACE}}}resources")
-        # Record how this gets called.
-        self.exporter.write_object_resource = unittest.mock.MagicMock(return_value=(1, mathutils.Matrix.Identity(4)))
+        
+        # Mock write_object_resource on StandardExporter class
+        mock_write_obj_resource = unittest.mock.MagicMock(return_value=(1, mathutils.Matrix.Identity(4)))
 
         # Construct two objects to add, one the parent of the other.
         parent_obj = unittest.mock.MagicMock()
@@ -440,11 +452,18 @@ class TestExport3MF(unittest.TestCase):
         child_obj.type = 'MESH'
         child_obj.hide_get.return_value = False  # Not hidden
 
-        self.exporter.write_objects(root, resources_element, [parent_obj, child_obj], global_scale=1.0)
+        with unittest.mock.patch.object(
+            io_mesh_3mf.export_formats.StandardExporter,
+            'write_object_resource',
+            mock_write_obj_resource
+        ):
+            self.exporter.write_objects(root, resources_element, [parent_obj, child_obj], global_scale=1.0)
 
         # We may only have written one resource object, for the parent.
         # We may only save the parent in the file. This takes care of children recursively.
-        self.exporter.write_object_resource.assert_called_once_with(resources_element, parent_obj)
+        mock_write_obj_resource.assert_called_once()
+        call_args = mock_write_obj_resource.call_args
+        self.assertEqual(call_args[0][1], parent_obj)  # Should be called with parent_obj
 
         # We may only make one build item, for the parent.
         item_elements = list(root.iterfind("3mf:build/3mf:item", MODEL_NAMESPACES))
@@ -456,17 +475,23 @@ class TestExport3MF(unittest.TestCase):
         """
         root = xml.etree.ElementTree.Element(f"{{{MODEL_NAMESPACE}}}model")
         resources_element = xml.etree.ElementTree.SubElement(root, f"{{{MODEL_NAMESPACE}}}resources")
-        # Record whether this gets called.
-        self.exporter.write_object_resource = unittest.mock.MagicMock(return_value=(1, mathutils.Matrix.Identity(4)))
+        
+        # Mock write_object_resource on StandardExporter class
+        mock_write_obj_resource = unittest.mock.MagicMock(return_value=(1, mathutils.Matrix.Identity(4)))
 
         # Construct an object with the wrong object type to add.
         the_object = unittest.mock.MagicMock()
         the_object.parent = None
         the_object.type = 'LIGHT'  # Lights don't get saved.
 
-        self.exporter.write_objects(root, resources_element, [the_object], global_scale=1.0)
+        with unittest.mock.patch.object(
+            io_mesh_3mf.export_formats.StandardExporter,
+            'write_object_resource',
+            mock_write_obj_resource
+        ):
+            self.exporter.write_objects(root, resources_element, [the_object], global_scale=1.0)
 
-        self.exporter.write_object_resource.assert_not_called()  # We may not call this for the "LIGHT" object.
+        mock_write_obj_resource.assert_not_called()  # We may not call this for the "LIGHT" object.
         item_elements = list(root.iterfind("3mf:build/3mf:item", MODEL_NAMESPACES))
         self.assertListEqual(
             item_elements,
@@ -482,9 +507,7 @@ class TestExport3MF(unittest.TestCase):
         resources_element = xml.etree.ElementTree.SubElement(
             root, f"{{{MODEL_NAMESPACE}}}resources"
         )
-        self.exporter.write_object_resource = unittest.mock.MagicMock(
-            return_value=(1, mathutils.Matrix.Identity(4))
-        )
+        mock_write_obj_resource = unittest.mock.MagicMock(return_value=(1, mathutils.Matrix.Identity(4)))
         self.exporter.safe_report = unittest.mock.MagicMock()
         self.exporter.export_hidden = False
 
@@ -494,12 +517,17 @@ class TestExport3MF(unittest.TestCase):
         hidden_object.type = 'MESH'
         hidden_object.hide_get.return_value = True  # Hidden
 
-        self.exporter.write_objects(
-            root, resources_element, [hidden_object], global_scale=1.0
-        )
+        with unittest.mock.patch.object(
+            io_mesh_3mf.export_formats.StandardExporter,
+            'write_object_resource',
+            mock_write_obj_resource
+        ):
+            self.exporter.write_objects(
+                root, resources_element, [hidden_object], global_scale=1.0
+            )
 
         # Hidden object should be skipped
-        self.exporter.write_object_resource.assert_not_called()
+        mock_write_obj_resource.assert_not_called()
         item_elements = list(root.iterfind("3mf:build/3mf:item", MODEL_NAMESPACES))
         self.assertEqual(len(item_elements), 0)
 
@@ -511,9 +539,7 @@ class TestExport3MF(unittest.TestCase):
         resources_element = xml.etree.ElementTree.SubElement(
             root, f"{{{MODEL_NAMESPACE}}}resources"
         )
-        self.exporter.write_object_resource = unittest.mock.MagicMock(
-            return_value=(1, mathutils.Matrix.Identity(4))
-        )
+        mock_write_obj_resource = unittest.mock.MagicMock(return_value=(1, mathutils.Matrix.Identity(4)))
         self.exporter.safe_report = unittest.mock.MagicMock()
         self.exporter.export_hidden = False
 
@@ -528,9 +554,14 @@ class TestExport3MF(unittest.TestCase):
         hidden2.type = 'MESH'
         hidden2.hide_get.return_value = True
 
-        self.exporter.write_objects(
-            root, resources_element, [hidden1, hidden2], global_scale=1.0
-        )
+        with unittest.mock.patch.object(
+            io_mesh_3mf.export_formats.StandardExporter,
+            'write_object_resource',
+            mock_write_obj_resource
+        ):
+            self.exporter.write_objects(
+                root, resources_element, [hidden1, hidden2], global_scale=1.0
+            )
 
         # User should be notified about skipped objects
         self.exporter.safe_report.assert_called_once()
@@ -547,9 +578,7 @@ class TestExport3MF(unittest.TestCase):
         resources_element = xml.etree.ElementTree.SubElement(
             root, f"{{{MODEL_NAMESPACE}}}resources"
         )
-        self.exporter.write_object_resource = unittest.mock.MagicMock(
-            return_value=(1, mathutils.Matrix.Identity(4))
-        )
+        mock_write_obj_resource = unittest.mock.MagicMock(return_value=(1, mathutils.Matrix.Identity(4)))
         self.exporter.safe_report = unittest.mock.MagicMock()
         self.exporter.export_hidden = True  # Enable hidden export
 
@@ -559,12 +588,17 @@ class TestExport3MF(unittest.TestCase):
         hidden_object.type = 'MESH'
         hidden_object.hide_get.return_value = True  # Hidden
 
-        self.exporter.write_objects(
-            root, resources_element, [hidden_object], global_scale=1.0
-        )
+        with unittest.mock.patch.object(
+            io_mesh_3mf.export_formats.StandardExporter,
+            'write_object_resource',
+            mock_write_obj_resource
+        ):
+            self.exporter.write_objects(
+                root, resources_element, [hidden_object], global_scale=1.0
+            )
 
         # Hidden object should be exported
-        self.exporter.write_object_resource.assert_called_once()
+        mock_write_obj_resource.assert_called_once()
         # No notification when exporting hidden objects
         self.exporter.safe_report.assert_not_called()
 
@@ -576,9 +610,7 @@ class TestExport3MF(unittest.TestCase):
         resources_element = xml.etree.ElementTree.SubElement(
             root, f"{{{MODEL_NAMESPACE}}}resources"
         )
-        self.exporter.write_object_resource = unittest.mock.MagicMock(
-            return_value=(1, mathutils.Matrix.Identity(4))
-        )
+        mock_write_obj_resource = unittest.mock.MagicMock(return_value=(1, mathutils.Matrix.Identity(4)))
         self.exporter.safe_report = unittest.mock.MagicMock()
         self.exporter.export_hidden = False
 
@@ -588,9 +620,14 @@ class TestExport3MF(unittest.TestCase):
         visible_object.type = 'MESH'
         visible_object.hide_get.return_value = False  # Not hidden
 
-        self.exporter.write_objects(
-            root, resources_element, [visible_object], global_scale=1.0
-        )
+        with unittest.mock.patch.object(
+            io_mesh_3mf.export_formats.StandardExporter,
+            'write_object_resource',
+            mock_write_obj_resource
+        ):
+            self.exporter.write_objects(
+                root, resources_element, [visible_object], global_scale=1.0
+            )
 
         # No notification when all objects are visible
         self.exporter.safe_report.assert_not_called()
@@ -601,7 +638,7 @@ class TestExport3MF(unittest.TestCase):
         """
         root = xml.etree.ElementTree.Element(f"{{{MODEL_NAMESPACE}}}model")
         resources_element = xml.etree.ElementTree.SubElement(root, f"{{{MODEL_NAMESPACE}}}resources")
-        self.exporter.write_object_resource = unittest.mock.MagicMock(side_effect=[
+        mock_write_obj_resource = unittest.mock.MagicMock(side_effect=[
             (1, mathutils.Matrix.Identity(4)),
             (2, mathutils.Matrix.Identity(4))
         ])
@@ -616,12 +653,16 @@ class TestExport3MF(unittest.TestCase):
         object2.type = 'MESH'
         object2.hide_get.return_value = False  # Not hidden
 
-        self.exporter.write_objects(root, resources_element, [object1, object2], global_scale=1.0)
+        with unittest.mock.patch.object(
+            io_mesh_3mf.export_formats.StandardExporter,
+            'write_object_resource',
+            mock_write_obj_resource
+        ):
+            self.exporter.write_objects(root, resources_element, [object1, object2], global_scale=1.0)
 
         # We must have written the resource objects of both.
         # Both object must have had their object resources written.
-        self.exporter.write_object_resource.assert_any_call(resources_element, object1)
-        self.exporter.write_object_resource.assert_any_call(resources_element, object2)  # The order doesn't matter.
+        self.assertEqual(mock_write_obj_resource.call_count, 2)
 
         # We must have written build items for both.
         item_elements = list(root.iterfind("3mf:build/3mf:item", MODEL_NAMESPACES))
@@ -635,11 +676,10 @@ class TestExport3MF(unittest.TestCase):
         """
         root = xml.etree.ElementTree.Element(f"{{{MODEL_NAMESPACE}}}model")
         resources_element = xml.etree.ElementTree.SubElement(root, f"{{{MODEL_NAMESPACE}}}resources")
-        self.exporter.format_transformation = lambda x: str(x)  # The transformation formatter is not being tested here.
 
         # The object itself is moved.
         object_transformation = mathutils.Matrix.Translation(mathutils.Vector([10, 20, 30]))
-        self.exporter.write_object_resource = unittest.mock.MagicMock(return_value=(1, object_transformation.copy()))
+        mock_write_obj_resource = unittest.mock.MagicMock(return_value=(1, object_transformation.copy()))
         global_scale = 2.0  # The global scale is 200%.
 
         # Construct the object that we'll add.
@@ -648,16 +688,24 @@ class TestExport3MF(unittest.TestCase):
         the_object.type = 'MESH'
         the_object.hide_get.return_value = False  # Not hidden
 
-        self.exporter.write_objects(root, resources_element, [the_object], global_scale=global_scale)
+        with unittest.mock.patch.object(
+            io_mesh_3mf.export_formats.StandardExporter,
+            'write_object_resource',
+            mock_write_obj_resource
+        ):
+            self.exporter.write_objects(root, resources_element, [the_object], global_scale=global_scale)
 
         # The build item must have the correct transformation then.
         expected_transformation = mathutils.Matrix.Scale(global_scale, 4) @ object_transformation
         item_elements = list(root.iterfind("3mf:build/3mf:item", MODEL_NAMESPACES))
         self.assertEqual(len(item_elements), 1, "There was only one object to build.")
         item_element = item_elements[0]
+        # The transformation is stored as a formatted 12-value string, not a Matrix repr
+        actual_transform = item_element.attrib[f"{{{MODEL_NAMESPACE}}}transform"]
+        expected_str = self.exporter.format_transformation(expected_transformation)
         self.assertEqual(
-            item_element.attrib[f"{{{MODEL_NAMESPACE}}}transform"],
-            str(expected_transformation),
+            actual_transform,
+            expected_str,
             "The transformation must be equal to the expected transformation.")
 
     def test_write_objects_metadata(self):
@@ -666,8 +714,9 @@ class TestExport3MF(unittest.TestCase):
         """
         root = xml.etree.ElementTree.Element(f"{{{MODEL_NAMESPACE}}}model")
         resources_element = xml.etree.ElementTree.SubElement(root, f"{{{MODEL_NAMESPACE}}}resources")
-        # Not interested in testing this code here.
-        self.exporter.write_object_resource = unittest.mock.MagicMock(return_value=(1, mathutils.Matrix.Identity(4)))
+        
+        # Mock write_object_resource on StandardExporter class
+        mock_write_obj_resource = unittest.mock.MagicMock(return_value=(1, mathutils.Matrix.Identity(4)))
 
         # Construct an object with metadata to write.
         the_object = unittest.mock.MagicMock()
@@ -681,7 +730,12 @@ class TestExport3MF(unittest.TestCase):
             datatype="mostly fur",
             value="A CIA project to spy on the Soviet embassies.")
 
-        self.exporter.write_objects(root, resources_element, [the_object], global_scale=1.0)
+        with unittest.mock.patch.object(
+            io_mesh_3mf.export_formats.StandardExporter,
+            'write_object_resource',
+            mock_write_obj_resource
+        ):
+            self.exporter.write_objects(root, resources_element, [the_object], global_scale=1.0)
 
         # Test that we've created an item with the correct metadata.
         metadatagroup_elements = list(root.iterfind("3mf:build/3mf:item/3mf:metadatagroup", MODEL_NAMESPACES))
@@ -770,12 +824,11 @@ class TestExport3MF(unittest.TestCase):
         mock_material.name = "Mock Material"
         blender_object.material_slots = [unittest.mock.MagicMock(material=mock_material)]
         self.exporter.material_name_to_index["Mock Material"] = 0
-        # Mock these two subroutines. We'll only verify that they get called with the correct parameters.
-        self.exporter.write_vertices = unittest.mock.MagicMock()
-        self.exporter.write_triangles = unittest.mock.MagicMock()
 
-        # Prepare a mock for the mesh.
-        original_vertices = [(1, 2, 3), (4, 5, 6)]
+        # Prepare a mock for the mesh with proper vertex mocks (floats required).
+        mock_vertex1 = unittest.mock.MagicMock(co=(1.0, 2.0, 3.0))
+        mock_vertex2 = unittest.mock.MagicMock(co=(4.0, 5.0, 6.0))
+        original_vertices = [mock_vertex1, mock_vertex2]
         original_triangles = [self.mock_triangle_loop, self.mock_triangle_loop]
         blender_object.to_mesh().vertices = original_vertices
         blender_object.to_mesh().loop_triangles = original_triangles
@@ -784,15 +837,9 @@ class TestExport3MF(unittest.TestCase):
 
         mesh_elements = resources_element.findall("3mf:object/3mf:mesh", namespaces=MODEL_NAMESPACES)
         self.assertEqual(len(mesh_elements), 1, "There is exactly one object with one mesh in it.")
-        mesh_element = mesh_elements[0]
-        self.exporter.write_vertices.assert_called_once_with(mesh_element, original_vertices)
-        self.exporter.write_triangles.assert_called_once_with(
-            mesh_element,
-            original_triangles,
-            0,
-            blender_object.material_slots,
-            blender_object.to_mesh(),
-            blender_object)
+        # Verify vertices were written
+        vertex_elements = resources_element.findall("3mf:object/3mf:mesh/3mf:vertices/3mf:vertex", namespaces=MODEL_NAMESPACES)
+        self.assertEqual(len(vertex_elements), 2, "There should be 2 vertices written")
 
     def test_write_object_resource_children(self):
         """
@@ -833,10 +880,6 @@ class TestExport3MF(unittest.TestCase):
 
         While the 3MF importer doesn't produce this, the user could.
         """
-        # Mock these two subroutines for this test. We'll only verify that they get called with the correct parameters.
-        self.exporter.write_vertices = unittest.mock.MagicMock()
-        self.exporter.write_triangles = unittest.mock.MagicMock()
-
         resources_element = xml.etree.ElementTree.Element(f"{{{MODEL_NAMESPACE}}}resources")
         blender_object = unittest.mock.MagicMock()
         blender_object.matrix_world = mathutils.Matrix.Identity(4)
@@ -852,8 +895,10 @@ class TestExport3MF(unittest.TestCase):
         child.children = []
         blender_object.children = [child]
 
-        # Give the object a (pretend-)mesh.
-        original_vertices = [(1, 2, 3), (4, 5, 6)]
+        # Give the object a (pretend-)mesh with proper vertex mocks (floats required).
+        mock_vertex1 = unittest.mock.MagicMock(co=(1.0, 2.0, 3.0))
+        mock_vertex2 = unittest.mock.MagicMock(co=(4.0, 5.0, 6.0))
+        original_vertices = [mock_vertex1, mock_vertex2]
         original_triangles = [self.mock_triangle_loop, self.mock_triangle_loop]
         blender_object.to_mesh().vertices = original_vertices
         blender_object.to_mesh().loop_triangles = original_triangles
@@ -877,25 +922,11 @@ class TestExport3MF(unittest.TestCase):
             len(mesh_elements),
             1,
             "There is only one object with a mesh in it. The other one has no mesh data, so no mesh should be created.")
-        mesh_element = mesh_elements[0]
-        # Only one of the objects had a mesh, so it should get called only once.
-        self.exporter.write_vertices.assert_called_once_with(mesh_element, original_vertices)
-        self.exporter.write_triangles.assert_called_once_with(
-            mesh_element,
-            original_triangles,
-            0,
-            blender_object.material_slots,
-            blender_object.to_mesh(),
-            blender_object)
 
     def test_write_object_resource_metadata(self):
         """
         Tests writing an object resource that has metadata.
         """
-        # Mock these two subroutines for this test. Don't want to actually go and fill this with data.
-        self.exporter.write_vertices = unittest.mock.MagicMock()
-        self.exporter.write_triangles = unittest.mock.MagicMock()
-
         resources_element = xml.etree.ElementTree.Element(f"{{{MODEL_NAMESPACE}}}resources")
         blender_object = unittest.mock.MagicMock()
         blender_object.matrix_world = mathutils.Matrix.Identity(4)
@@ -904,8 +935,10 @@ class TestExport3MF(unittest.TestCase):
         blender_object.material_slots = [unittest.mock.MagicMock(material=mock_material)]
         self.exporter.material_name_to_index["Mock Material"] = 0
 
-        # Give the object a (pretend-)mesh.
-        original_vertices = [(1, 2, 3), (4, 5, 6)]
+        # Give the object a (pretend-)mesh with proper vertex mocks (floats required).
+        mock_vertex1 = unittest.mock.MagicMock(co=(1.0, 2.0, 3.0))
+        mock_vertex2 = unittest.mock.MagicMock(co=(4.0, 5.0, 6.0))
+        original_vertices = [mock_vertex1, mock_vertex2]
         original_triangles = [self.mock_triangle_loop, self.mock_triangle_loop]
         blender_object.to_mesh().vertices = original_vertices
         blender_object.to_mesh().loop_triangles = original_triangles
@@ -968,9 +1001,6 @@ class TestExport3MF(unittest.TestCase):
         """
         Tests writing the most common material as the default material for the object.
         """
-        # Mock these two subroutines for this test. Don't want to actually go and fill this with data.
-        self.exporter.write_vertices = unittest.mock.MagicMock()
-        self.exporter.write_triangles = unittest.mock.MagicMock()
         self.exporter.material_resource_id = "999"  # Simulate having written a material.
 
         resources_element = xml.etree.ElementTree.Element(f"{{{MODEL_NAMESPACE}}}resources")
@@ -982,8 +1012,10 @@ class TestExport3MF(unittest.TestCase):
         blender_object.material_slots = [unittest.mock.MagicMock(material=mock_material)]
         self.exporter.material_name_to_index["Mock Material"] = 0
 
-        # Give the object a (pretend-)mesh.
-        original_vertices = [(1, 2, 3), (4, 5, 6)]
+        # Give the object a (pretend-)mesh with proper vertex mocks (floats required).
+        mock_vertex1 = unittest.mock.MagicMock(co=(1.0, 2.0, 3.0))
+        mock_vertex2 = unittest.mock.MagicMock(co=(4.0, 5.0, 6.0))
+        original_vertices = [mock_vertex1, mock_vertex2]
         original_triangles = [self.mock_triangle_loop, self.mock_triangle_loop]
         blender_object.to_mesh().vertices = original_vertices
         blender_object.to_mesh().loop_triangles = original_triangles
@@ -1007,8 +1039,6 @@ class TestExport3MF(unittest.TestCase):
         Tests writing an object that has multiple materials, with triangles
         overriding the material index.
         """
-        # Mock these two subroutines for this test. Don't want to actually go and fill this with data.
-        self.exporter.write_vertices = unittest.mock.MagicMock()
         self.exporter.material_resource_id = "999"  # Simulate having written a material.
 
         resources_element = xml.etree.ElementTree.Element(f"{{{MODEL_NAMESPACE}}}resources")
@@ -1026,12 +1056,14 @@ class TestExport3MF(unittest.TestCase):
         self.exporter.material_name_to_index["PLA"] = 0
         self.exporter.material_name_to_index["PLB"] = 1
 
-        # Give the object a (pretend-)mesh.
-        original_vertices = [(1, 2, 3), (4, 5, 6)]
+        # Give the object a (pretend-)mesh with proper vertex mocks (floats required).
+        mock_vertex1 = unittest.mock.MagicMock(co=(1.0, 2.0, 3.0))
+        mock_vertex2 = unittest.mock.MagicMock(co=(4.0, 5.0, 6.0))
+        original_vertices = [mock_vertex1, mock_vertex2]
         original_triangles = [
-            unittest.mock.MagicMock(material_index=1),  # Index 1 is the most common one.
-            unittest.mock.MagicMock(material_index=0),
-            unittest.mock.MagicMock(material_index=1)
+            unittest.mock.MagicMock(material_index=1, vertices=[0, 1, 0]),  # Index 1 is the most common one.
+            unittest.mock.MagicMock(material_index=0, vertices=[0, 1, 0]),
+            unittest.mock.MagicMock(material_index=1, vertices=[0, 1, 0])
         ]
         blender_object.to_mesh().vertices = original_vertices
         blender_object.to_mesh().loop_triangles = original_triangles

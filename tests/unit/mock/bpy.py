@@ -39,6 +39,11 @@ class MockPrincipledBSDFWrapper:
     """
     def __init__(self, material, is_readonly=False):
         self.material = material
+        # PBR attributes with sensible defaults
+        self.metallic = 0.0
+        self.roughness = 0.5
+        self.specular = 0.5
+        self.ior = 1.45
 
     def __getattr__(self, item):
         if item == "base_color":

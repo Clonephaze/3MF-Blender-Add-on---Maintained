@@ -98,6 +98,15 @@ VOLUMETRIC_EXTENSION = Extension(
     required=True,
 )
 
+TRIANGLE_SETS_EXTENSION = Extension(
+    namespace="http://schemas.microsoft.com/3dmanufacturing/trianglesets/2021/07",
+    prefix="t",
+    name="Triangle Sets",
+    extension_type=ExtensionType.OFFICIAL,
+    description="Grouping of triangles for selection workflows and property assignment",
+    required=False,  # Optional extension, not required
+)
+
 # Vendor-Specific Extensions
 
 ORCA_EXTENSION = Extension(
@@ -118,6 +127,7 @@ EXTENSION_REGISTRY: Dict[str, Extension] = {
     SLICE_EXTENSION.namespace: SLICE_EXTENSION,
     BEAM_LATTICE_EXTENSION.namespace: BEAM_LATTICE_EXTENSION,
     VOLUMETRIC_EXTENSION.namespace: VOLUMETRIC_EXTENSION,
+    TRIANGLE_SETS_EXTENSION.namespace: TRIANGLE_SETS_EXTENSION,
     ORCA_EXTENSION.namespace: ORCA_EXTENSION,
 }
 
@@ -244,6 +254,7 @@ __all__ = [
     "SLICE_EXTENSION",
     "BEAM_LATTICE_EXTENSION",
     "VOLUMETRIC_EXTENSION",
+    "TRIANGLE_SETS_EXTENSION",
     "ORCA_EXTENSION",
     "get_extension_by_namespace",
     "get_extension_by_prefix",
