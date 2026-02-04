@@ -310,9 +310,9 @@ def check_non_manifold_geometry(blender_objects: List[bpy.types.Object],
     Non-manifold geometry can cause problems in slicers and is generally
     not suitable for 3D printing. Uses BMesh's C-optimized is_manifold
     property for fast detection.
-    
+
     Stops checking after finding the first non-manifold object for performance.
-    
+
     :param blender_objects: List of Blender objects to check.
     :param use_mesh_modifiers: Whether to apply modifiers when getting mesh.
     :return: List with first object name that has non-manifold geometry, or empty list.
@@ -339,22 +339,22 @@ def check_non_manifold_geometry(blender_objects: List[bpy.types.Object],
         # Use BMesh for fast C-optimized non-manifold detection
         bm = bmesh.new()
         bm.from_mesh(mesh)
-        
+
         has_non_manifold = False
-        
+
         # Check edges - BMesh provides is_manifold property at C level
         for edge in bm.edges:
             if not edge.is_manifold:
                 has_non_manifold = True
                 break
-        
+
         # Check vertices for non-manifold (wire verts, etc.)
         if not has_non_manifold:
             for vert in bm.verts:
                 if not vert.is_manifold:
                     has_non_manifold = True
                     break
-        
+
         bm.free()
         eval_object.to_mesh_clear()
 

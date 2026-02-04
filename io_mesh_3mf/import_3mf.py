@@ -2331,10 +2331,10 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                     min_z = min(v[2] for v in bbox)
                     center_x = (min(v[0] for v in bbox) + max(v[0] for v in bbox)) / 2
                     center_y = (min(v[1] for v in bbox) + max(v[1] for v in bbox)) / 2
-                    
+
                     # Calculate offset from current origin to bottom center
                     bottom_center = mathutils.Vector((center_x, center_y, min_z))
-                    
+
                     # Move mesh data in opposite direction to effectively move origin
                     mesh.transform(mathutils.Matrix.Translation(-bottom_center))
                     # Update the object's location to compensate
