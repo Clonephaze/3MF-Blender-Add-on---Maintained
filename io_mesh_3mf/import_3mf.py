@@ -2441,6 +2441,80 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
         return triangle_sets
 
+    def read_triangle_sets(self, object_node: xml.etree.ElementTree.Element) -> Dict[str, List[int]]:
+        """
+        Reads triangle sets from an XML node of an object.
+
+        Triangle sets are groups of triangles with a name and unique identifier.
+        They are used for selection workflows and property assignment.
+        Introduced in 3MF Core Spec v1.3.0.
+
+        Supports both <ref index="N"/> and <refrange startindex="N" endindex="M"/> elements.
+
+        :param object_node: An <object> element from the 3dmodel.model file.
+        :return: Dictionary mapping triangle set names to lists of triangle indices.
+        """
+        triangle_sets = {}
+
+        # Look for triangle sets under <mesh><trianglesets>
+        for triangleset in object_node.iterfind(
+            "./3mf:mesh/t:trianglesets/t:triangleset", MODEL_NAMESPACES
+        ):
+            attrib = triangleset.attrib
+
+            # Per spec: both name and identifier are required, but we gracefully handle missing
+            set_name = attrib.get("name")
+            if not set_name:
+                # Fall back to identifier if name missing
+                set_name = attrib.get("identifier")
+            if not set_name:
+                log.warning("Triangle set missing name attribute, skipping")
+                self.safe_report({'WARNING'}, "Triangle set missing name attribute")
+                continue
+
+            # Cache set name to protect Unicode characters
+            set_name = str(set_name)
+
+            # Parse triangle indices from child <ref> and <refrange> elements
+            triangle_indices = []
+
+            # Handle <ref index="N"/> elements
+            for ref in triangleset.iterfind("t:ref", MODEL_NAMESPACES):
+                try:
+                    index = int(ref.attrib.get("index", "-1"))
+                    if index < 0:
+                        log.warning(f"Triangle set '{set_name}' contains negative triangle index")
+                        continue
+                    triangle_indices.append(index)
+                except (KeyError, ValueError) as e:
+                    log.warning(f"Triangle set '{set_name}' contains invalid ref: {e}")
+                    continue
+
+            # Handle <refrange startindex="N" endindex="M"/> elements (inclusive range)
+            for refrange in triangleset.iterfind("t:refrange", MODEL_NAMESPACES):
+                try:
+                    start_index = int(refrange.attrib.get("startindex", "-1"))
+                    end_index = int(refrange.attrib.get("endindex", "-1"))
+                    if start_index < 0 or end_index < 0:
+                        log.warning(f"Triangle set '{set_name}' contains invalid refrange indices")
+                        continue
+                    if end_index < start_index:
+                        log.warning(f"Triangle set '{set_name}' has refrange with end < start")
+                        continue
+                    # Per spec: range is inclusive on both ends
+                    triangle_indices.extend(range(start_index, end_index + 1))
+                except (KeyError, ValueError) as e:
+                    log.warning(f"Triangle set '{set_name}' contains invalid refrange: {e}")
+                    continue
+
+            if triangle_indices:
+                # Remove duplicates per spec: "A consumer MUST ignore duplicate references"
+                triangle_indices = list(dict.fromkeys(triangle_indices))
+                triangle_sets[set_name] = triangle_indices
+                log.info(f"Loaded triangle set '{set_name}' with {len(triangle_indices)} triangles")
+
+        return triangle_sets
+
     def read_components(self, object_node: xml.etree.ElementTree.Element) -> List[Component]:
         """
         Reads out the components from an XML node of an object.
@@ -3331,6 +3405,9 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
                             # Apply textured PBR properties (metallic/roughness/specular texture maps)
                             self._apply_pbr_textures_to_material(material, triangle_material)
+
+                        # Apply PBR properties from 3MF Materials Extension
+                        self._apply_pbr_to_principled(principled, material, triangle_material)
 
                     self.resource_to_material[triangle_material] = material
                 else:

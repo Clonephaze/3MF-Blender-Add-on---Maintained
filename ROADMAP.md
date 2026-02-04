@@ -157,6 +157,7 @@ Features and improvements organized by priority. Complexity ratings help with pl
 ### Research Needed
 *Requires investigation before committing*
 
+- [ ] PrusaSlicer Volumetric Paint (Per-vertex paint bucket encoding - requires reverse-engineering proprietary format)
 - [ ] Seam/support painting formats (No idea if we can add this in any way slicers support it)
 - [ ] Material settings round-trip (Extra material settings, etc, for full re-import)
 
