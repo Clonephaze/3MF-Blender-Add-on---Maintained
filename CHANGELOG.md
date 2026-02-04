@@ -22,6 +22,14 @@ Technical
 * Texture metadata preserved as custom properties for perfect round-trips
 * Note: Normal maps are exported to archive but cannot be imported (3MF spec has no `normaltextureid` attribute). Will re-visit this in the future.
 
+Code Organization
+----
+* **Import/Export Module Refactoring:** Split large monolithic files into extension-centric packages for better maintainability and easier future additions:
+  - `export_materials/` package: base.py, textures.py, pbr.py, passthrough.py
+  - `import_materials/` package: base.py, textures.py, pbr.py, passthrough.py
+  - Standalone `export_trianglesets.py` and `import_trianglesets.py` modules
+* Backward-compatible re-exports preserve existing API
+
 ---
 
 1.2.7 — Full PBR Materials Extension Support
@@ -40,7 +48,6 @@ Technical
 * Implements PBR display properties from 3MF Materials Extension specification
 * Workflow selection is automatic based on material properties (metallic → specular → translucent priority)
 * Note: 3MF PBR workflows are mutually exclusive per spec — materials using multiple workflows will use the highest-priority workflow that applies
-* Export_3mf has been refactored into 3 separated files for better maintainability:
 
 ---
 
