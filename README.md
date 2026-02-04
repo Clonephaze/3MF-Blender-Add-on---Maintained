@@ -43,22 +43,28 @@ For Blender versions **2.80–3.6**, see the [original releases](https://github.
 
 ## Installation
 
-> **Note**  
-> This add-on is under review for inclusion on the official Blender Extensions platform: [Approval Queue](https://extensions.blender.org/approval-queue/threemf-io/)
+### Blender 4.2+ (Recommended)
 
-### Blender 4.2+
+[**Official Blender Extensions Platform**](https://extensions.blender.org/add-ons/threemf-io) – Includes automatic updates!
 
-**Option 1: Drag & Drop (recommended)**
-1. Download the ZIP
+1. Open Blender
+2. Go to *Edit → Preferences → Get Extensions*
+3. Search for **"3MF"**
+4. Click *Install* on **3MF Import/Export**
+
+### Manual Installation
+
+**Option 1: Drag & Drop**
+1. Download the ZIP from [Releases](https://github.com/Ghostkeeper/Blender3mfFormat/releases)
 2. Open Blender
-3. Drag the `io_mesh_3mf` folder into Blender
+3. Drag the downloaded ZIP file into Blender
 4. Enable the add-on
 
 **Option 2: Preferences**
-1. Extract ZIP
+1. Download the ZIP from [Releases](https://github.com/Ghostkeeper/Blender3mfFormat/releases)
 2. Open *Edit → Preferences → Add-ons*
-3. Click *Install…* and select `io_mesh_3mf`
-4. Enable **Import-Export: 3MF format**
+3. Click *Install…* and select the downloaded ZIP file
+4. Enable **3MF Import/Export**
 
 ---
 
