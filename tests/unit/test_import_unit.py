@@ -67,6 +67,13 @@ class TestImport3MF(unittest.TestCase):
         self.importer.resource_objects = {}
         self.importer.resource_materials = {}
         self.importer.resource_to_material = {}
+        self.importer.resource_textures = {}  # ID -> ResourceTexture
+        self.importer.resource_texture_groups = {}  # ID -> ResourceTextureGroup
+        self.importer.resource_composites = {}  # ID -> ResourceComposite (round-trip)
+        self.importer.resource_multiproperties = {}  # ID -> ResourceMultiproperties (round-trip)
+        self.importer.resource_pbr_texture_displays = {}  # ID -> ResourcePBRTextureDisplay (round-trip)
+        self.importer.resource_colorgroups = {}  # ID -> ResourceColorgroup (round-trip)
+        self.importer.resource_pbr_display_props = {}  # ID -> ResourcePBRDisplayProps (round-trip)
         self.importer.num_loaded = 0
         # Initialize import options (new properties added for extension framework)
         self.importer.import_materials = True
@@ -1017,7 +1024,7 @@ class TestImport3MF(unittest.TestCase):
         object_node = xml.etree.ElementTree.Element(f"{{{MODEL_NAMESPACE}}}object")
         xml.etree.ElementTree.SubElement(object_node, f"{{{MODEL_NAMESPACE}}}mesh")
 
-        triangles, _ = self.importer.read_triangles(object_node, None, "")
+        triangles, _, _ = self.importer.read_triangles(object_node, None, "")
         self.assertListEqual(
             triangles,
             [],
@@ -1031,7 +1038,7 @@ class TestImport3MF(unittest.TestCase):
         mesh_node = xml.etree.ElementTree.SubElement(object_node, f"{{{MODEL_NAMESPACE}}}mesh")
         xml.etree.ElementTree.SubElement(mesh_node, f"{{{MODEL_NAMESPACE}}}triangles")
 
-        triangles, _ = self.importer.read_triangles(object_node, None, "")
+        triangles, _, _ = self.importer.read_triangles(object_node, None, "")
         self.assertListEqual(
             triangles,
             [],
@@ -1054,7 +1061,7 @@ class TestImport3MF(unittest.TestCase):
             triangle_node.attrib["v2"] = str(triangle[1])
             triangle_node.attrib["v3"] = str(triangle[2])
 
-        reconstructed_triangles, _ = self.importer.read_triangles(object_node, None, "")
+        reconstructed_triangles, _, _ = self.importer.read_triangles(object_node, None, "")
         self.assertListEqual(
             reconstructed_triangles,
             triangles,
@@ -1074,7 +1081,7 @@ class TestImport3MF(unittest.TestCase):
         triangle_node.attrib["v2"] = "2"
         # Leave out v3. It's missing then.
 
-        triangles, _ = self.importer.read_triangles(object_node, None, "")
+        triangles, _, _ = self.importer.read_triangles(object_node, None, "")
         self.assertListEqual(triangles, [], "The only triangle was invalid, so the output should have no triangles.")
 
     def test_read_triangles_broken_vertex(self):
@@ -1106,7 +1113,7 @@ class TestImport3MF(unittest.TestCase):
         # Doesn't parse as integer! Should make the triangle go missing.
         invalid_index_triangle_node.attrib["v3"] = "doodie"
 
-        triangles, _ = self.importer.read_triangles(object_node, None, "")
+        triangles, _, _ = self.importer.read_triangles(object_node, None, "")
         self.assertListEqual(triangles, [], "All triangles are invalid, so the output should have no triangles.")
 
     def test_read_triangles_default_material(self):
@@ -1126,7 +1133,7 @@ class TestImport3MF(unittest.TestCase):
         default_material = io_mesh_3mf.import_3mf.ResourceMaterial(name="PLA", color=None)
         self.importer.resource_materials["material-set"] = {1: default_material}
 
-        _, materials = self.importer.read_triangles(object_node, default_material, "")
+        _, materials, _ = self.importer.read_triangles(object_node, default_material, "")
 
         self.assertListEqual(
             materials,
@@ -1154,7 +1161,7 @@ class TestImport3MF(unittest.TestCase):
             1: default_material
         }
 
-        _, materials = self.importer.read_triangles(object_node, default_material, "")
+        _, materials, _ = self.importer.read_triangles(object_node, default_material, "")
 
         self.assertListEqual(
             materials,
@@ -1185,7 +1192,7 @@ class TestImport3MF(unittest.TestCase):
         }
 
         # Supply a default PID. It should use the indices from the triangles to reference to this PID.
-        _, materials = self.importer.read_triangles(object_node, default_material, "material-set")
+        _, materials, _ = self.importer.read_triangles(object_node, default_material, "material-set")
 
         self.assertListEqual(
             materials,
@@ -1218,7 +1225,7 @@ class TestImport3MF(unittest.TestCase):
         }
 
         # Supply a default PID. It should use the indices from the triangles to reference to this PID.
-        _, materials = self.importer.read_triangles(object_node, default_material, "material-set")
+        _, materials, _ = self.importer.read_triangles(object_node, default_material, "material-set")
 
         self.assertListEqual(
             materials,
@@ -1246,7 +1253,7 @@ class TestImport3MF(unittest.TestCase):
         }
 
         # Supply a default PID. It should use the indices from the triangles to reference to this PID.
-        _, materials = self.importer.read_triangles(object_node, default_material, "material-set")
+        _, materials, _ = self.importer.read_triangles(object_node, default_material, "material-set")
 
         self.assertListEqual(
             materials,
@@ -1275,7 +1282,7 @@ class TestImport3MF(unittest.TestCase):
         }
 
         # Supply a default PID. It should use the indices from the triangles to reference to this PID.
-        _, materials = self.importer.read_triangles(object_node, default_material, "material-set")
+        _, materials, _ = self.importer.read_triangles(object_node, default_material, "material-set")
 
         self.assertListEqual(
             materials,

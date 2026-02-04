@@ -354,6 +354,118 @@ class TestActivePBRMaterials(MaterialsExtensionTestCase):
         transmission = node.inputs[trans_input].default_value
         self.assertGreater(transmission, 0, "Transmission should be set for translucent material")
 
+    def test_textured_pbr_metallic_creates_nodes(self):
+        """Textured PBR metallic properties should create texture nodes (displaypropertiesid on base)."""
+        model_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="{NS_CORE}" xmlns:m="{NS_MATERIAL}" unit="millimeter">
+  <resources>
+    <basematerials id="1">
+      <base name="TexturedMetal" displaycolor="#AABBCC" displaypropertiesid="4" />
+    </basematerials>
+    <m:texture2d id="2" path="/3D/Texture/metal.png" contenttype="image/png" />
+    <m:texture2d id="3" path="/3D/Texture/rough.png" contenttype="image/png" />
+    <m:pbmetallictexturedisplayproperties id="4" name="MetalPBR"
+        metallictextureid="2" roughnesstextureid="3"
+        metallicfactor="1.0" roughnessfactor="0.5" />
+    {CUBE_MESH_WITH_MATERIAL}
+  </resources>
+  <build>
+    <item objectid="100" />
+  </build>
+</model>'''
+        
+        textures = {
+            '3D/Texture/metal.png': MINIMAL_PNG,
+            '3D/Texture/rough.png': MINIMAL_PNG,
+        }
+        
+        input_path = self.create_test_3mf(model_xml, textures)
+        self.assertTrue(self.import_3mf(input_path), "Import failed")
+        
+        # Find the TexturedMetal material
+        mat = None
+        for m in bpy.data.materials:
+            if m.name == "TexturedMetal":
+                mat = m
+                break
+        
+        self.assertIsNotNone(mat, "TexturedMetal material not found")
+        self.assertTrue(mat.use_nodes, "Material should use nodes")
+        
+        # Check for Image Texture nodes
+        nodes = mat.node_tree.nodes
+        tex_nodes = [n for n in nodes if n.type == 'TEX_IMAGE']
+        
+        self.assertGreaterEqual(len(tex_nodes), 1, 
+            "Should have at least one Image Texture node for PBR textures")
+        
+        # Check that Principled BSDF has texture inputs connected
+        principled = self._get_principled_node(mat)
+        self.assertIsNotNone(principled, "Principled BSDF not found")
+        
+        # The Metallic and/or Roughness inputs should have links
+        metallic_linked = principled.inputs['Metallic'].is_linked
+        roughness_linked = principled.inputs['Roughness'].is_linked
+        
+        self.assertTrue(metallic_linked or roughness_linked,
+            "At least one of Metallic or Roughness should have texture connected")
+
+    def test_textured_pbr_metallic_group_level_displaypropertiesid(self):
+        """Textured PBR with displaypropertiesid on basematerials (not on base) should work."""
+        model_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="{NS_CORE}" xmlns:m="{NS_MATERIAL}" unit="millimeter">
+  <resources>
+    <basematerials id="1" displaypropertiesid="4">
+      <base name="TexturedPBR" displaycolor="#CCCCCC" />
+    </basematerials>
+    <m:texture2d id="2" path="/3D/Texture/basecolor.png" contenttype="image/png" />
+    <m:texture2d id="3" path="/3D/Texture/roughness.png" contenttype="image/png" />
+    <m:pbmetallictexturedisplayproperties id="4" name="TexturedPBR"
+        basecolortextureid="2" roughnesstextureid="3" />
+    {CUBE_MESH_WITH_MATERIAL}
+  </resources>
+  <build>
+    <item objectid="100" />
+  </build>
+</model>'''
+        
+        textures = {
+            '3D/Texture/basecolor.png': MINIMAL_PNG,
+            '3D/Texture/roughness.png': MINIMAL_PNG,
+        }
+        
+        input_path = self.create_test_3mf(model_xml, textures)
+        self.assertTrue(self.import_3mf(input_path), "Import failed")
+        
+        # Find the TexturedPBR material
+        mat = None
+        for m in bpy.data.materials:
+            if m.name == "TexturedPBR":
+                mat = m
+                break
+        
+        self.assertIsNotNone(mat, "TexturedPBR material not found")
+        self.assertTrue(mat.use_nodes, "Material should use nodes")
+        
+        # Check for Image Texture nodes - should have at least 2 (basecolor and roughness)
+        nodes = mat.node_tree.nodes
+        tex_nodes = [n for n in nodes if n.type == 'TEX_IMAGE']
+        
+        self.assertGreaterEqual(len(tex_nodes), 2,
+            f"Should have at least 2 Image Texture nodes for basecolor and roughness, got {len(tex_nodes)}")
+        
+        # Check that Principled BSDF has texture inputs connected
+        principled = self._get_principled_node(mat)
+        self.assertIsNotNone(principled, "Principled BSDF not found")
+        
+        # Base Color should have a texture link
+        basecolor_linked = principled.inputs['Base Color'].is_linked
+        self.assertTrue(basecolor_linked, "Base Color should have texture connected")
+        
+        # Roughness should have a texture link
+        roughness_linked = principled.inputs['Roughness'].is_linked
+        self.assertTrue(roughness_linked, "Roughness should have texture connected")
+
 
 # =============================================================================
 # Test: Colorgroup
