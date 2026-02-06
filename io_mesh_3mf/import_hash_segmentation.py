@@ -25,6 +25,7 @@ The hash format is slicer-agnostic - only the XML attribute names differ.
 """
 
 import bpy
+import numpy as np
 from typing import Tuple, List, Dict
 from .hash_segmentation import SegmentationNode, TriangleState
 
@@ -102,152 +103,130 @@ def subdivide_in_uv_space(
 
 
 def render_triangle_to_image(
-    pixels: List[float],
+    buf: np.ndarray,
     width: int,
     height: int,
     uv0: Tuple[float, float],
     uv1: Tuple[float, float],
     uv2: Tuple[float, float],
-    color: List[float],
+    color: np.ndarray,
 ) -> None:
     """
-    Render a solid triangle to the pixel array using edge function rasterization.
+    Render a solid triangle to the pixel buffer using vectorized edge function rasterization.
 
-    :param pixels: Flat list of RGBA values (modified in-place)
+    Uses numpy meshgrid over the bounding box to evaluate all three edge functions
+    simultaneously, eliminating the per-pixel Python loop entirely.
+
+    :param buf: Numpy array of shape (H, W, 4), modified in-place
     :param width: Image width
     :param height: Image height
     :param uv0, uv1, uv2: UV coordinates (0-1)
-    :param color: RGBA color list (0-1)
+    :param color: Numpy array of 4 floats (RGBA, 0-1)
     """
     x0, y0 = uv0[0] * width, uv0[1] * height
     x1, y1 = uv1[0] * width, uv1[1] * height
     x2, y2 = uv2[0] * width, uv2[1] * height
 
-    # Edge function gives signed area; consistent sign means inside.
-    def edge_function(ax, ay, bx, by, px, py):
-        return (px - ax) * (by - ay) - (py - ay) * (bx - ax)
-
-    area = edge_function(x0, y0, x1, y1, x2, y2)
+    # Signed area via cross product; skip degenerate triangles.
+    area = (x2 - x0) * (y1 - y0) - (y2 - y0) * (x1 - x0)
     if abs(area) < 0.0001:
         return
 
-    # Normalize winding to keep edge tests consistent.
+    # Normalize winding so edge tests are consistent.
     if area < 0:
         x1, y1, x2, y2 = x2, y2, x1, y1
-        area = -area
 
     min_x = max(0, int(min(x0, x1, x2) - 1))
     max_x = min(width - 1, int(max(x0, x1, x2) + 2))
     min_y = max(0, int(min(y0, y1, y2) - 1))
     max_y = min(height - 1, int(max(y0, y1, y2) + 2))
 
+    if min_x > max_x or min_y > max_y:
+        return
+
+    # Build pixel-center grid over the bounding box.
+    xs = np.arange(min_x, max_x + 1, dtype=np.float32) + 0.5
+    ys = np.arange(min_y, max_y + 1, dtype=np.float32) + 0.5
+    px, py = np.meshgrid(xs, ys)  # shape (ny, nx)
+
+    # Vectorized edge functions: all pixels evaluated at once.
+    e0 = (px - x0) * (y1 - y0) - (py - y0) * (x1 - x0)
+    e1 = (px - x1) * (y2 - y1) - (py - y1) * (x2 - x1)
+    e2 = (px - x2) * (y0 - y2) - (py - y2) * (x0 - x2)
+
     # Slight negative threshold avoids pinholes on shared edges.
-    threshold = -1.5
+    mask = (e0 >= -1.5) & (e1 >= -1.5) & (e2 >= -1.5)
 
-    for y in range(min_y, max_y + 1):
-        py = y + 0.5
-        for x in range(min_x, max_x + 1):
-            px = x + 0.5
-
-            e0 = edge_function(x0, y0, x1, y1, px, py)
-            e1 = edge_function(x1, y1, x2, y2, px, py)
-            e2 = edge_function(x2, y2, x0, y0, px, py)
-
-            if e0 >= threshold and e1 >= threshold and e2 >= threshold:
-                idx = (y * width + x) * 4
-                if 0 <= idx < len(pixels) - 3:
-                    pixels[idx] = color[0]
-                    pixels[idx + 1] = color[1]
-                    pixels[idx + 2] = color[2]
-                    pixels[idx + 3] = color[3]
+    # Write color to all inside pixels in one shot.
+    buf[min_y:max_y + 1, min_x:max_x + 1][mask] = color
 
 
 def close_gaps_in_texture(
-    pixels: List[float], width: int, height: int, iterations: int = 1
-) -> List[float]:
+    buf: np.ndarray, width: int, height: int, iterations: int = 3
+) -> np.ndarray:
     """
-    Apply morphological dilation to close small gaps in the texture.
-    For each transparent/background pixel, check neighbors and fill with most common color.
+    Morphological dilation using numpy array shifts instead of per-pixel Python loops.
 
-    :param pixels: Flat list of RGBA values
+    For each transparent pixel with >= 2 opaque 4-connected neighbors, fills with
+    the color of the first opaque neighbor found. Uses np.roll with edge zeroing
+    to prevent wrap-around artifacts at image boundaries.
+
+    :param buf: Numpy array of shape (H, W, 4)
     :param width: Image width
     :param height: Image height
     :param iterations: Number of dilation passes
-    :return: Modified pixel list
+    :return: Modified buffer (may be a new array)
     """
-    result = list(pixels)
+    for _ in range(iterations):
+        alpha = buf[:, :, 3]
+        transparent = alpha < 0.5  # (H, W)
+        if not np.any(transparent):
+            break
 
-    for iteration in range(iterations):
-        temp = list(result)
+        # Shift arrays to get 4-connected neighbors. Zero edges to prevent wrapping.
+        left = np.roll(buf, 1, axis=1)
+        left[:, 0] = 0
+        right = np.roll(buf, -1, axis=1)
+        right[:, -1] = 0
+        up = np.roll(buf, 1, axis=0)
+        up[0, :] = 0
+        down = np.roll(buf, -1, axis=0)
+        down[-1, :] = 0
 
-        for y in range(height):
-            for x in range(width):
-                idx = (y * width + x) * 4
+        # Count opaque neighbors per pixel.
+        left_opaque = left[:, :, 3] > 0.5
+        right_opaque = right[:, :, 3] > 0.5
+        up_opaque = up[:, :, 3] > 0.5
+        down_opaque = down[:, :, 3] > 0.5
+        count = (
+            left_opaque.astype(np.int8)
+            + right_opaque.astype(np.int8)
+            + up_opaque.astype(np.int8)
+            + down_opaque.astype(np.int8)
+        )
 
-                if result[idx + 3] > 0.5:
-                    continue
+        # Only fill transparent pixels with >= 2 opaque neighbors.
+        fill_mask = transparent & (count >= 2)
+        if not np.any(fill_mask):
+            break
 
-                neighbors = []
+        # Pick fill color from first opaque neighbor (lowest priority written first,
+        # highest priority overwrites). Result: left > right > up > down.
+        fill_color = np.zeros_like(buf)
+        for neighbor, opaque in [
+            (down, down_opaque),
+            (up, up_opaque),
+            (right, right_opaque),
+            (left, left_opaque),
+        ]:
+            opaque_3d = opaque[:, :, np.newaxis]
+            fill_color = np.where(opaque_3d, neighbor, fill_color)
 
-                if x > 0:
-                    left_idx = (y * width + (x - 1)) * 4
-                    if result[left_idx + 3] > 0.5:
-                        neighbors.append(
-                            (
-                                result[left_idx],
-                                result[left_idx + 1],
-                                result[left_idx + 2],
-                                result[left_idx + 3],
-                            )
-                        )
+        # Apply fill only at fill_mask positions.
+        fill_3d = fill_mask[:, :, np.newaxis]
+        buf = np.where(fill_3d, fill_color, buf)
 
-                if x < width - 1:
-                    right_idx = (y * width + (x + 1)) * 4
-                    if result[right_idx + 3] > 0.5:
-                        neighbors.append(
-                            (
-                                result[right_idx],
-                                result[right_idx + 1],
-                                result[right_idx + 2],
-                                result[right_idx + 3],
-                            )
-                        )
-
-                if y > 0:
-                    up_idx = ((y - 1) * width + x) * 4
-                    if result[up_idx + 3] > 0.5:
-                        neighbors.append(
-                            (
-                                result[up_idx],
-                                result[up_idx + 1],
-                                result[up_idx + 2],
-                                result[up_idx + 3],
-                            )
-                        )
-
-                if y < height - 1:
-                    down_idx = ((y + 1) * width + x) * 4
-                    if result[down_idx + 3] > 0.5:
-                        neighbors.append(
-                            (
-                                result[down_idx],
-                                result[down_idx + 1],
-                                result[down_idx + 2],
-                                result[down_idx + 3],
-                            )
-                        )
-
-                # Require at least two neighbors to avoid smearing isolated pixels.
-                if len(neighbors) >= 2:
-                    if neighbors:
-                        temp[idx] = neighbors[0][0]
-                        temp[idx + 1] = neighbors[0][1]
-                        temp[idx + 2] = neighbors[0][2]
-                        temp[idx + 3] = neighbors[0][3]
-
-        result = temp
-
-    return result
+    return buf
 
 
 def render_segmentation_to_texture(
@@ -263,6 +242,9 @@ def render_segmentation_to_texture(
 
     Uses Smart UV Project to create a good UV layout, then renders
     segmentation patterns as colored triangles in UV space.
+
+    Optimized path: numpy (H, W, 4) pixel buffer, bulk UV reads via
+    foreach_get, vectorized rasterization and gap closing.
 
     :param obj: Blender mesh object
     :param seg_strings: Dict mapping face_index -> segmentation_string
@@ -297,14 +279,29 @@ def render_segmentation_to_texture(
 
     bpy.ops.object.mode_set(mode="OBJECT")
 
+    # Bulk-read all UVs into a numpy array instead of per-loop attribute access.
     uv_layer_data = mesh.uv_layers.active.data
+    num_loops = len(uv_layer_data)
+    uv_flat = np.zeros(num_loops * 2, dtype=np.float64)
+    uv_layer_data.foreach_get("uv", uv_flat)
+    all_uvs = uv_flat.reshape(-1, 2)
 
     image_name = f"{obj.name}_segmentation"
     image = bpy.data.images.new(
         image_name, width=texture_size, height=texture_size, alpha=True
     )
 
-    pixels = [0.0, 0.0, 0.0, 0.0] * (texture_size * texture_size)
+    # Numpy pixel buffer: (H, W, 4) instead of flat Python list.
+    buf = np.zeros((texture_size, texture_size, 4), dtype=np.float32)
+
+    # Pre-build color lookup table for fast indexed access.
+    max_color_idx = max(extruder_colors.keys()) if extruder_colors else 0
+    color_table = np.full((max_color_idx + 2, 4), [0.5, 0.5, 0.5, 1.0], dtype=np.float32)
+    for idx, col in extruder_colors.items():
+        color_table[idx] = col
+
+    default_color_index = default_extruder - 1
+    default_color = color_table[min(default_color_index, len(color_table) - 1)]
 
     decode_failures = 0
     subdivision_failures = 0
@@ -318,9 +315,9 @@ def render_segmentation_to_texture(
             continue
 
         loop_indices = list(poly.loop_indices)
-        uv0 = tuple(uv_layer_data[loop_indices[0]].uv)
-        uv1 = tuple(uv_layer_data[loop_indices[1]].uv)
-        uv2 = tuple(uv_layer_data[loop_indices[2]].uv)
+        uv0 = all_uvs[loop_indices[0]]
+        uv1 = all_uvs[loop_indices[1]]
+        uv2 = all_uvs[loop_indices[2]]
 
         tree = decode_segmentation_string(seg_string)
         if tree is None:
@@ -329,12 +326,8 @@ def render_segmentation_to_texture(
                 f"    WARNING: Failed to decode segmentation for face {face_idx}: '{seg_string}'"
             )
             # Fallback to default extruder so the face remains printable.
-            default_color_index = default_extruder - 1
-            fallback_color = list(
-                extruder_colors.get(default_color_index, [0.5, 0.5, 0.5, 1.0])
-            )
             render_triangle_to_image(
-                pixels, texture_size, texture_size, uv0, uv1, uv2, fallback_color
+                buf, texture_size, texture_size, uv0, uv1, uv2, default_color
             )
             continue
 
@@ -343,31 +336,25 @@ def render_segmentation_to_texture(
         if not sub_triangles:
             subdivision_failures += 1
             print(f"    WARNING: Subdivision produced no triangles for face {face_idx}")
-            # Fallback keeps visuals intact even if a tree is malformed.
-            default_color_index = default_extruder - 1
-            fallback_color = list(
-                extruder_colors.get(default_color_index, [0.5, 0.5, 0.5, 1.0])
-            )
             render_triangle_to_image(
-                pixels, texture_size, texture_size, uv0, uv1, uv2, fallback_color
+                buf, texture_size, texture_size, uv0, uv1, uv2, default_color
             )
             continue
 
         for sub_uv0, sub_uv1, sub_uv2, state in sub_triangles:
             if state == TriangleState.DEFAULT or state == 0:
-                color_index = default_extruder - 1
+                color = default_color
             else:
-                color_index = (
-                    int(state) - 1
-                )
-            color = list(extruder_colors.get(color_index, [0.5, 0.5, 0.5, 1.0]))
+                ci = int(state) - 1
+                if 0 <= ci < len(color_table):
+                    color = color_table[ci]
+                else:
+                    color = np.array([0.5, 0.5, 0.5, 1.0], dtype=np.float32)
 
             render_triangle_to_image(
-                pixels, texture_size, texture_size, sub_uv0, sub_uv1, sub_uv2, color
+                buf, texture_size, texture_size, sub_uv0, sub_uv1, sub_uv2, color
             )
 
-    default_color_index = default_extruder - 1
-    default_col = list(extruder_colors.get(default_color_index, [0.5, 0.5, 0.5, 1.0]))
     # Fill any faces without segmentation with the default color.
     for face_idx, poly in enumerate(mesh.polygons):
         if face_idx in seg_strings:
@@ -376,11 +363,11 @@ def render_segmentation_to_texture(
             continue
 
         loop_indices = list(poly.loop_indices)
-        uv0 = tuple(uv_layer_data[loop_indices[0]].uv)
-        uv1 = tuple(uv_layer_data[loop_indices[1]].uv)
-        uv2 = tuple(uv_layer_data[loop_indices[2]].uv)
+        uv0 = all_uvs[loop_indices[0]]
+        uv1 = all_uvs[loop_indices[1]]
+        uv2 = all_uvs[loop_indices[2]]
         render_triangle_to_image(
-            pixels, texture_size, texture_size, uv0, uv1, uv2, default_col
+            buf, texture_size, texture_size, uv0, uv1, uv2, default_color
         )
 
     if decode_failures > 0 or subdivision_failures > 0:
@@ -388,9 +375,10 @@ def render_segmentation_to_texture(
             f"  Segmentation processing: {decode_failures} decode failures, {subdivision_failures} subdivision failures"
         )
 
-    pixels = close_gaps_in_texture(pixels, texture_size, texture_size, iterations=3)
+    buf = close_gaps_in_texture(buf, texture_size, texture_size, iterations=3)
 
-    image.pixels[:] = pixels
+    # Bulk-write pixels to Blender image.
+    image.pixels.foreach_set(buf.ravel())
     image.pack()
 
     return image
