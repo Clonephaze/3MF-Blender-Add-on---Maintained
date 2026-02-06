@@ -54,6 +54,12 @@ from .unit_conversions import (  # To convert to Blender's units.
     threemf_to_metre,
 )
 
+# Hash-based segmentation support (PrusaSlicer, Orca Slicer)
+from .hash_segmentation import (
+    TriangleSubdivider,
+    decode_segmentation_string,
+)
+
 # Import materials package for Materials Extension support
 from .import_materials import (
     read_materials as _read_materials_impl,
@@ -86,8 +92,8 @@ log = logging.getLogger(__name__)
 
 ResourceObject = collections.namedtuple(
     "ResourceObject",
-    ["vertices", "triangles", "materials", "components", "metadata", "triangle_sets", "triangle_uvs"],
-    defaults=[None, None]  # triangle_sets and triangle_uvs are optional (Python 3.7+)
+    ["vertices", "triangles", "materials", "components", "metadata", "triangle_sets", "triangle_uvs", "segmentation_strings", "default_extruder"],
+    defaults=[None, None, None, None]  # triangle_sets, triangle_uvs, segmentation_strings, default_extruder are optional
 )
 # Component with optional path field for Production Extension support
 # Using defaults parameter (Python 3.7+) to make path optional
@@ -207,10 +213,10 @@ def parse_paint_color_to_index(paint_code: str) -> int:
     """
     Parse a paint_color code to a filament index.
 
-    Handles case insensitivity and unknown codes.
+    Returns 0 if not a known Orca paint code (caller should try segmentation decode).
 
     :param paint_code: The paint_color attribute value.
-    :return: Filament index (1-based), or 0 if no color.
+    :return: Filament index (1-based), or 0 if not a known paint code.
     """
     if not paint_code:
         return 0
@@ -224,9 +230,8 @@ def parse_paint_color_to_index(paint_code: str) -> int:
     if paint_code in ORCA_PAINT_TO_INDEX:
         return ORCA_PAINT_TO_INDEX[paint_code]
 
-    # Unknown code - log warning and use filament 1
-    log.warning(f"Unknown paint_color code: {paint_code}, using as filament 1")
-    return 1
+    # Not a known Orca paint code - return 0 so caller can try segmentation decode
+    return 0
 
 
 # Production Extension namespace for p:path attributes
@@ -256,11 +261,15 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
     global_scale: bpy.props.FloatProperty(
         name="Scale", default=1.0, soft_min=0.001, soft_max=1000.0, min=1e-6, max=1e6
     )
-    import_materials: bpy.props.BoolProperty(
-        name="Import Materials",
-        description="Import material colors from the 3MF file. "
-                    "Disable to import geometry only",
-        default=True,
+    import_materials: bpy.props.EnumProperty(
+        name="Material Mode",
+        description="How to import material and color data",
+        items=[
+            ('MATERIALS', 'Import Materials', 'Import material colors and properties (standard 3MF)'),
+            ('PAINT', 'Import MMU Paint Data', 'Render multi-material segmentation to UV texture for painting (experimental, may be slow for large models)'),
+            ('NONE', 'Geometry Only', 'Skip all material and color data'),
+        ],
+        default='MATERIALS',
     )
     reuse_materials: bpy.props.BoolProperty(
         name="Reuse Existing Materials",
@@ -605,7 +614,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                     root = document.getroot()
 
                     # Detect vendor-specific format (if materials are enabled)
-                    if self.import_materials:
+                    if self.import_materials != 'NONE':
                         self.vendor_format = self.detect_vendor(root)
                         if self.vendor_format:
                             self.safe_report({'INFO'}, f"Detected {self.vendor_format.upper()} Slicer format")
@@ -681,10 +690,13 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                     self.resource_textures = {}  # ID -> ResourceTexture
                     self.resource_texture_groups = {}  # ID -> ResourceTextureGroup
                     self.orca_filament_colors = {}  # Maps filament index -> hex color
+                    self.object_default_extruders = {}  # Maps object ID -> default extruder (1-based)
 
                     # Try to read filament colors from metadata
                     self.read_orca_filament_colors(path)  # Orca project_settings.config
+                    self.read_prusa_slic3r_colors(path)   # PrusaSlicer Slic3r_PE.config
                     self.read_prusa_filament_colors(path)  # Blender's PrusaSlicer metadata
+                    self.read_prusa_object_extruders(path)  # PrusaSlicer object extruder assignments
 
                     self._progress_update(25, "Reading materials and objects...")
                     scene_metadata = self.read_metadata(root, scene_metadata)
@@ -1092,7 +1104,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         :param root: The root of an XML document that may contain materials.
         """
         # Skip all material import if disabled
-        if not self.import_materials:
+        if self.import_materials == 'NONE':
             log.info("Material import disabled, skipping all material data")
             return
 
@@ -1278,7 +1290,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                     material = self.resource_materials[pid][index]
                 except KeyError:
                     # Only warn if materials were supposed to be imported
-                    if self.import_materials:
+                    if self.import_materials != 'NONE':
                         log.warning(
                             f"Object with ID {objectid} refers to material collection {pid} with index {pindex}"
                             f" which doesn't exist."
@@ -1302,7 +1314,11 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                         f"Object with ID {objectid} specifies material index {pindex}, which is not integer")
 
             vertices = self.read_vertices(object_node)
-            triangles, materials, triangle_uvs = self.read_triangles(object_node, material, pid)
+            # Pass vertex coordinates to allow PrusaSlicer segmentation subdivision
+            # Also pass objectid for looking up default extruder
+            triangles, materials, triangle_uvs, vertices, segmentation_strings, default_extruder = self.read_triangles(
+                object_node, material, pid, vertices, objectid
+            )
             components = self.read_components(object_node)
 
             # Check if components have p:path references (Production Extension)
@@ -1356,6 +1372,8 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 metadata=metadata,
                 triangle_sets=triangle_sets,
                 triangle_uvs=triangle_uvs if has_uvs else None,
+                segmentation_strings=segmentation_strings if segmentation_strings else None,
+                default_extruder=default_extruder,
             )
 
     def read_vertices(self, object_node: xml.etree.ElementTree.Element) -> List[Tuple[float, float, float]]:
@@ -1396,8 +1414,10 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
     def read_triangles(
             self, object_node: xml.etree.ElementTree.Element,
             default_material: Optional[int],
-            material_pid: Optional[int]
-    ) -> Tuple[List[Tuple[int, int, int]], List[Optional[int]], List[Optional[Tuple]]]:
+            material_pid: Optional[int],
+            vertex_coords: Optional[List[Tuple[float, float, float]]] = None,
+            object_id: Optional[str] = None
+    ) -> Tuple[List[Tuple[int, int, int]], List[Optional[int]], List[Optional[Tuple]], List[Tuple[float, float, float]], Dict[int, str], int]:
         """
         Reads out the triangles from an XML node of an object.
 
@@ -1405,23 +1425,47 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         previously. The triangle also contains an associated material, or None if the triangle gets no material.
 
         For textured triangles (pid references a texture2dgroup), UV coordinates are extracted from p1, p2, p3.
+        
+        For PrusaSlicer/Orca segmentation:
+        - If import_materials == 'PAINT': Store hash strings for UV texture rendering
+        - Otherwise: Subdivide geometry (legacy method)
 
         :param object_node: An <object> element from the 3dmodel.model file.
         :param default_material: If the triangle specifies no material, it should get this material. May be `None` if
         the model specifies no material.
         :param material_pid: Triangles that specify a material index will get their material from this material group.
-        :return: Three lists of equal length:
+        :param vertex_coords: Optional list of vertex coordinates for PrusaSlicer subdivision support.
+        :param object_id: Object ID for looking up default extruder from PrusaSlicer metadata.
+        :return: Six values:
             - vertices: 3-tuples of vertex indices
             - materials: material for each triangle (or None)
             - uvs: UV coordinates per triangle ((u1,v1), (u2,v2), (u3,v3)) or None if not textured
+            - vertex_coords: Possibly expanded vertex coordinate list
+            - segmentation_strings: Dict mapping face_index -> hash string
+            - default_extruder: Default extruder index for this object
         """
         vertices = []
         materials = []
         triangle_uvs = []  # List of ((u1,v1), (u2,v2), (u3,v3)) or None per triangle
+        segmentation_strings = {}  # Dict mapping face_index -> hash string for UV texture rendering
+        
+        # Make a mutable copy of vertex coordinates (or empty list if not provided)
+        vertex_list = list(vertex_coords) if vertex_coords else []
+        
+        # Track state->material mapping for PrusaSlicer segmentation
+        state_materials = {}
+        
+        # Get object's default extruder (1-based), default to 1 if not specified
+        default_extruder = 1
+        if object_id and hasattr(self, 'object_default_extruders'):
+            default_extruder = self.object_default_extruders.get(object_id, 1)
+        
+        # Threshold to distinguish simple Orca codes from PrusaSlicer segmentation
+        PRUSA_SEGMENTATION_THRESHOLD = 10
 
-        for triangle in object_node.iterfind(
+        for tri_index, triangle in enumerate(object_node.iterfind(
             "./3mf:mesh/3mf:triangles/3mf:triangle", MODEL_NAMESPACES
-        ):
+        )):
             attrib = triangle.attrib
             try:
                 v1 = int(attrib["v1"])
@@ -1439,7 +1483,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 material = None
                 uvs = None  # Will be set if this is a textured triangle
 
-                if self.import_materials:
+                if self.import_materials != 'NONE':
                     # Check for multi-material paint attributes first
                     # PrusaSlicer uses slic3rpe:mmu_segmentation, Orca uses paint_color
                     paint_code = attrib.get("paint_color")
@@ -1450,11 +1494,53 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                         # Also check prefixed form (some parsers)
                         paint_code = attrib.get("slic3rpe:mmu_segmentation")
 
-                    if paint_code:
-                        # Multi-material paint attribute found
-                        filament_index = parse_paint_color_to_index(paint_code)
-                        if filament_index > 0:
-                            material = self.get_or_create_paint_material(filament_index, paint_code)
+                    # Handle paint_code attribute (segmentation or Orca-style markers)
+                    if paint_code and self.import_materials == 'PAINT' and vertex_list:
+                        # PAINT mode: All paint codes are segmentation strings for UV texture
+                        current_face_index = len(vertices)
+                        segmentation_strings[current_face_index] = paint_code
+                        vertices.append((v1, v2, v3))
+                        triangle_uvs.append(None)
+                        materials.append(material or default_material)
+                        continue  # Skip normal triangle addition below
+                    elif paint_code and self.import_materials == 'MATERIALS' and vertex_list:
+                        # MATERIALS mode: Try different strategies based on length
+                        if len(paint_code) >= PRUSA_SEGMENTATION_THRESHOLD:
+                            # Long string (10+ chars): Full segmentation tree - subdivide geometry
+                            try:
+                                sub_tris, sub_mats = self._subdivide_prusa_segmentation(
+                                    v1, v2, v3, paint_code, vertex_list, state_materials, tri_index,
+                                    default_extruder
+                                )
+                                for tri in sub_tris:
+                                    vertices.append(tri)
+                                    triangle_uvs.append(None)
+                                materials.extend(sub_mats)
+                                continue  # Skip normal triangle addition
+                            except Exception as e:
+                                log.warning(f"Failed to subdivide long segmentation: {e}")
+                                # Fall through to default material
+                        else:
+                            # Short string (<10 chars): Could be Orca code or short segmentation
+                            filament_index = parse_paint_color_to_index(paint_code)
+                            if filament_index > 0:
+                                # It's a known Orca paint code ("4", "8", "0C", etc.)
+                                material = self.get_or_create_paint_material(filament_index, paint_code)
+                            else:
+                                # Unknown code - try as short segmentation string
+                                try:
+                                    sub_tris, sub_mats = self._subdivide_prusa_segmentation(
+                                        v1, v2, v3, paint_code, vertex_list, state_materials, tri_index,
+                                        default_extruder
+                                    )
+                                    for tri in sub_tris:
+                                        vertices.append(tri)
+                                        triangle_uvs.append(None)
+                                    materials.extend(sub_mats)
+                                    continue
+                                except Exception as e:
+                                    log.debug(f"String '{paint_code}' not valid Orca code or segmentation, using default")
+                                    # Fall through to default material
                     elif pid is not None and pid in self.resource_texture_groups:
                         # This is a texture group reference - extract UVs
                         texture_group = self.resource_texture_groups[pid]
@@ -1511,7 +1597,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 log.warning(f"Vertex reference is not an integer: {e}")
                 self.safe_report({'WARNING'}, f"Vertex reference is not an integer: {e}")
                 continue  # No fallback this time. Leave out the entire triangle.
-        return vertices, materials, triangle_uvs
+        return vertices, materials, triangle_uvs, vertex_list, segmentation_strings, default_extruder
 
     def _get_or_create_textured_material(
             self, texture_group_id: str,
@@ -1736,7 +1822,8 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 continue
 
             vertices = self.read_vertices(object_node)
-            triangles, materials = self.read_triangles_with_paint_color(object_node)
+            # Pass vertices to allow PrusaSlicer segmentation subdivision to expand them
+            triangles, materials, vertices, segmentation_strings, default_extruder = self.read_triangles_with_paint_color(object_node, vertices, objectid)
             components = self.read_components(object_node)
 
             metadata = Metadata()
@@ -1771,6 +1858,9 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 components=components,
                 metadata=metadata,
                 triangle_sets=triangle_sets,
+                triangle_uvs=None,  # Orca objects don't have textured UVs
+                segmentation_strings=segmentation_strings if segmentation_strings else None,
+                default_extruder=default_extruder,
             )
             log.info(
                 f"Loaded object {objectid} from {source_path} "
@@ -1778,25 +1868,53 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             )
 
     def read_triangles_with_paint_color(
-            self, object_node: xml.etree.ElementTree.Element
-    ) -> Tuple[List[Tuple[int, int, int]], List[Optional[ResourceMaterial]]]:
+            self, object_node: xml.etree.ElementTree.Element,
+            vertices: Optional[List[Tuple[float, float, float]]] = None,
+            object_id: Optional[str] = None
+    ) -> Tuple[List[Tuple[int, int, int]], List[Optional[ResourceMaterial]], List[Tuple[float, float, float]], Dict[int, str], int]:
         """
-        Read triangles from an object node, handling paint_color attributes (Orca Slicer format).
+        Read triangles from an object node, handling paint_color attributes.
 
-        This creates materials on-the-fly from paint_color values.
+        Supports both Orca Slicer format (simple paint codes like "4", "8") and
+        PrusaSlicer format (hierarchical segmentation strings that get subdivided).
 
         :param object_node: An <object> element from a model file.
-        :return: Tuple of (triangle list, material list).
+        :param vertices: Optional list of vertex coordinates for PrusaSlicer subdivision.
+                        If None, vertices are read from object_node.
+        :param object_id: Object ID for looking up default extruder from PrusaSlicer metadata.
+        :return: Tuple of (triangle list, material list, vertex list, segmentation_strings dict, default_extruder).
+                 Vertex list may be expanded if PrusaSlicer segmentation is present.
         """
-        vertices = []
+        triangles = []
         materials = []
+        segmentation_strings = {}  # For UV texture rendering in PAINT mode
+        
+        # Read vertices if not provided
+        if vertices is None:
+            vertices = self.read_vertices(object_node)
+        
+        # Make a mutable copy of vertices that we can extend
+        vertex_list = list(vertices)
 
         # Track paint_color to material mapping for this object
         paint_color_materials = {}
+        
+        # Track state->material mapping for PrusaSlicer segmentation
+        state_materials = {}
+        
+        # Get object's default extruder (1-based), default to 1 if not specified
+        default_extruder = 1
+        if object_id and hasattr(self, 'object_default_extruders'):
+            default_extruder = self.object_default_extruders.get(object_id, 1)
+        
+        # Threshold to distinguish simple Orca codes from PrusaSlicer segmentation
+        # Simple codes are short: "", "4", "8", "0C", "1C" etc. (≤ 3 chars)
+        # PrusaSlicer segmentation strings are long (hundreds of chars)
+        PRUSA_SEGMENTATION_THRESHOLD = 10
 
-        for triangle in object_node.iterfind(
+        for tri_index, triangle in enumerate(object_node.iterfind(
             "./3mf:mesh/3mf:triangles/3mf:triangle", MODEL_NAMESPACES
-        ):
+        )):
             attrib = triangle.attrib
             try:
                 v1 = int(attrib["v1"])
@@ -1806,34 +1924,67 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                     log.warning("Triangle with negative vertex index.")
                     continue
 
-                vertices.append((v1, v2, v3))
-
                 # Handle multi-material attributes (Orca/PrusaSlicer)
-                # Orca uses paint_color, PrusaSlicer uses slic3rpe:mmu_segmentation
-                # Both use the same hex code format ("4", "8", "0C", etc.)
                 material = None
-                if self.import_materials:
+                if self.import_materials != 'NONE':
                     # Try paint_color first (Orca), then mmu_segmentation (PrusaSlicer)
                     paint_code = attrib.get("paint_color")
                     if not paint_code:
-                        # Check for PrusaSlicer's attribute with namespace
+                        #Check for PrusaSlicer's attribute with namespace
                         paint_code = attrib.get(f"{{{SLIC3RPE_NAMESPACE}}}mmu_segmentation")
                         if not paint_code:
                             # Also try without namespace (some files have it as plain attribute)
                             paint_code = attrib.get("slic3rpe:mmu_segmentation")
 
-                    if paint_code:  # Found a multi-material attribute
-                        if paint_code not in paint_color_materials:
-                            # Create a material for this code
-                            filament_index = parse_paint_color_to_index(paint_code)
-                            if filament_index > 0:  # Valid filament (1+)
-                                # Use fallback colors if no config file (PrusaSlicer case)
-                                material = self.get_or_create_paint_material(filament_index, paint_code)
-                                paint_color_materials[paint_code] = material
-                                log.debug(f"Multi-material code '{paint_code}' -> filament {filament_index}")
+                    # Handle paint_code attribute (segmentation or Orca-style markers)
+                    if paint_code and self.import_materials == 'PAINT':
+                        # PAINT mode: All paint codes are segmentation strings for UV texture
+                        current_face_index = len(triangles)
+                        segmentation_strings[current_face_index] = paint_code
+                        triangles.append((v1, v2, v3))
+                        materials.append(material)
+                        continue  # Skip normal triangle addition below
+                    elif paint_code and self.import_materials == 'MATERIALS':
+                        # MATERIALS mode: Try different strategies based on length
+                        if len(paint_code) >= PRUSA_SEGMENTATION_THRESHOLD:
+                            # Long string (10+ chars): Full segmentation tree - subdivide geometry
+                            try:
+                                sub_tris, sub_mats = self._subdivide_prusa_segmentation(
+                                    v1, v2, v3, paint_code, vertex_list, state_materials, tri_index,
+                                    default_extruder
+                                )
+                                triangles.extend(sub_tris)
+                                materials.extend(sub_mats)
+                                continue  # Skip normal triangle addition
+                            except Exception as e:
+                                log.warning(f"Failed to subdivide long segmentation: {e}")
+                                # Fall through to treat as unpainted triangle
                         else:
-                            material = paint_color_materials[paint_code]
+                            # Short string (<10 chars): Could be Orca code or short segmentation
+                            if paint_code not in paint_color_materials:
+                                filament_index = parse_paint_color_to_index(paint_code)
+                                if filament_index > 0:
+                                    # It's a known Orca paint code ("4", "8", "0C", etc.)
+                                    material = self.get_or_create_paint_material(filament_index, paint_code)
+                                    paint_color_materials[paint_code] = material
+                                    log.debug(f"Multi-material code '{paint_code}' -> filament {filament_index}")
+                                else:
+                                    # Unknown code - try as short segmentation string
+                                    try:
+                                        sub_tris, sub_mats = self._subdivide_prusa_segmentation(
+                                            v1, v2, v3, paint_code, vertex_list, state_materials, tri_index,
+                                            default_extruder
+                                        )
+                                        triangles.extend(sub_tris)
+                                        materials.extend(sub_mats)
+                                        continue
+                                    except Exception as e:
+                                        log.debug(f"String '{paint_code}' not valid Orca code or segmentation, using default")
+                                        # Fall through to default material
+                            else:
+                                material = paint_color_materials[paint_code]
 
+                triangles.append((v1, v2, v3))
                 materials.append(material)
 
             except KeyError as e:
@@ -1843,7 +1994,90 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 log.warning(f"Invalid vertex reference: {e}")
                 continue
 
-        return vertices, materials
+        return triangles, materials, vertex_list, segmentation_strings, default_extruder
+    
+    def _subdivide_prusa_segmentation(
+            self,
+            v1: int, v2: int, v3: int,
+            segmentation_string: str,
+            vertex_list: List[Tuple[float, float, float]],
+            state_materials: Dict[int, ResourceMaterial],
+            source_triangle_index: int,
+            default_extruder: int = 1
+    ) -> Tuple[List[Tuple[int, int, int]], List[Optional[ResourceMaterial]]]:
+        """
+        Subdivide a triangle according to PrusaSlicer segmentation.
+        
+        :param v1, v2, v3: Vertex indices of the original triangle
+        :param segmentation_string: The slic3rpe:mmu_segmentation hex string
+        :param vertex_list: Vertex coordinate list (will be extended with new vertices)
+        :param state_materials: Dict mapping state -> material (will be extended)
+        :param source_triangle_index: Index of source triangle (for tracking)
+        :param default_extruder: Object's default extruder (1-based) for state 0
+        :return: Tuple of (sub-triangles, sub-materials)
+        """
+        # Decode the segmentation tree
+        tree = decode_segmentation_string(segmentation_string)
+        if tree is None:
+            # Failed to decode - return original triangle without material
+            return [(v1, v2, v3)], [None]
+        
+        # Get vertex coordinates
+        p1 = vertex_list[v1]
+        p2 = vertex_list[v2]
+        p3 = vertex_list[v3]
+        
+        # Subdivide using the tree
+        subdivider = TriangleSubdivider()
+        new_verts, sub_tris = subdivider.subdivide(p1, p2, p3, tree, source_triangle_index)
+        
+        # Add new vertices (indices 3+ in new_verts are new midpoints)
+        base_vertex_idx = len(vertex_list)
+        for i in range(3, len(new_verts)):
+            vertex_list.append(new_verts[i])
+        
+        # Remap triangle vertex indices to global vertex list
+        def remap_idx(local_idx: int) -> int:
+            if local_idx == 0:
+                return v1
+            elif local_idx == 1:
+                return v2
+            elif local_idx == 2:
+                return v3
+            else:
+                return base_vertex_idx + (local_idx - 3)
+        
+        result_triangles = []
+        result_materials = []
+        
+        for tri in sub_tris:
+            # Remap indices
+            result_triangles.append((
+                remap_idx(tri.v0),
+                remap_idx(tri.v1),
+                remap_idx(tri.v2)
+            ))
+            
+            # Get or create material for this state
+            # State 0 = object's default extruder, State N = Extruder N directly
+            state = int(tri.state)
+            if state == 0:
+                extruder_num = default_extruder  # Use object's assigned extruder
+            else:
+                extruder_num = state  # State value IS the extruder number (1-based)
+            
+            if state not in state_materials:
+                # Create material for this extruder state
+                material = self.get_or_create_paint_material(
+                    extruder_num, f"prusa_extruder_{extruder_num}"
+                )
+                state_materials[state] = material
+            result_materials.append(state_materials[state])
+        
+        log.debug(f"Subdivided triangle {source_triangle_index}: "
+                 f"{len(new_verts)-3} new vertices, {len(result_triangles)} sub-triangles")
+        
+        return result_triangles, result_materials
 
     def get_or_create_paint_material(self, filament_index: int, paint_code: str) -> ResourceMaterial:
         """
@@ -1902,7 +2136,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
         :param archive_path: Path to the 3MF archive file.
         """
-        if not self.import_materials:
+        if self.import_materials == 'NONE':
             return
 
         try:
@@ -1935,6 +2169,101 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         except (zipfile.BadZipFile, IOError) as e:
             log.debug(f"Could not read Orca config from {archive_path}: {e}")
 
+    def read_prusa_slic3r_colors(self, archive_path: str) -> None:
+        """
+        Read extruder colors from PrusaSlicer's Slic3r_PE.config.
+
+        This file contains lines like:
+        ; extruder_colour = #FF8000;#DB5182;#3EC0FF;#FF4F4F;#FBEB7D
+
+        :param archive_path: Path to the 3MF archive file.
+        """
+        if self.import_materials == 'NONE':
+            return
+
+        # Skip if colors already loaded from Orca config
+        if self.orca_filament_colors:
+            log.debug("Filament colors already loaded, skipping Slic3r_PE.config")
+            return
+
+        try:
+            with zipfile.ZipFile(archive_path, 'r') as archive:
+                config_path = "Metadata/Slic3r_PE.config"
+                if config_path not in archive.namelist():
+                    log.debug(f"No {config_path} in archive, skipping PrusaSlicer color import")
+                    return
+
+                with archive.open(config_path) as config_file:
+                    content = config_file.read().decode('UTF-8')
+
+                    # Parse ; extruder_colour = ... line
+                    for line in content.split('\n'):
+                        line = line.strip()
+                        if line.startswith('; extruder_colour = '):
+                            colors_str = line[len('; extruder_colour = '):]
+                            hex_colors = [c.strip() for c in colors_str.split(';')]
+
+                            for idx, hex_color in enumerate(hex_colors):
+                                if hex_color.startswith('#'):
+                                    self.orca_filament_colors[idx] = hex_color
+
+                            log.info(f"Loaded {len(hex_colors)} PrusaSlicer extruder colors: {hex_colors}")
+                            self.safe_report({'INFO'}, f"Loaded {len(hex_colors)} PrusaSlicer extruder colors")
+                            break
+
+        except (zipfile.BadZipFile, IOError) as e:
+            log.debug(f"Could not read PrusaSlicer config from {archive_path}: {e}")
+
+    def read_prusa_object_extruders(self, archive_path: str) -> None:
+        """
+        Read object extruder assignments from PrusaSlicer's Slic3r_PE_model.config.
+
+        This file contains XML like:
+        <object id="1" ...>
+          <metadata type="object" key="extruder" value="3"/>
+        </object>
+
+        :param archive_path: Path to the 3MF archive file.
+        """
+        try:
+            with zipfile.ZipFile(archive_path, 'r') as archive:
+                config_path = "Metadata/Slic3r_PE_model.config"
+                if config_path not in archive.namelist():
+                    log.debug(f"No {config_path} in archive, skipping object extruder import")
+                    return
+
+                with archive.open(config_path) as config_file:
+                    content = config_file.read().decode('UTF-8')
+                    
+                    try:
+                        root = xml.etree.ElementTree.fromstring(content)
+                    except xml.etree.ElementTree.ParseError as e:
+                        log.warning(f"Failed to parse {config_path}: {e}")
+                        return
+
+                    # Find all object elements and extract extruder metadata
+                    for obj in root.findall('.//object'):
+                        obj_id = obj.get('id')
+                        if obj_id is None:
+                            continue
+                        
+                        # Look for extruder metadata at object level
+                        for meta in obj.findall('metadata'):
+                            if meta.get('type') == 'object' and meta.get('key') == 'extruder':
+                                try:
+                                    extruder = int(meta.get('value', '1'))
+                                    # PrusaSlicer uses 1-based extruder numbers
+                                    self.object_default_extruders[obj_id] = extruder
+                                    log.debug(f"Object {obj_id} uses extruder {extruder}")
+                                except ValueError:
+                                    pass
+
+                    if self.object_default_extruders:
+                        log.info(f"Loaded extruder assignments for {len(self.object_default_extruders)} objects")
+
+        except (zipfile.BadZipFile, IOError) as e:
+            log.debug(f"Could not read PrusaSlicer model config from {archive_path}: {e}")
+
     def read_prusa_filament_colors(self, archive_path: str) -> None:
         """
         Read filament colors from Blender's PrusaSlicer MMU export metadata.
@@ -1944,7 +2273,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
         :param archive_path: Path to the 3MF archive file.
         """
-        if not self.import_materials:
+        if self.import_materials == 'NONE':
             return
 
         try:
@@ -2230,90 +2559,193 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 mesh.update()
                 resource_object.metadata.store(mesh)
 
-                # Mapping resource materials to indices in the list of materials for this specific mesh.
-                # Build material index array for batch assignment (much faster than per-face assignment)
-                materials_to_index = {}
-                material_indices = [0] * len(resource_object.materials)  # Pre-allocate
+                # Track if we rendered paint texture (to skip standard material assignment)
+                paint_texture_rendered = False
 
-                for triangle_index, triangle_material in enumerate(
-                    resource_object.materials
-                ):
-                    if triangle_material is None:
-                        continue
-
-                    # Add the material to Blender if it doesn't exist yet. Otherwise create a new material in Blender.
-                    if triangle_material not in self.resource_to_material:
-                        # Cache material name to protect Unicode characters from garbage collection
-                        material_name = str(triangle_material.name)
-
-                        # Try to reuse existing material if enabled (not for textured materials or PBR textured materials)
-                        material = None
-                        has_pbr_textures = (
-                            triangle_material.basecolor_texid is not None
-                            or triangle_material.metallic_texid is not None
-                            or triangle_material.roughness_texid is not None
-                            or triangle_material.specular_texid is not None
-                            or triangle_material.glossiness_texid is not None
-                        )
-
-                        if self.reuse_materials and triangle_material.texture_id is None and not has_pbr_textures:
-                            material = self.find_existing_material(material_name, triangle_material.color)
-
-                        # Create new material if not found or reuse disabled
-                        if material is None:
-                            material = bpy.data.materials.new(material_name)
-                            material.use_nodes = True
-
-                            # Check if this is a textured material
-                            if triangle_material.texture_id is not None:
-                                # Get texture group and texture
-                                texture_group = self.resource_texture_groups.get(triangle_material.texture_id)
-                                if texture_group:
-                                    texture = self.resource_textures.get(texture_group.texid)
-                                    if texture and texture.blender_image:
-                                        # Create material with Image Texture node
-                                        self._setup_textured_material(material, texture)
-                                        # Also apply PBR textures (roughness, metallic, etc.)
-                                        self._apply_pbr_textures_to_material(material, triangle_material)
-                                    else:
-                                        log.warning(f"Texture not found for texture group {triangle_material.texture_id}")
+                # Handle MMU segmentation with UV texture rendering (if in PAINT mode)
+                if (resource_object.segmentation_strings and 
+                    self.import_materials == 'PAINT' and 
+                    resource_object.default_extruder is not None):
+                    # Need to create a temporary object for UV unwrapping
+                    temp_obj_for_uv = bpy.data.objects.new("_temp_uv", mesh)
+                    bpy.context.collection.objects.link(temp_obj_for_uv)
+                    
+                    try:
+                        # Get extruder colors from vendor config (both Orca and PrusaSlicer use orca_filament_colors)
+                        extruder_colors_hex = {}
+                        if hasattr(self, 'orca_filament_colors') and self.orca_filament_colors:
+                            extruder_colors_hex = self.orca_filament_colors.copy()
+                        
+                        # If colors are available, render segmentation to texture
+                        if extruder_colors_hex:
+                            from .import_hash_segmentation import render_segmentation_to_texture
+                            
+                            # Convert hex colors to RGBA lists
+                            extruder_colors = {}
+                            for idx, hex_color in extruder_colors_hex.items():
+                                if hex_color.startswith('#') and len(hex_color) == 7:
+                                    r = int(hex_color[1:3], 16) / 255.0
+                                    g = int(hex_color[3:5], 16) / 255.0
+                                    b = int(hex_color[5:7], 16) / 255.0
+                                    extruder_colors[idx] = [r, g, b, 1.0]
                                 else:
-                                    log.warning(f"Texture group not found: {triangle_material.texture_id}")
+                                    extruder_colors[idx] = [0.5, 0.5, 0.5, 1.0]  # Fallback gray
+                            
+                            # Determine texture size based on tri count (balance quality vs performance)
+                            tri_count = len(resource_object.triangles)
+                            if tri_count < 5000:
+                                texture_size = 1024
+                            elif tri_count < 20000:
+                                texture_size = 2048
                             else:
-                                # Standard color-based material
-                                principled = bpy_extras.node_shader_utils.PrincipledBSDFWrapper(
-                                    material, is_readonly=False
-                                )
-                                principled.base_color = triangle_material.color[:3]
-                                principled.alpha = triangle_material.color[3]
-
-                                # Apply scalar PBR properties from 3MF Materials Extension
-                                self._apply_pbr_to_principled(principled, material, triangle_material)
-
-                                # Apply textured PBR properties (metallic/roughness/specular texture maps)
-                                self._apply_pbr_textures_to_material(material, triangle_material)
-
-                        self.resource_to_material[triangle_material] = material
-                    else:
-                        material = self.resource_to_material[triangle_material]
-
-                    # Add the material to this mesh if it doesn't have it yet. Otherwise re-use previous index.
-                    if triangle_material not in materials_to_index:
-                        new_index = len(mesh.materials.items())
-                        if new_index > 32767:
-                            log.warning(
-                                "Blender doesn't support more than 32768 different materials per mesh."
+                                texture_size = 4096
+                            
+                            log.info(f"Rendering MMU segmentation to {texture_size}x{texture_size} UV texture for {tri_count} triangles")
+                            
+                            # Render segmentation to texture
+                            image = render_segmentation_to_texture(
+                                temp_obj_for_uv,
+                                resource_object.segmentation_strings,
+                                extruder_colors,
+                                texture_size=texture_size,
+                                default_extruder=resource_object.default_extruder,
+                                bpy=bpy
                             )
+                            
+                            # Create material with the segmentation texture
+                            mat = bpy.data.materials.new(name=f"{mesh.name}_MMU_Paint")
+                            mat.use_nodes = True
+                            nodes = mat.node_tree.nodes
+                            links = mat.node_tree.links
+                            
+                            # Clear default nodes
+                            nodes.clear()
+                            
+                            # Create texture node
+                            tex_node = nodes.new('ShaderNodeTexImage')
+                            tex_node.image = image
+                            tex_node.location = (-300, 0)
+                            
+                            # Create BSDF
+                            bsdf = nodes.new('ShaderNodeBsdfPrincipled')
+                            bsdf.location = (100, 0)
+                            
+                            # Create output
+                            output = nodes.new('ShaderNodeOutputMaterial')
+                            output.location = (400, 0)
+                            
+                            # Link nodes
+                            links.new(tex_node.outputs['Color'], bsdf.inputs['Base Color'])
+                            links.new(bsdf.outputs['BSDF'], output.inputs['Surface'])
+                            
+                            # Add material to mesh
+                            mesh.materials.append(mat)
+                            
+                            # Assign this material to ALL faces (index 0 since it's the only material)
+                            num_faces = len(mesh.polygons)
+                            material_indices = [0] * num_faces
+                            mesh.polygons.foreach_set("material_index", material_indices)
+                            
+                            # Store extruder color mapping as custom properties for export round-trip
+                            mesh["3mf_paint_extruder_colors"] = str(extruder_colors_hex)  # Store as dict string
+                            mesh["3mf_paint_default_extruder"] = resource_object.default_extruder
+                            mesh["3mf_is_paint_texture"] = True
+                            
+                            paint_texture_rendered = True
+                            log.info(f"Successfully rendered MMU paint data to UV texture")
+                        else:
+                            log.warning("No extruder colors found - cannot render MMU paint texture")
+                    
+                    finally:
+                        # Remove temporary object
+                        bpy.data.objects.remove(temp_obj_for_uv, do_unlink=True)
+                
+                # Only do standard material assignment if we didn't render a paint texture
+                if not paint_texture_rendered:
+                    # Mapping resource materials to indices in the list of materials for this specific mesh.
+                    # Build material index array for batch assignment (much faster than per-face assignment)
+                    materials_to_index = {}
+                    material_indices = [0] * len(resource_object.materials)  # Pre-allocate
+
+                    for triangle_index, triangle_material in enumerate(
+                        resource_object.materials
+                    ):
+                        if triangle_material is None:
                             continue
-                        mesh.materials.append(material)
-                        materials_to_index[triangle_material] = new_index
 
-                    # Store material index for batch assignment
-                    material_indices[triangle_index] = materials_to_index[triangle_material]
+                        # Add the material to Blender if it doesn't exist yet. Otherwise create a new material in Blender.
+                        if triangle_material not in self.resource_to_material:
+                            # Cache material name to protect Unicode characters from garbage collection
+                            material_name = str(triangle_material.name)
 
-            # Batch assign material indices using foreach_set (much faster than per-face loop)
-            if materials_to_index:  # Only if we have materials to assign
-                mesh.polygons.foreach_set("material_index", material_indices)
+                            # Try to reuse existing material if enabled (not for textured materials or PBR textured materials)
+                            material = None
+                            has_pbr_textures = (
+                                triangle_material.basecolor_texid is not None
+                                or triangle_material.metallic_texid is not None
+                                or triangle_material.roughness_texid is not None
+                                or triangle_material.specular_texid is not None
+                                or triangle_material.glossiness_texid is not None
+                            )
+
+                            if self.reuse_materials and triangle_material.texture_id is None and not has_pbr_textures:
+                                material = self.find_existing_material(material_name, triangle_material.color)
+
+                            # Create new material if not found or reuse disabled
+                            if material is None:
+                                material = bpy.data.materials.new(material_name)
+                                material.use_nodes = True
+
+                                # Check if this is a textured material
+                                if triangle_material.texture_id is not None:
+                                    # Get texture group and texture
+                                    texture_group = self.resource_texture_groups.get(triangle_material.texture_id)
+                                    if texture_group:
+                                        texture = self.resource_textures.get(texture_group.texid)
+                                        if texture and texture.blender_image:
+                                            # Create material with Image Texture node
+                                            self._setup_textured_material(material, texture)
+                                            # Also apply PBR textures (roughness, metallic, etc.)
+                                            self._apply_pbr_textures_to_material(material, triangle_material)
+                                        else:
+                                            log.warning(f"Texture not found for texture group {triangle_material.texture_id}")
+                                    else:
+                                        log.warning(f"Texture group not found: {triangle_material.texture_id}")
+                                else:
+                                    # Standard color-based material
+                                    principled = bpy_extras.node_shader_utils.PrincipledBSDFWrapper(
+                                        material, is_readonly=False
+                                    )
+                                    principled.base_color = triangle_material.color[:3]
+                                    principled.alpha = triangle_material.color[3]
+
+                                    # Apply scalar PBR properties from 3MF Materials Extension
+                                    self._apply_pbr_to_principled(principled, material, triangle_material)
+
+                                    # Apply textured PBR properties (metallic/roughness/specular texture maps)
+                                    self._apply_pbr_textures_to_material(material, triangle_material)
+
+                            self.resource_to_material[triangle_material] = material
+                        else:
+                            material = self.resource_to_material[triangle_material]
+
+                        # Add the material to this mesh if it doesn't have it yet. Otherwise re-use previous index.
+                        if triangle_material not in materials_to_index:
+                            new_index = len(mesh.materials.items())
+                            if new_index > 32767:
+                                log.warning(
+                                    "Blender doesn't support more than 32768 different materials per mesh."
+                                )
+                                continue
+                            mesh.materials.append(material)
+                            materials_to_index[triangle_material] = new_index
+
+                        # Store material index for batch assignment
+                        material_indices[triangle_index] = materials_to_index[triangle_material]
+
+                    # Batch assign material indices using foreach_set (much faster than per-face loop)
+                    if materials_to_index:  # Only if we have materials to assign
+                        mesh.polygons.foreach_set("material_index", material_indices)
 
             # Apply triangle sets as integer face attributes
             # Face maps were removed in Blender 4.0, use custom attributes instead

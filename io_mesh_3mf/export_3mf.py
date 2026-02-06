@@ -89,12 +89,15 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         min=0,
         max=12,
     )
-    use_orca_format: bpy.props.BoolProperty(
-        name="Multi-Material Color Zones",
-        description="Export per-face materials as multi-material filament zones for Orca Slicer, "
-                    "BambuStudio, and PrusaSlicer. Each material color becomes a separate filament slot. "
-                    "Compatible with multi-material printing workflows",
-        default=False,
+    use_orca_format: bpy.props.EnumProperty(
+        name="Material Export Mode",
+        description="How to export material and color data",
+        items=[
+            ('STANDARD', 'Standard 3MF', 'Export geometry without material data (maximum compatibility)'),
+            ('BASEMATERIAL', 'Base Material', 'Export one solid color per object using basematerials (simple multi-color prints)'),
+            ('PAINT', 'Paint Segmentation', 'Export UV-painted regions as hash segmentation for multi-material printing (experimental, may be slow)'),
+        ],
+        default='BASEMATERIAL',
     )
 
     export_triangle_sets: bpy.props.BoolProperty(
@@ -370,6 +373,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             getattr(self, 'texture_groups', None),
             (str(self.material_resource_id)
              if hasattr(self, 'material_resource_id') and self.material_resource_id else None),
+            None,  # segmentation_strings - not used in this wrapper
         )
 
     def write_objects(self, root, resources_element, blender_objects, global_scale: float) -> None:

@@ -112,11 +112,15 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
     )
 
     # Import behavior settings
-    default_import_materials: bpy.props.BoolProperty(
-        name="Import Materials",
-        description="Import material colors from 3MF files by default. "
-                    "Disable to import geometry only",
-        default=True,
+    default_import_materials: bpy.props.EnumProperty(
+        name="Material Import Mode",
+        description="How to handle materials and multi-material paint data",
+        items=[
+            ('MATERIALS', 'Import Materials', 'Import material colors and properties (standard 3MF)'),
+            ('PAINT', 'Import MMU Paint Data', 'Render multi-material segmentation to UV texture for painting (experimental, may be slow)'),
+            ('NONE', 'Geometry Only', 'Skip all material and color data'),
+        ],
+        default='MATERIALS',
     )
 
     default_reuse_materials: bpy.props.BoolProperty(
@@ -158,11 +162,15 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         default='KEEP',
     )
 
-    default_multi_material_export: bpy.props.BoolProperty(
-        name="Multi-Material Color Zones",
-        description="Export per-face materials as multi-material filament zones by default. "
-                    "Compatible with Orca Slicer, BambuStudio, and PrusaSlicer",
-        default=False,
+    default_multi_material_export: bpy.props.EnumProperty(
+        name="Material Export Mode",
+        description="How to export material and color data to 3MF",
+        items=[
+            ('STANDARD', 'Standard 3MF', 'Export basic geometry without material data (maximum compatibility)'),
+            ('BASEMATERIAL', 'Base Material', 'Export one solid color per object (simple multi-color prints)'),
+            ('PAINT', 'Paint Segmentation', 'Export UV-painted regions as hash segmentation (experimental, may be slow)'),
+        ],
+        default='BASEMATERIAL',
     )
 
     default_export_triangle_sets: bpy.props.BoolProperty(

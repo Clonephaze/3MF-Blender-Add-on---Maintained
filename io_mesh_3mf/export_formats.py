@@ -42,7 +42,7 @@ from .extensions import (
     PRODUCTION_EXTENSION,
     ORCA_EXTENSION,
 )
-from .metadata import Metadata
+from .metadata import Metadata, MetadataEntry
 from .export_components import (
     detect_linked_duplicates,
     should_use_components,
@@ -93,7 +93,7 @@ class BaseExporter:
         In Orca/PrusaSlicer mode, attributes should not have namespace prefixes.
         In standard 3MF mode with default_namespace, they need the prefix.
         """
-        if self.op.use_orca_format or self.op.mmu_slicer_format == 'PRUSA':
+        if self.op.use_orca_format in ('PAINT', 'BASEMATERIAL') or self.op.mmu_slicer_format == 'PRUSA':
             return name
         return f"{{{MODEL_NAMESPACE}}}{name}"
 
@@ -409,6 +409,8 @@ class StandardExporter(BaseExporter):
                     )
 
         # Get vertex data (may need to apply modifiers)
+        # Store reference to original object for accessing custom properties
+        original_object = blender_object
         if self.op.use_mesh_modifiers:
             dependency_graph = bpy.context.evaluated_depsgraph_get()
             blender_object = blender_object.evaluated_get(dependency_graph)
@@ -446,10 +448,9 @@ class StandardExporter(BaseExporter):
             # Find the most common material for this mesh
             most_common_material_list_index = 0
 
-            log.info(f"write_object_resource: {blender_object.name}, Orca={self.op.use_orca_format}, "
-                     f"vertex_colors={self.op.vertex_colors}")
-            log.info(f"  mesh has {len(mesh.loop_triangles)} triangles, "
-                     f"{len(blender_object.material_slots)} material slots")
+            print(f"[export_formats] write_object_resource: {blender_object.name}, mode={self.op.use_orca_format}, "
+                  f"slicer={self.op.mmu_slicer_format}")
+            print(f"  mesh has {len(mesh.loop_triangles)} triangles, {len(blender_object.material_slots)} material slots")
 
             # Check if this object has any textured materials
             has_textured_material = False
@@ -459,8 +460,8 @@ class StandardExporter(BaseExporter):
                         has_textured_material = True
                         break
 
-            # In Orca mode, use face colors mapped to colorgroup IDs
-            if self.op.use_orca_format and self.op.vertex_colors and self.op.mmu_slicer_format == 'ORCA':
+            # In BASEMATERIAL mode, use face colors mapped to colorgroup IDs
+            if self.op.use_orca_format == 'BASEMATERIAL' and self.op.vertex_colors and self.op.mmu_slicer_format == 'ORCA':
                 color_counts = {}
                 for triangle in mesh.loop_triangles:
                     triangle_color = get_triangle_color(mesh, triangle, blender_object)
@@ -504,6 +505,81 @@ class StandardExporter(BaseExporter):
 
             write_vertices(mesh_element, mesh.vertices, self.op.use_orca_format,
                            self.op.coordinate_precision)
+            
+            # Generate segmentation strings from UV texture if in PAINT mode
+            segmentation_strings = {}
+            print(f"[export_formats] Checking PAINT export: mode={self.op.use_orca_format}, has_uv={bool(mesh.uv_layers.active)}")
+            if self.op.use_orca_format == 'PAINT' and mesh.uv_layers.active:
+                # Check if this mesh was imported with paint texture (has custom properties)
+                # Read from original object's data, not the temporary evaluated mesh
+                original_mesh_data = original_object.data
+                print(f"  PAINT mode active - checking custom properties on '{original_mesh_data.name}'")
+                print(f"  Has 3mf_is_paint_texture: {'3mf_is_paint_texture' in original_mesh_data}")
+                if "3mf_is_paint_texture" in original_mesh_data:
+                    print(f"  Value: {original_mesh_data['3mf_is_paint_texture']}")
+                if "3mf_is_paint_texture" in original_mesh_data and original_mesh_data["3mf_is_paint_texture"]:
+                    paint_texture = None
+                    extruder_colors = {}
+                    default_extruder = original_mesh_data.get("3mf_paint_default_extruder", 0)
+                    print(f"  Found paint texture flag, default_extruder={default_extruder}")
+                    
+                    # Get the stored extruder colors
+                    if "3mf_paint_extruder_colors" in original_mesh_data:
+                        import ast
+                        try:
+                            # Parse the stored dict string back to dict
+                            extruder_colors_hex = ast.literal_eval(original_mesh_data["3mf_paint_extruder_colors"])
+                            # Convert hex colors to RGB tuples for texture sampling
+                            for idx, hex_color in extruder_colors_hex.items():
+                                r = int(hex_color[1:3], 16) / 255.0
+                                g = int(hex_color[3:5], 16) / 255.0
+                                b = int(hex_color[5:7], 16) / 255.0
+                                extruder_colors[idx] = (r, g, b)
+                        except Exception as e:
+                            print(f"  WARNING: Failed to parse extruder colors: {e}")
+                    
+                    # Find the MMU paint texture
+                    for mat_slot in original_object.material_slots:
+                        if mat_slot.material and mat_slot.material.use_nodes:
+                            for node in mat_slot.material.node_tree.nodes:
+                                if node.type == 'TEX_IMAGE' and node.image:
+                                    paint_texture = node.image
+                                    break
+                            if paint_texture:
+                                break
+                    
+                    if paint_texture and extruder_colors:
+                        print(f"  Exporting paint texture '{paint_texture.name}' as segmentation (default_extruder={default_extruder})")
+                        print(f"  Image size: {paint_texture.size[0]}x{paint_texture.size[1]}")
+                        print(f"  Color space: {paint_texture.colorspace_settings.name}")
+                        print(f"  Alpha mode: {paint_texture.alpha_mode}")
+                        print(f"  Extruder colors: {extruder_colors}")
+                        
+                        # Import here to avoid circular dependency
+                        from .export_hash_segmentation import texture_to_segmentation
+                        
+                        try:
+                            # Use evaluated object for mesh/UV data access (has calc_loop_triangles called)
+                            # Original object's mesh may have empty UV layer data after addon reload
+                            segmentation_strings = texture_to_segmentation(
+                                blender_object,
+                                paint_texture,
+                                extruder_colors,
+                                default_extruder
+                            )
+                            print(f"  Generated {len(segmentation_strings)} segmentation strings from texture")
+                        except Exception as e:
+                            print(f"  WARNING: Failed to generate segmentation from texture: {e}")
+                            import traceback
+                            traceback.print_exc()
+                            segmentation_strings = {}
+                    else:
+                        if not paint_texture:
+                            print("  WARNING: No paint texture found for export")
+                        if not extruder_colors:
+                            print("  WARNING: No extruder color mapping found for export")
+            
+            print(f"[export_formats] Calling write_triangles with {len(segmentation_strings)} segmentation strings")
             write_triangles(
                 mesh_element,
                 mesh.loop_triangles,
@@ -517,6 +593,7 @@ class StandardExporter(BaseExporter):
                 blender_object,
                 getattr(self.op, 'texture_groups', None),
                 str(self.op.material_resource_id) if self.op.material_resource_id else None,
+                segmentation_strings,  # Pass the generated segmentation strings
             )
 
             # Write triangle sets if enabled
@@ -599,7 +676,7 @@ class StandardExporter(BaseExporter):
                         break
             
             # Handle material assignment (same logic as write_object_resource)
-            if self.op.use_orca_format and self.op.vertex_colors and self.op.mmu_slicer_format == 'ORCA':
+            if self.op.use_orca_format == 'BASEMATERIAL' and self.op.vertex_colors and self.op.mmu_slicer_format == 'ORCA':
                 color_counts = {}
                 for triangle in mesh.loop_triangles:
                     triangle_color = get_triangle_color(mesh, triangle, blender_object)
@@ -1177,17 +1254,18 @@ class PrusaExporter(BaseExporter):
         root.set("unit", "millimeter")
         root.set("{http://www.w3.org/XML/1998/namespace}lang", "en-US")
 
-        # Add PrusaSlicer metadata
-        metadata_version = xml.etree.ElementTree.SubElement(
-            root, f"{{{MODEL_NAMESPACE}}}metadata", attrib={"name": "slic3rpe:Version3mf"})
-        metadata_version.text = "1"
-        metadata_painting = xml.etree.ElementTree.SubElement(
-            root, f"{{{MODEL_NAMESPACE}}}metadata", attrib={"name": "slic3rpe:MmPaintingVersion"})
-        metadata_painting.text = "1"
-
-        # Add scene metadata
+        # Add scene metadata first
         scene_metadata = Metadata()
         scene_metadata.retrieve(bpy.context.scene)
+        
+        # Add PrusaSlicer metadata if not already present in scene
+        if "slic3rpe:Version3mf" not in scene_metadata:
+            scene_metadata["slic3rpe:Version3mf"] = MetadataEntry(
+                name="slic3rpe:Version3mf", preserve=False, datatype=None, value="1")
+        if "slic3rpe:MmPaintingVersion" not in scene_metadata:
+            scene_metadata["slic3rpe:MmPaintingVersion"] = MetadataEntry(
+                name="slic3rpe:MmPaintingVersion", preserve=False, datatype=None, value="1")
+        
         write_metadata(root, scene_metadata, self.op.use_orca_format)
 
         resources_element = xml.etree.ElementTree.SubElement(

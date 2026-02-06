@@ -383,14 +383,14 @@ def format_transformation(transformation: mathutils.Matrix) -> str:
 
 def write_vertices(mesh_element: xml.etree.ElementTree.Element,
                    vertices: List[bpy.types.MeshVertex],
-                   use_orca_format: bool,
+                   use_orca_format: str,  # 'PAINT', 'BASEMATERIAL', or 'STANDARD'
                    coordinate_precision: int) -> None:
     """
     Writes a list of vertices into the specified mesh element.
 
     :param mesh_element: The <mesh> element of the 3MF document.
     :param vertices: A list of Blender vertices to add.
-    :param use_orca_format: Whether to use Orca format (affects namespace handling).
+    :param use_orca_format: Material export mode - affects namespace handling.
     :param coordinate_precision: Number of decimal places for coordinates.
     """
     vertices_element = xml.etree.ElementTree.SubElement(
@@ -398,11 +398,13 @@ def write_vertices(mesh_element: xml.etree.ElementTree.Element,
     )
 
     vertex_name = f"{{{MODEL_NAMESPACE}}}vertex"
-    if use_orca_format:
+    if use_orca_format in ('PAINT', 'BASEMATERIAL'):
+        # PAINT and BASEMATERIAL modes use short attribute names
         x_name = "x"
         y_name = "y"
         z_name = "z"
     else:
+        # STANDARD mode uses fully namespaced attribute names
         x_name = f"{{{MODEL_NAMESPACE}}}x"
         y_name = f"{{{MODEL_NAMESPACE}}}y"
         z_name = f"{{{MODEL_NAMESPACE}}}z"
@@ -423,13 +425,14 @@ def write_triangles(
     object_material_list_index: int,
     material_slots: List[bpy.types.MaterialSlot],
     material_name_to_index: Dict[str, int],
-    use_orca_format: bool,
+    use_orca_format: str,  # 'PAINT', 'BASEMATERIAL', or 'STANDARD'
     mmu_slicer_format: str,
     vertex_colors: Dict[str, int],
     mesh: Optional[bpy.types.Mesh] = None,
     blender_object: Optional[bpy.types.Object] = None,
     texture_groups: Optional[Dict[str, Dict]] = None,
-    basematerials_resource_id: Optional[str] = None
+    basematerials_resource_id: Optional[str] = None,
+    segmentation_strings: Optional[Dict[int, str]] = None
 ) -> None:
     """
     Writes a list of triangles into the specified mesh element.
@@ -439,20 +442,24 @@ def write_triangles(
     :param object_material_list_index: The index of the material that the object was written with.
     :param material_slots: List of materials belonging to the object.
     :param material_name_to_index: Mapping from material name to index.
-    :param use_orca_format: Whether to use Orca format.
+    :param use_orca_format: Material export mode - 'PAINT', 'BASEMATERIAL', or 'STANDARD'.
     :param mmu_slicer_format: The target slicer format ('ORCA' or 'PRUSA').
     :param vertex_colors: Dictionary of color hex to filament index.
     :param mesh: The mesh containing these triangles.
     :param blender_object: The Blender object.
     :param texture_groups: Dict of material_name -> texture group data for UV mapping.
     :param basematerials_resource_id: The ID of the basematerials resource for per-face material refs.
+    :param segmentation_strings: Dict of face_index -> segmentation hash string (for PAINT mode).
     """
+    print(f"[write_triangles] mode={use_orca_format}, slicer={mmu_slicer_format}, seg_strings={len(segmentation_strings) if segmentation_strings else 0}")
+    
     triangles_element = xml.etree.ElementTree.SubElement(
         mesh_element, f"{{{MODEL_NAMESPACE}}}triangles"
     )
 
     triangle_name = f"{{{MODEL_NAMESPACE}}}triangle"
-    if use_orca_format:
+    if use_orca_format in ('PAINT', 'BASEMATERIAL'):
+        # PAINT and BASEMATERIAL modes use short attribute names
         v1_name = "v1"
         v2_name = "v2"
         v3_name = "v3"
@@ -461,6 +468,7 @@ def write_triangles(
         p3_name = "p3"
         pid_name = "pid"
     else:
+        # STANDARD mode uses fully namespaced attribute names
         v1_name = f"{{{MODEL_NAMESPACE}}}v1"
         v2_name = f"{{{MODEL_NAMESPACE}}}v2"
         v3_name = f"{{{MODEL_NAMESPACE}}}v3"
@@ -474,7 +482,17 @@ def write_triangles(
     if mesh and texture_groups and mesh.uv_layers.active:
         uv_layer = mesh.uv_layers.active
 
-    for triangle in triangles:
+    # Track how many segmentation strings we actually write
+    seg_strings_written = 0
+    
+    # Debug: log first few triangles and their indices
+    if segmentation_strings:
+        print(f"  [write_triangles] First 10 polygon indices in dict: {list(segmentation_strings.keys())[:10]}")
+    
+    for tri_idx, triangle in enumerate(triangles):
+        # Debug: log first few triangles to see what indices we have
+        if tri_idx < 5 and segmentation_strings:
+            print(f"  [write_triangles] Triangle loop_idx={tri_idx}, polygon_index={triangle.polygon_index}, in dict={triangle.polygon_index in segmentation_strings}")
         triangle_element = xml.etree.ElementTree.SubElement(
             triangles_element, triangle_name
         )
@@ -482,8 +500,28 @@ def write_triangles(
         triangle_element.attrib[v2_name] = str(triangle.vertices[1])
         triangle_element.attrib[v3_name] = str(triangle.vertices[2])
 
-        # Handle multi-material color zones based on format
-        if use_orca_format and vertex_colors and mesh and blender_object:
+        # Handle segmentation strings from UV texture (PAINT mode)
+        # Note: segmentation_strings is keyed by polygon_index, not loop_triangle index
+        if segmentation_strings and triangle.polygon_index in segmentation_strings:
+            seg_string = segmentation_strings[triangle.polygon_index]
+            if seg_string:
+                if mmu_slicer_format == 'PRUSA':
+                    # PrusaSlicer format: use mmu_segmentation attribute
+                    ns_attr = "{http://schemas.slic3r.org/3mf/2017/06}mmu_segmentation"
+                    triangle_element.attrib[ns_attr] = seg_string
+                    seg_strings_written += 1
+                    if triangle.polygon_index < 5:  # Log first few for debugging
+                        print(f"    Triangle poly={triangle.polygon_index}: writing mmu_segmentation='{seg_string[:20]}...'")
+                else:
+                    # Orca format: use paint_color attribute
+                    triangle_element.attrib["paint_color"] = seg_string
+                    seg_strings_written += 1
+                    if triangle.polygon_index < 5:  # Log first few for debugging
+                        print(f"    Triangle poly={triangle.polygon_index}: writing paint_color='{seg_string[:20]}...'")
+                continue  # Skip other material handling for this triangle
+        
+        # Handle multi-material color zones (BASEMATERIAL mode only)
+        if use_orca_format == 'BASEMATERIAL' and vertex_colors and mesh and blender_object:
             triangle_color = get_triangle_color(mesh, triangle, blender_object)
             if triangle_color and triangle_color in vertex_colors:
                 colorgroup_id = vertex_colors[triangle_color]
@@ -545,21 +583,25 @@ def write_triangles(
                             triangle_element.attrib[pid_name] = str(basematerials_resource_id)
                         triangle_element.attrib[p1_name] = str(material_index)
 
+    # Log summary of segmentation string writing
+    if segmentation_strings:
+        print(f"  [write_triangles] Wrote {seg_strings_written} segmentation strings to triangles (had {len(segmentation_strings)} available)")
+
 
 # =============================================================================
 # Metadata Writing
 # =============================================================================
 
 def write_metadata(node: xml.etree.ElementTree.Element, metadata: Metadata,
-                   use_orca_format: bool) -> None:
+                   use_orca_format: str) -> None:  # 'PAINT', 'BASEMATERIAL', or 'STANDARD'
     """
     Writes metadata from a metadata storage into an XML node.
     :param node: The node to add <metadata> tags to.
     :param metadata: The collection of metadata to write to that node.
-    :param use_orca_format: Whether to use Orca format (affects namespace handling).
+    :param use_orca_format: Material export mode - affects namespace handling.
     """
     def attr(name: str) -> str:
-        if use_orca_format:
+        if use_orca_format in ('PAINT', 'BASEMATERIAL'):
             return name
         return f"{{{MODEL_NAMESPACE}}}{name}"
 
