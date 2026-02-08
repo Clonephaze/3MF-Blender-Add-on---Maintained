@@ -93,6 +93,22 @@ Menus after installation:
   - **Orca Slicer** – `Production Extension` with `paint_color` attributes
   - **PrusaSlicer** – `slic3rpe:mmu_segmentation` attributes for color metadata and round-trip fidelity
 
+### MMU Paint Suite
+
+Built-in multi-material texture painting system for creating per-triangle filament assignments directly in Blender's 3D Viewport.
+
+**Features:**
+- **Texture-Based Painting** – Paint multi-filament regions using Blender's native paint tools
+- **Visual Filament Palette** – Click-to-switch color swatches in the 3D View sidebar (N-panel → 3MF tab)
+- **Filament Management** – Add, remove, and reassign filament colors during painting
+
+**Usage:**
+1. Import a 3MF file with multi-material data, or select any mesh object
+2. Open sidebar (N-panel) → 3MF tab → MMU Paint Suite
+3. Add filaments and click "Initialize Painting"
+4. Click filament swatches to switch active color, then paint in Texture Paint mode
+5. Export to 3MF with desired slicer format
+
 ---
 
 ## Development & Contributing

@@ -26,15 +26,13 @@ IDs are remapped to avoid conflicts with newly created materials.
 """
 
 import json
-import logging
 import xml.etree.ElementTree
 from typing import Dict, Tuple
 
 import bpy
 
 from ..constants import MATERIAL_NAMESPACE
-
-log = logging.getLogger(__name__)
+from ..utilities import debug, warn
 
 
 def write_passthrough_materials(resources_element: xml.etree.ElementTree.Element,
@@ -142,7 +140,7 @@ def write_passthrough_materials(resources_element: xml.etree.ElementTree.Element
         for orig_id in sorted(conflicting_ids, key=lambda x: int(x) if x.isdigit() else 0):
             id_remap[orig_id] = str(next_resource_id)
             next_resource_id += 1
-        log.info(f"Remapped {len(conflicting_ids)} conflicting passthrough IDs: {id_remap}")
+        debug(f"Remapped {len(conflicting_ids)} conflicting passthrough IDs: {id_remap}")
 
     # Update next_resource_id to account for non-conflicting original IDs
     # This ensures objects don't use IDs that overlap with passthrough
@@ -191,7 +189,7 @@ def _write_passthrough_composites(resources_element: xml.etree.ElementTree.Eleme
     try:
         composite_data = json.loads(stored_data)
     except json.JSONDecodeError:
-        log.warning("Failed to parse stored compositematerials data")
+        warn("Failed to parse stored compositematerials data")
         return
 
     for res_id, comp in composite_data.items():
@@ -218,9 +216,9 @@ def _write_passthrough_composites(resources_element: xml.etree.ElementTree.Eleme
                 attrib={"values": c.get("values", "")},
             )
 
-        log.debug(f"Wrote passthrough compositematerials {res_id} -> {new_id}")
+        debug(f"Wrote passthrough compositematerials {res_id} -> {new_id}")
 
-    log.info(f"Wrote {len(composite_data)} passthrough compositematerials")
+    debug(f"Wrote {len(composite_data)} passthrough compositematerials")
 
 
 def _write_passthrough_textures(resources_element: xml.etree.ElementTree.Element,
@@ -240,7 +238,7 @@ def _write_passthrough_textures(resources_element: xml.etree.ElementTree.Element
     try:
         texture_data = json.loads(stored_data)
     except json.JSONDecodeError:
-        log.warning("Failed to parse stored textures data")
+        warn("Failed to parse stored textures data")
         return
 
     for res_id, tex in texture_data.items():
@@ -264,9 +262,9 @@ def _write_passthrough_textures(resources_element: xml.etree.ElementTree.Element
             attrib=attrib,
         )
 
-        log.debug(f"Wrote passthrough texture2d {res_id} -> {new_id}")
+        debug(f"Wrote passthrough texture2d {res_id} -> {new_id}")
 
-    log.info(f"Wrote {len(texture_data)} passthrough textures")
+    debug(f"Wrote {len(texture_data)} passthrough textures")
 
 
 def _write_passthrough_texture_groups(resources_element: xml.etree.ElementTree.Element,
@@ -286,7 +284,7 @@ def _write_passthrough_texture_groups(resources_element: xml.etree.ElementTree.E
     try:
         texgroup_data = json.loads(stored_data)
     except json.JSONDecodeError:
-        log.warning("Failed to parse stored texture groups data")
+        warn("Failed to parse stored texture groups data")
         return
 
     for res_id, tg in texgroup_data.items():
@@ -315,9 +313,9 @@ def _write_passthrough_texture_groups(resources_element: xml.etree.ElementTree.E
                     attrib={"u": str(coord[0]), "v": str(coord[1])},
                 )
 
-        log.debug(f"Wrote passthrough texture2dgroup {res_id} -> {new_id}")
+        debug(f"Wrote passthrough texture2dgroup {res_id} -> {new_id}")
 
-    log.info(f"Wrote {len(texgroup_data)} passthrough texture groups")
+    debug(f"Wrote {len(texgroup_data)} passthrough texture groups")
 
 
 def _write_passthrough_colorgroups(resources_element: xml.etree.ElementTree.Element,
@@ -337,7 +335,7 @@ def _write_passthrough_colorgroups(resources_element: xml.etree.ElementTree.Elem
     try:
         colorgroup_data = json.loads(stored_data)
     except json.JSONDecodeError:
-        log.warning("Failed to parse stored colorgroups data")
+        warn("Failed to parse stored colorgroups data")
         return
 
     for res_id, cg in colorgroup_data.items():
@@ -361,9 +359,9 @@ def _write_passthrough_colorgroups(resources_element: xml.etree.ElementTree.Elem
                 attrib={"color": color},
             )
 
-        log.debug(f"Wrote passthrough colorgroup {res_id} -> {new_id}")
+        debug(f"Wrote passthrough colorgroup {res_id} -> {new_id}")
 
-    log.info(f"Wrote {len(colorgroup_data)} passthrough colorgroups")
+    debug(f"Wrote {len(colorgroup_data)} passthrough colorgroups")
 
 
 def _write_passthrough_pbr_display(resources_element: xml.etree.ElementTree.Element,
@@ -383,7 +381,7 @@ def _write_passthrough_pbr_display(resources_element: xml.etree.ElementTree.Elem
     try:
         pbr_data = json.loads(stored_data)
     except json.JSONDecodeError:
-        log.warning("Failed to parse stored PBR display props data")
+        warn("Failed to parse stored PBR display props data")
         return
 
     for res_id, prop in pbr_data.items():
@@ -401,7 +399,7 @@ def _write_passthrough_pbr_display(resources_element: xml.etree.ElementTree.Elem
             element_name = f"{{{MATERIAL_NAMESPACE}}}translucentdisplayproperties"
             child_name = f"{{{MATERIAL_NAMESPACE}}}translucent"
         else:
-            log.warning(f"Unknown PBR display property type: {prop_type}")
+            warn(f"Unknown PBR display property type: {prop_type}")
             continue
 
         display_element = xml.etree.ElementTree.SubElement(
@@ -418,9 +416,9 @@ def _write_passthrough_pbr_display(resources_element: xml.etree.ElementTree.Elem
                 attrib=prop_dict,
             )
 
-        log.debug(f"Wrote passthrough {prop_type} PBR display properties {res_id} -> {new_id}")
+        debug(f"Wrote passthrough {prop_type} PBR display properties {res_id} -> {new_id}")
 
-    log.info(f"Wrote {len(pbr_data)} passthrough PBR display properties")
+    debug(f"Wrote {len(pbr_data)} passthrough PBR display properties")
 
 
 def _write_passthrough_multiproperties(resources_element: xml.etree.ElementTree.Element,
@@ -440,7 +438,7 @@ def _write_passthrough_multiproperties(resources_element: xml.etree.ElementTree.
     try:
         multi_data = json.loads(stored_data)
     except json.JSONDecodeError:
-        log.warning("Failed to parse stored multiproperties data")
+        warn("Failed to parse stored multiproperties data")
         return
 
     for res_id, multi in multi_data.items():
@@ -470,9 +468,9 @@ def _write_passthrough_multiproperties(resources_element: xml.etree.ElementTree.
                 attrib={"pindices": m.get("pindices", "")},
             )
 
-        log.debug(f"Wrote passthrough multiproperties {res_id} -> {new_id}")
+        debug(f"Wrote passthrough multiproperties {res_id} -> {new_id}")
 
-    log.info(f"Wrote {len(multi_data)} passthrough multiproperties")
+    debug(f"Wrote {len(multi_data)} passthrough multiproperties")
 
 
 def _write_passthrough_pbr_textures(resources_element: xml.etree.ElementTree.Element,
@@ -492,7 +490,7 @@ def _write_passthrough_pbr_textures(resources_element: xml.etree.ElementTree.Ele
     try:
         pbr_data = json.loads(stored_data)
     except json.JSONDecodeError:
-        log.warning("Failed to parse stored PBR texture displays data")
+        warn("Failed to parse stored PBR texture displays data")
         return
 
     for res_id, prop in pbr_data.items():
@@ -549,6 +547,6 @@ def _write_passthrough_pbr_textures(resources_element: xml.etree.ElementTree.Ele
                 attrib=attrib,
             )
 
-        log.debug(f"Wrote passthrough {prop_type} PBR texture display {res_id} -> {new_id}")
+        debug(f"Wrote passthrough {prop_type} PBR texture display {res_id} -> {new_id}")
 
-    log.info(f"Wrote {len(pbr_data)} passthrough PBR texture displays")
+    debug(f"Wrote {len(pbr_data)} passthrough PBR texture displays")

@@ -13,7 +13,6 @@
 import base64  # To encode MustPreserve files in the Blender scene.
 import collections  # For namedtuple.
 import json  # For reading Orca project_settings.config
-import logging  # To debug and log progress.
 import os.path  # To take file paths relative to the selected directory.
 import re  # To find files in the archive based on the content types.
 import xml.etree.ElementTree  # To parse the 3dmodel.model file.
@@ -85,10 +84,11 @@ from .import_materials import (
 # Import triangle sets module
 from .import_trianglesets import read_triangle_sets as _read_triangle_sets_impl
 
+# Debugging
+from .utilities import debug, warn, error
+
 # IDE and Documentation support.
 __all__ = ["Import3MF"]
-
-log = logging.getLogger(__name__)
 
 ResourceObject = collections.namedtuple(
     "ResourceObject",
@@ -419,7 +419,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
         # Fallback: single object goes to origin (already placed there)
         if len(objects) == 1:
-            log.info("Grid layout: single object, placed at origin")
+            debug("Grid layout: single object, placed at origin")
             return
 
         # Calculate bounding boxes for all objects
@@ -506,7 +506,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
             current_y += row_heights[row] + spacing
 
-        log.info(f"Grid layout: arranged {num_objects} objects in {rows}x{cols} grid")
+        debug(f"Grid layout: arranged {num_objects} objects in {rows}x{cols} grid")
 
     def detect_vendor(self, root: xml.etree.ElementTree.Element) -> Optional[str]:
         """
@@ -521,18 +521,18 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         for metadata_node in root.iterfind("./3mf:metadata", MODEL_NAMESPACES):
             name = metadata_node.attrib.get("name", "")
             if name == "BambuStudio:3mfVersion":
-                log.info("Detected BambuStudio/Orca Slicer format")
+                debug("Detected BambuStudio/Orca Slicer format")
                 return "orca"
             if name == "Application" and metadata_node.text:
                 app_name = metadata_node.text.lower()
                 if "orca" in app_name or "bambu" in app_name:
-                    log.info(f"Detected Orca/Bambu format from Application: {metadata_node.text}")
+                    debug(f"Detected Orca/Bambu format from Application: {metadata_node.text}")
                     return "orca"
 
         # Check for BambuStudio namespace in root attributes
         for attr_name in root.attrib:
             if "bambu" in attr_name.lower():
-                log.info(f"Detected BambuStudio format from attribute: {attr_name}")
+                debug(f"Detected BambuStudio format from attribute: {attr_name}")
                 return "orca"
 
         return None
@@ -561,6 +561,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             self.component_instance_cache = {}  # Track component instances: objectid -> (mesh_data, instances_count)
             self.num_loaded = 0
             self.imported_objects = []  # Track all imported objects for grid layout
+            self._paint_object_names = []  # Track objects with rendered paint textures
             self.vendor_format = None  # Will be set when we detect vendor-specific format
             self.extension_manager = ExtensionManager()  # Track active extensions
             scene_metadata = Metadata()
@@ -604,7 +605,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                     try:
                         document = xml.etree.ElementTree.ElementTree(file=model_file)
                     except xml.etree.ElementTree.ParseError as e:
-                        log.error(f"3MF document in {path} is malformed: {str(e)}")
+                        error(f"3MF document in {path} is malformed: {str(e)}")
                         self.safe_report({'ERROR'}, f"3MF document in {path} is malformed: {str(e)}")
                         continue
                     if document is None:
@@ -618,10 +619,10 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                         self.vendor_format = self.detect_vendor(root)
                         if self.vendor_format:
                             self.safe_report({'INFO'}, f"Detected {self.vendor_format.upper()} Slicer format")
-                            log.info(f"Will import {self.vendor_format} specific color data")
+                            debug(f"Will import {self.vendor_format} specific color data")
                     else:
                         self.vendor_format = None
-                        log.info("Material import disabled: importing geometry only")
+                        debug("Material import disabled: importing geometry only")
 
                     # Activate extensions based on what's declared in the file
                     required_ext = root.attrib.get("requiredextensions", "")
@@ -630,7 +631,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                         for ns in resolved_namespaces:
                             if ns in SUPPORTED_EXTENSIONS:
                                 self.extension_manager.activate(ns)
-                                log.info(f"Activated required extension: {ns}")
+                                debug(f"Activated required extension: {ns}")
 
                     # Validate required extensions
                     if not self.is_supported(root.attrib.get("requiredextensions", ""), root):
@@ -649,7 +650,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                                     ext_names.append(ns)
 
                             ext_list = ", ".join(ext_names) if ext_names else ", ".join(truly_unsupported)
-                            log.warning(f"3MF document in {path} requires unsupported extensions: {ext_list}")
+                            warn(f"3MF document in {path} requires unsupported extensions: {ext_list}")
                             self.safe_report({'WARNING'}, f"3MF document requires unsupported extensions: {ext_list}")
                         # Still continue processing even though the spec says not to. Our aim is to retrieve whatever
                         # information we can.
@@ -661,7 +662,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                         for ns in resolved_recommended:
                             if ns in SUPPORTED_EXTENSIONS:
                                 self.extension_manager.activate(ns)
-                                log.info(f"Activated recommended extension: {ns}")
+                                debug(f"Activated recommended extension: {ns}")
 
                         if not self.is_supported(recommended, root):
                             truly_unsupported = resolved_recommended - SUPPORTED_EXTENSIONS
@@ -676,7 +677,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                                         rec_names.append(ns)
 
                                 rec_list = ", ".join(rec_names) if rec_names else ", ".join(truly_unsupported)
-                                log.info(
+                                debug(
                                     f"3MF document in {path} recommends extensions not fully supported: {rec_list}"
                                 )
                                 self.safe_report(
@@ -692,10 +693,11 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                     self.orca_filament_colors = {}  # Maps filament index -> hex color
                     self.object_default_extruders = {}  # Maps object ID -> default extruder (1-based)
 
-                    # Try to read filament colors from metadata
+                    # Try to read filament colors from metadata (priority order)
                     self.read_orca_filament_colors(path)  # Orca project_settings.config
                     self.read_prusa_slic3r_colors(path)   # PrusaSlicer Slic3r_PE.config
-                    self.read_prusa_filament_colors(path)  # Blender's PrusaSlicer metadata
+                    self.read_blender_addon_colors(path)  # Blender addon fallback (direct extruder index)
+                    # Note: read_prusa_filament_colors removed - replaced by read_blender_addon_colors
                     self.read_prusa_object_extruders(path)  # PrusaSlicer object extruder assignments
 
                     self._progress_update(25, "Reading materials and objects...")
@@ -740,8 +742,22 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                                 bpy.ops.view3d.view_selected(override)
 
             self._progress_update(100, "Finalizing import...")
-            log.info(f"Imported {self.num_loaded} objects from 3MF files.")
+            debug(f"Imported {self.num_loaded} objects from 3MF files.")
             self.safe_report({'INFO'}, f"Imported {self.num_loaded} objects from 3MF files")
+
+            # Show popup if any objects had MMU paint data
+            if hasattr(self, '_paint_object_names') and self._paint_object_names:
+                # Find the first paint object to offer switching to
+                paint_obj_name = self._paint_object_names[0]
+                # Find the Blender object by mesh name
+                for obj in self.imported_objects:
+                    if obj.data and obj.data.name == paint_obj_name:
+                        paint_obj_name = obj.name
+                        break
+                try:
+                    bpy.ops.mmu.import_paint_popup('INVOKE_DEFAULT', object_name=paint_obj_name)
+                except Exception as e:
+                    debug(f"Could not show paint popup: {e}")
 
             return {"FINISHED"}
         finally:
@@ -772,7 +788,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 result[mime_type].append(archive.open(path))
         except (zipfile.BadZipFile, EnvironmentError) as e:
             # File is corrupt, or the OS prevents us from reading it (doesn't exist, no permissions, etc.)
-            log.error(f"Unable to read archive: {e}")
+            error(f"Unable to read archive: {e}")
             self.safe_report({'ERROR'}, f"Unable to read archive: {e}")
             return result
         return result
@@ -801,7 +817,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 try:
                     root = xml.etree.ElementTree.ElementTree(file=f)
                 except xml.etree.ElementTree.ParseError as e:
-                    log.warning(
+                    warn(
                         f"{CONTENT_TYPES_LOCATION} has malformed XML"
                         f"(position {e.position[0]}:{e.position[1]})."
                     )
@@ -818,7 +834,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                             "PartName" not in override_node.attrib
                             or "ContentType" not in override_node.attrib
                         ):
-                            log.warning(
+                            warn(
                                 "[Content_Types].xml malformed: Override node without path or MIME type."
                             )
                             self.safe_report(
@@ -838,7 +854,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                             "Extension" not in default_node.attrib
                             or "ContentType" not in default_node.attrib
                         ):
-                            log.warning(
+                            warn(
                                 "[Content_Types].xml malformed: Default node without extension or MIME type."
                             )
                             self.safe_report(
@@ -851,7 +867,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                         )
                         result.append((match_regex, default_node.attrib["ContentType"]))
         except KeyError:  # ZipFile reports that the content types file doesn't exist.
-            log.warning(f"{CONTENT_TYPES_LOCATION} file missing!")
+            warn(f"{CONTENT_TYPES_LOCATION} file missing!")
             self.safe_report({'WARNING'}, f"{CONTENT_TYPES_LOCATION} file missing")
 
         # This parser should be robust to slightly broken files and retrieve what we can.
@@ -1012,7 +1028,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             else:
                 # Unknown prefix - keep as-is for warning purposes
                 resolved.add(prefix)
-                log.debug(f"Unknown extension prefix: {prefix}")
+                debug(f"Unknown extension prefix: {prefix}")
 
         return resolved
 
@@ -1073,7 +1089,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
         for metadata_node in node.iterfind("./3mf:metadata", MODEL_NAMESPACES):
             if "name" not in metadata_node.attrib:
-                log.warning("Metadata entry without name is discarded.")
+                warn("Metadata entry without name is discarded.")
                 self.safe_report({'WARNING'}, "Metadata entry without name is discarded")
                 continue  # This attribute has no name, so there's no key by which I can save the metadata.
             name = metadata_node.attrib["name"]
@@ -1105,7 +1121,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         """
         # Skip all material import if disabled
         if self.import_materials == 'NONE':
-            log.info("Material import disabled, skipping all material data")
+            debug("Material import disabled, skipping all material data")
             return
 
         from .constants import MATERIAL_NAMESPACE
@@ -1128,7 +1144,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         display_properties.update(pbr_translucent_props)
 
         if display_properties:
-            log.info(f"Parsed {len(display_properties)} PBR display property groups")
+            debug(f"Parsed {len(display_properties)} PBR display property groups")
 
         # Import basematerials and colorgroups (delegates to import_materials.base module)
         _read_materials_impl(self, root, material_ns, display_properties)
@@ -1275,7 +1291,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             try:
                 objectid = object_node.attrib["id"]
             except KeyError:
-                log.warning("Object resource without ID!")
+                warn("Object resource without ID!")
                 self.safe_report({'WARNING'}, "Object resource without ID")
                 continue  # ID is required, otherwise the build can't refer to it.
 
@@ -1291,7 +1307,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 except KeyError:
                     # Only warn if materials were supposed to be imported
                     if self.import_materials != 'NONE':
-                        log.warning(
+                        warn(
                             f"Object with ID {objectid} refers to material collection {pid} with index {pindex}"
                             f" which doesn't exist."
                         )
@@ -1301,12 +1317,12 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                             f"with index {pindex} which doesn't exist"
                         )
                     else:
-                        log.debug(
+                        debug(
                             f"Object with ID {objectid} refers to material {pid}:{pindex} "
                             f"(skipped due to import_materials=False)"
                         )
                 except ValueError:
-                    log.warning(
+                    warn(
                         f"Object with ID {objectid} specifies material index {pindex}, which is not integer."
                     )
                     self.safe_report(
@@ -1393,19 +1409,19 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             try:
                 x = float(attrib.get("x", 0))
             except ValueError:  # Not a float.
-                log.warning("Vertex missing X coordinate.")
+                warn("Vertex missing X coordinate.")
                 self.safe_report({'WARNING'}, "Vertex missing X coordinate")
                 x = 0
             try:
                 y = float(attrib.get("y", 0))
             except ValueError:
-                log.warning("Vertex missing Y coordinate.")
+                warn("Vertex missing Y coordinate.")
                 self.safe_report({'WARNING'}, "Vertex missing Y coordinate")
                 y = 0
             try:
                 z = float(attrib.get("z", 0))
             except ValueError:
-                log.warning("Vertex missing Z coordinate.")
+                warn("Vertex missing Z coordinate.")
                 self.safe_report({'WARNING'}, "Vertex missing Z coordinate")
                 z = 0
             result.append((x, y, z))
@@ -1472,7 +1488,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 v2 = int(attrib["v2"])
                 v3 = int(attrib["v3"])
                 if v1 < 0 or v2 < 0 or v3 < 0:  # Negative indices are not allowed.
-                    log.warning("Triangle containing negative index to vertex list.")
+                    warn("Triangle containing negative index to vertex list.")
                     self.safe_report({'WARNING'}, "Triangle containing negative index to vertex list")
                     continue
 
@@ -1518,7 +1534,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                                 materials.extend(sub_mats)
                                 continue  # Skip normal triangle addition
                             except Exception as e:
-                                log.warning(f"Failed to subdivide long segmentation: {e}")
+                                warn(f"Failed to subdivide long segmentation: {e}")
                                 # Fall through to default material
                         else:
                             # Short string (<10 chars): Could be Orca code or short segmentation
@@ -1538,8 +1554,8 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                                         triangle_uvs.append(None)
                                     materials.extend(sub_mats)
                                     continue
-                                except Exception as e:
-                                    log.debug(f"String '{paint_code}' not valid Orca code or segmentation, using default")
+                                except Exception:
+                                    debug(f"String '{paint_code}' not valid Orca code or segmentation, using default")
                                     # Fall through to default material
                     elif pid is not None and pid in self.resource_texture_groups:
                         # This is a texture group reference - extract UVs
@@ -1562,7 +1578,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                             material = self._get_or_create_textured_material(pid, texture_group)
 
                         except (ValueError, IndexError) as e:
-                            log.warning(f"Invalid texture coordinate index: {e}")
+                            warn(f"Invalid texture coordinate index: {e}")
                             uvs = None
                     elif pid is not None and pid in self.resource_multiproperties:
                         # Multiproperties reference - resolve to underlying basematerial
@@ -1574,11 +1590,11 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                         try:
                             material = self.resource_materials[pid][int(p1)]
                         except KeyError as e:
-                            log.warning(f"Material {e} is missing.")
+                            warn(f"Material {e} is missing.")
                             self.safe_report({'WARNING'}, f"Material {e} is missing")
                             material = default_material
                         except ValueError as e:
-                            log.warning(f"Material index is not an integer: {e}")
+                            warn(f"Material index is not an integer: {e}")
                             self.safe_report({'WARNING'}, f"Material index is not an integer: {e}")
                             material = default_material
                     else:
@@ -1590,11 +1606,11 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 materials.append(material)
                 triangle_uvs.append(uvs)
             except KeyError as e:
-                log.warning(f"Vertex {e} is missing.")
+                warn(f"Vertex {e} is missing.")
                 self.safe_report({'WARNING'}, f"Vertex {e} is missing")
                 continue
             except ValueError as e:
-                log.warning(f"Vertex reference is not an integer: {e}")
+                warn(f"Vertex reference is not an integer: {e}")
                 self.safe_report({'WARNING'}, f"Vertex reference is not an integer: {e}")
                 continue  # No fallback this time. Leave out the entire triangle.
         return vertices, materials, triangle_uvs, vertex_list, segmentation_strings, default_extruder
@@ -1642,23 +1658,23 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         """
         multiprop = self.resource_multiproperties.get(multiprop_id)
         if not multiprop:
-            log.warning(f"Multiproperties {multiprop_id} not found")
+            warn(f"Multiproperties {multiprop_id} not found")
             return default_material, None
 
         # Get the multi index from p1 (per 3MF spec, p1 is required for multiproperties)
         if p1 is None:
-            log.warning(f"Multiproperties {multiprop_id} requires p1 index")
+            warn(f"Multiproperties {multiprop_id} requires p1 index")
             return default_material, None
 
         try:
             multi_index = int(p1)
         except ValueError:
-            log.warning(f"Invalid multi index: {p1}")
+            warn(f"Invalid multi index: {p1}")
             return default_material, None
 
         # Get the multi element at this index
         if multi_index < 0 or multi_index >= len(multiprop.multis):
-            log.warning(f"Multi index {multi_index} out of range for multiproperties {multiprop_id}")
+            warn(f"Multi index {multi_index} out of range for multiproperties {multiprop_id}")
             return default_material, None
 
         multi = multiprop.multis[multi_index]
@@ -1685,7 +1701,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                     material_group = self.resource_materials[pid]
                     if pindex in material_group:
                         material = material_group[pindex]
-                        log.debug(f"Multiproperties {multiprop_id}: resolved to material "
+                        debug(f"Multiproperties {multiprop_id}: resolved to material "
                                   f"'{material.name}' from basematerials {pid}[{pindex}]")
 
             # Check if this pid is a texture group (for UVs)
@@ -1708,7 +1724,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                     pass
 
         if material is None:
-            log.debug(f"Multiproperties {multiprop_id}: no basematerial found, using default")
+            debug(f"Multiproperties {multiprop_id}: no basematerial found, using default")
             material = default_material
 
         return material, uvs
@@ -1752,7 +1768,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             # This references an external model file
             path = component_node.attrib.get(f"{{{PRODUCTION_NAMESPACE}}}path")
             if path:
-                log.info(f"Component references external model: {path}")
+                debug(f"Component references external model: {path}")
 
             result.append(Component(resource_object=objectid, transformation=transform, path=path))
         return result
@@ -1767,7 +1783,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         :param model_path: The path to the model file (e.g., "/3D/Objects/Cube_1.model")
         """
         if not hasattr(self, 'current_archive_path') or not self.current_archive_path:
-            log.warning(f"Cannot load external model {model_path}: no archive path set")
+            warn(f"Cannot load external model {model_path}: no archive path set")
             return
 
         # Normalize path (remove leading slash for archive access)
@@ -1776,14 +1792,14 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         try:
             with zipfile.ZipFile(self.current_archive_path, 'r') as archive:
                 if archive_path not in archive.namelist():
-                    log.warning(f"External model file not found in archive: {archive_path}")
+                    warn(f"External model file not found in archive: {archive_path}")
                     return
 
                 with archive.open(archive_path) as model_file:
                     try:
                         document = xml.etree.ElementTree.parse(model_file)
                     except xml.etree.ElementTree.ParseError as e:
-                        log.error(f"External model {archive_path} is malformed: {e}")
+                        error(f"External model {archive_path} is malformed: {e}")
                         self.safe_report({'ERROR'}, f"External model {archive_path} is malformed")
                         return
 
@@ -1792,10 +1808,10 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                     # Read objects from this external model file
                     self.read_external_model_objects(root, model_path)
 
-                    log.info(f"Loaded external model: {archive_path}")
+                    debug(f"Loaded external model: {archive_path}")
 
         except (zipfile.BadZipFile, IOError) as e:
-            log.error(f"Failed to read external model {archive_path}: {e}")
+            error(f"Failed to read external model {archive_path}: {e}")
             self.safe_report({'ERROR'}, f"Failed to read external model: {e}")
 
     def read_external_model_objects(self, root: xml.etree.ElementTree.Element, source_path: str) -> None:
@@ -1813,12 +1829,12 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             try:
                 objectid = object_node.attrib["id"]
             except KeyError:
-                log.warning(f"Object in {source_path} without ID!")
+                warn(f"Object in {source_path} without ID!")
                 continue
 
             # Skip if we already have this object (don't overwrite)
             if objectid in self.resource_objects:
-                log.debug(f"Object {objectid} already loaded, skipping duplicate from {source_path}")
+                debug(f"Object {objectid} already loaded, skipping duplicate from {source_path}")
                 continue
 
             vertices = self.read_vertices(object_node)
@@ -1862,7 +1878,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 segmentation_strings=segmentation_strings if segmentation_strings else None,
                 default_extruder=default_extruder,
             )
-            log.info(
+            debug(
                 f"Loaded object {objectid} from {source_path} "
                 f"with {len(vertices)} vertices, {len(triangles)} triangles"
             )
@@ -1921,7 +1937,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 v2 = int(attrib["v2"])
                 v3 = int(attrib["v3"])
                 if v1 < 0 or v2 < 0 or v3 < 0:
-                    log.warning("Triangle with negative vertex index.")
+                    warn("Triangle with negative vertex index.")
                     continue
 
                 # Handle multi-material attributes (Orca/PrusaSlicer)
@@ -1957,7 +1973,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                                 materials.extend(sub_mats)
                                 continue  # Skip normal triangle addition
                             except Exception as e:
-                                log.warning(f"Failed to subdivide long segmentation: {e}")
+                                warn(f"Failed to subdivide long segmentation: {e}")
                                 # Fall through to treat as unpainted triangle
                         else:
                             # Short string (<10 chars): Could be Orca code or short segmentation
@@ -1967,7 +1983,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                                     # It's a known Orca paint code ("4", "8", "0C", etc.)
                                     material = self.get_or_create_paint_material(filament_index, paint_code)
                                     paint_color_materials[paint_code] = material
-                                    log.debug(f"Multi-material code '{paint_code}' -> filament {filament_index}")
+                                    debug(f"Multi-material code '{paint_code}' -> filament {filament_index}")
                                 else:
                                     # Unknown code - try as short segmentation string
                                     try:
@@ -1978,8 +1994,8 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                                         triangles.extend(sub_tris)
                                         materials.extend(sub_mats)
                                         continue
-                                    except Exception as e:
-                                        log.debug(f"String '{paint_code}' not valid Orca code or segmentation, using default")
+                                    except Exception:
+                                        debug(f"String '{paint_code}' not valid Orca code or segmentation, using default")
                                         # Fall through to default material
                             else:
                                 material = paint_color_materials[paint_code]
@@ -1988,10 +2004,10 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 materials.append(material)
 
             except KeyError as e:
-                log.warning(f"Triangle missing vertex: {e}")
+                warn(f"Triangle missing vertex: {e}")
                 continue
             except ValueError as e:
-                log.warning(f"Invalid vertex reference: {e}")
+                warn(f"Invalid vertex reference: {e}")
                 continue
 
         return triangles, materials, vertex_list, segmentation_strings, default_extruder
@@ -2074,7 +2090,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 state_materials[state] = material
             result_materials.append(state_materials[state])
         
-        log.debug(f"Subdivided triangle {source_triangle_index}: "
+        debug(f"Subdivided triangle {source_triangle_index}: "
                  f"{len(new_verts)-3} new vertices, {len(result_triangles)} sub-triangles")
         
         return result_triangles, result_materials
@@ -2104,7 +2120,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 hex_color = self.orca_filament_colors[array_index]
                 color = self.parse_hex_color(hex_color)
                 color_name = f"Color {hex_color}"
-                log.info(f"Using Orca filament color {filament_index} (array index {array_index}): {hex_color}")
+                debug(f"Using Orca filament color {filament_index} (array index {array_index}): {hex_color}")
 
             if color is None:
                 # Fallback: generate a color based on filament index
@@ -2112,7 +2128,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 hue = (filament_index * 0.618033988749895) % 1.0  # Golden ratio for good distribution
                 r, g, b = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
                 color = (r, g, b, 1.0)
-                log.info(f"Generated fallback color for filament {filament_index}")
+                debug(f"Generated fallback color for filament {filament_index}")
 
             self.resource_materials[material_id] = {
                 0: ResourceMaterial(
@@ -2124,7 +2140,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                     specular_texid=None, glossiness_texid=None,
                 )
             }
-            log.info(f"Created paint material for filament {filament_index} (code: {paint_code})")
+            debug(f"Created paint material for filament {filament_index} (code: {paint_code})")
 
         return self.resource_materials[material_id][0]
 
@@ -2143,14 +2159,14 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             with zipfile.ZipFile(archive_path, 'r') as archive:
                 config_path = "Metadata/project_settings.config"
                 if config_path not in archive.namelist():
-                    log.debug(f"No {config_path} in archive, skipping Orca color import")
+                    debug(f"No {config_path} in archive, skipping Orca color import")
                     return
 
                 with archive.open(config_path) as config_file:
                     try:
                         config = json.load(config_file)
                     except json.JSONDecodeError as e:
-                        log.warning(f"Failed to parse {config_path}: {e}")
+                        warn(f"Failed to parse {config_path}: {e}")
                         return
 
                     # Extract filament_colour array
@@ -2163,11 +2179,11 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                         for idx, hex_color in enumerate(filament_colours):
                             self.orca_filament_colors[idx] = hex_color
 
-                        log.info(f"Loaded {len(filament_colours)} Orca filament colors: {filament_colours}")
+                        debug(f"Loaded {len(filament_colours)} Orca filament colors: {filament_colours}")
                         self.safe_report({'INFO'}, f"Loaded {len(filament_colours)} Orca filament colors")
 
         except (zipfile.BadZipFile, IOError) as e:
-            log.debug(f"Could not read Orca config from {archive_path}: {e}")
+            debug(f"Could not read Orca config from {archive_path}: {e}")
 
     def read_prusa_slic3r_colors(self, archive_path: str) -> None:
         """
@@ -2183,14 +2199,14 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
         # Skip if colors already loaded from Orca config
         if self.orca_filament_colors:
-            log.debug("Filament colors already loaded, skipping Slic3r_PE.config")
+            debug("Filament colors already loaded, skipping Slic3r_PE.config")
             return
 
         try:
             with zipfile.ZipFile(archive_path, 'r') as archive:
                 config_path = "Metadata/Slic3r_PE.config"
                 if config_path not in archive.namelist():
-                    log.debug(f"No {config_path} in archive, skipping PrusaSlicer color import")
+                    debug(f"No {config_path} in archive, skipping PrusaSlicer color import")
                     return
 
                 with archive.open(config_path) as config_file:
@@ -2207,12 +2223,62 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                                 if hex_color.startswith('#'):
                                     self.orca_filament_colors[idx] = hex_color
 
-                            log.info(f"Loaded {len(hex_colors)} PrusaSlicer extruder colors: {hex_colors}")
                             self.safe_report({'INFO'}, f"Loaded {len(hex_colors)} PrusaSlicer extruder colors")
                             break
 
         except (zipfile.BadZipFile, IOError) as e:
-            log.debug(f"Could not read PrusaSlicer config from {archive_path}: {e}")
+            debug(f"Could not read PrusaSlicer config from {archive_path}: {e}")
+
+    def read_blender_addon_colors(self, archive_path: str) -> None:
+        """
+        Read extruder colors from our addon's fallback metadata.
+
+        This XML file contains extruder elements like:
+        <filament_colors>
+          <extruder index="0" color="#FF8000"/>
+          <extruder index="1" color="#DB5182"/>
+        </filament_colors>
+
+        Used as a fallback when no slicer config is present, allowing
+        round-trip color preservation without forcing project file behavior.
+
+        :param archive_path: Path to the 3MF archive file.
+        """
+        if self.import_materials == 'NONE':
+            return
+
+        # Skip if colors already loaded from Orca or PrusaSlicer config
+        if self.orca_filament_colors:
+            debug("Filament colors already loaded, skipping blender_filament_colors.xml")
+            return
+
+        try:
+            with zipfile.ZipFile(archive_path, 'r') as archive:
+                config_path = "Metadata/blender_filament_colors.xml"
+                if config_path not in archive.namelist():
+                    debug(f"No {config_path} in archive, using default colors")
+                    return
+
+                with archive.open(config_path) as config_file:
+                    tree = xml.etree.ElementTree.parse(config_file)
+                    root = tree.getroot()
+
+                    # Parse <extruder index="0" color="#FF8000"/> elements
+                    for extruder_elem in root.findall('extruder'):
+                        try:
+                            extruder_idx = int(extruder_elem.get('index', '-1'))
+                            hex_color = extruder_elem.get('color', '')
+                            if extruder_idx >= 0 and hex_color.startswith('#'):
+                                self.orca_filament_colors[extruder_idx] = hex_color
+                        except (ValueError, AttributeError):
+                            continue
+
+                    if self.orca_filament_colors:
+                        debug(f"Loaded {len(self.orca_filament_colors)} colors from Blender addon metadata (fallback)")
+                        self.safe_report({'INFO'}, f"Loaded {len(self.orca_filament_colors)} colors from addon metadata")
+
+        except (zipfile.BadZipFile, IOError, xml.etree.ElementTree.ParseError) as e:
+            debug(f"Could not read Blender addon colors from {archive_path}: {e}")
 
     def read_prusa_object_extruders(self, archive_path: str) -> None:
         """
@@ -2229,7 +2295,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             with zipfile.ZipFile(archive_path, 'r') as archive:
                 config_path = "Metadata/Slic3r_PE_model.config"
                 if config_path not in archive.namelist():
-                    log.debug(f"No {config_path} in archive, skipping object extruder import")
+                    debug(f"No {config_path} in archive, skipping object extruder import")
                     return
 
                 with archive.open(config_path) as config_file:
@@ -2238,7 +2304,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                     try:
                         root = xml.etree.ElementTree.fromstring(content)
                     except xml.etree.ElementTree.ParseError as e:
-                        log.warning(f"Failed to parse {config_path}: {e}")
+                        warn(f"Failed to parse {config_path}: {e}")
                         return
 
                     # Find all object elements and extract extruder metadata
@@ -2254,15 +2320,15 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                                     extruder = int(meta.get('value', '1'))
                                     # PrusaSlicer uses 1-based extruder numbers
                                     self.object_default_extruders[obj_id] = extruder
-                                    log.debug(f"Object {obj_id} uses extruder {extruder}")
+                                    debug(f"Object {obj_id} uses extruder {extruder}")
                                 except ValueError:
                                     pass
 
                     if self.object_default_extruders:
-                        log.info(f"Loaded extruder assignments for {len(self.object_default_extruders)} objects")
+                        debug(f"Loaded extruder assignments for {len(self.object_default_extruders)} objects")
 
         except (zipfile.BadZipFile, IOError) as e:
-            log.debug(f"Could not read PrusaSlicer model config from {archive_path}: {e}")
+            debug(f"Could not read PrusaSlicer model config from {archive_path}: {e}")
 
     def read_prusa_filament_colors(self, archive_path: str) -> None:
         """
@@ -2280,7 +2346,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             with zipfile.ZipFile(archive_path, 'r') as archive:
                 metadata_path = "Metadata/blender_filament_colors.txt"
                 if metadata_path not in archive.namelist():
-                    log.debug(f"No {metadata_path} in archive, skipping Prusa color import")
+                    debug(f"No {metadata_path} in archive, skipping Prusa color import")
                     return
 
                 with archive.open(metadata_path) as metadata_file:
@@ -2297,12 +2363,12 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                                 array_index = filament_index - 1
                                 self.orca_filament_colors[array_index] = hex_color
 
-                    log.info(f"Loaded {len(self.orca_filament_colors)} Prusa filament colors from metadata")
+                    debug(f"Loaded {len(self.orca_filament_colors)} Prusa filament colors from metadata")
                     self.safe_report({'INFO'},
                                      f"Loaded {len(self.orca_filament_colors)} PrusaSlicer filament colors")
 
         except (zipfile.BadZipFile, IOError) as e:
-            log.debug(f"Could not read Prusa filament colors from {archive_path}: {e}")
+            debug(f"Could not read Prusa filament colors from {archive_path}: {e}")
 
     def srgb_to_linear(self, value: float) -> float:
         """
@@ -2398,14 +2464,14 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 col += 1
                 row = 0
                 if col > 3:
-                    log.warning(
+                    warn(
                         f"Transformation matrix contains too many components: {transformation_str}"
                     )
                     break  # Too many components. Ignore the rest.
             try:
                 component_float = float(component)
             except ValueError:  # Not a proper float. Skip this one.
-                log.warning(f"Transformation matrix malformed: {transformation_str}")
+                warn(f"Transformation matrix malformed: {transformation_str}")
                 continue
             result[row][col] = component_float
         return result
@@ -2445,7 +2511,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             except (
                 KeyError
             ):  # ID is required, and it must be in the available resource_objects.
-                log.warning("Encountered build item without object ID.")
+                warn("Encountered build item without object ID.")
                 continue  # Ignore this invalid item.
 
             metadata = Metadata()
@@ -2517,13 +2583,13 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 cached_mesh, instance_count = self.component_instance_cache[component_id]
                 mesh = cached_mesh
                 self.component_instance_cache[component_id] = (cached_mesh, instance_count + 1)
-                log.info(f"Creating linked duplicate {instance_count + 1} for component {component_id}")
+                debug(f"Creating linked duplicate {instance_count + 1} for component {component_id}")
             else:
                 # First instance - need to build the component and cache its mesh
                 try:
                     component_resource = self.resource_objects[component_id]
                 except KeyError:
-                    log.warning(f"Component reference to unknown resource ID: {component_id}")
+                    warn(f"Component reference to unknown resource ID: {component_id}")
                     return None
                 
                 # Build the component to get its mesh
@@ -2542,13 +2608,13 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                     mesh = temp_obj.data
                     # Cache the mesh for future instances
                     self.component_instance_cache[component_id] = (mesh, 1)
-                    log.info(f"Cached component {component_id} mesh for linked duplicates")
+                    debug(f"Cached component {component_id} mesh for linked duplicates")
                     
                     # Remove the temporary object from the scene
                     # We only wanted its mesh data
                     bpy.data.objects.remove(temp_obj, do_unlink=True)
                 else:
-                    log.warning(f"Failed to build component {component_id}")
+                    warn(f"Failed to build component {component_id}")
                     return None
         else:
             # Normal object or container with multiple components - create mesh as usual
@@ -2594,13 +2660,13 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                             # Determine texture size based on tri count (balance quality vs performance)
                             tri_count = len(resource_object.triangles)
                             if tri_count < 5000:
-                                texture_size = 1024
-                            elif tri_count < 20000:
                                 texture_size = 2048
-                            else:
+                            elif tri_count < 20000:
                                 texture_size = 4096
+                            else:
+                                texture_size = 8192
                             
-                            log.info(f"Rendering MMU segmentation to {texture_size}x{texture_size} UV texture for {tri_count} triangles")
+                            debug(f"Rendering MMU segmentation to {texture_size}x{texture_size} UV texture for {tri_count} triangles")
                             
                             # Render segmentation to texture
                             image = render_segmentation_to_texture(
@@ -2652,9 +2718,10 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                             mesh["3mf_is_paint_texture"] = True
                             
                             paint_texture_rendered = True
-                            log.info(f"Successfully rendered MMU paint data to UV texture")
+                            self._paint_object_names.append(mesh.name)
+                            debug("Successfully rendered MMU paint data to UV texture")
                         else:
-                            log.warning("No extruder colors found - cannot render MMU paint texture")
+                            warn("No extruder colors found - cannot render MMU paint texture")
                     
                     finally:
                         # Remove temporary object
@@ -2708,9 +2775,9 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                                             # Also apply PBR textures (roughness, metallic, etc.)
                                             self._apply_pbr_textures_to_material(material, triangle_material)
                                         else:
-                                            log.warning(f"Texture not found for texture group {triangle_material.texture_id}")
+                                            warn(f"Texture not found for texture group {triangle_material.texture_id}")
                                     else:
-                                        log.warning(f"Texture group not found: {triangle_material.texture_id}")
+                                        warn(f"Texture group not found: {triangle_material.texture_id}")
                                 else:
                                     # Standard color-based material
                                     principled = bpy_extras.node_shader_utils.PrincipledBSDFWrapper(
@@ -2733,7 +2800,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                         if triangle_material not in materials_to_index:
                             new_index = len(mesh.materials.items())
                             if new_index > 32767:
-                                log.warning(
+                                warn(
                                     "Blender doesn't support more than 32768 different materials per mesh."
                                 )
                                 continue
@@ -2778,7 +2845,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                     # Bulk assign using foreach_set (much faster than individual assignments)
                     mesh.attributes[attr_name].data.foreach_set("value", set_values)
 
-                    log.info(f"Applied {len(resource_object.triangle_sets)} triangle sets as face attributes")
+                    debug(f"Applied {len(resource_object.triangle_sets)} triangle sets as face attributes")
 
             # Apply UV coordinates from texture mapping (3MF Materials Extension)
             if resource_object.triangle_uvs:
@@ -2802,7 +2869,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
                     # Bulk assign UV coordinates
                     uv_layer.data.foreach_set("uv", uv_data)
-                    log.info(f"Applied UV coordinates to mesh ({len(resource_object.triangle_uvs)} triangles)")
+                    debug(f"Applied UV coordinates to mesh ({len(resource_object.triangle_uvs)} triangles)")
 
         # Only create a Blender object if there's actual mesh data.
         # Component-only objects (containers) don't need visible representation.
@@ -2884,14 +2951,14 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             for component in resource_object.components:
                 if component.resource_object in objectid_stack_trace:
                     # These object IDs refer to each other in a loop. Don't go in there!
-                    log.warning(
+                    warn(
                         f"Recursive components in object ID: {component.resource_object}"
                     )
                     continue
                 try:
                     child_object = self.resource_objects[component.resource_object]
                 except KeyError:  # Invalid resource ID. Doesn't exist!
-                    log.warning(
+                    warn(
                         f"Build item with unknown resource ID: {component.resource_object}"
                     )
                     continue

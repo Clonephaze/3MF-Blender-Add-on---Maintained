@@ -19,14 +19,13 @@ Triangle sets are groups of triangles with a name and identifier for selection
 and property assignment workflows.
 """
 
-import logging
 import xml.etree.ElementTree
 from typing import Dict, List, TYPE_CHECKING
 
+from .utilities import debug, warn
+
 if TYPE_CHECKING:
     from .import_3mf import Import3MF
-
-log = logging.getLogger(__name__)
 
 
 def read_triangle_sets(op: 'Import3MF',
@@ -60,7 +59,7 @@ def read_triangle_sets(op: 'Import3MF',
             # Fall back to identifier if name missing
             set_name = attrib.get("identifier")
         if not set_name:
-            log.warning("Triangle set missing name attribute, skipping")
+            warn("Triangle set missing name attribute, skipping")
             op.safe_report({'WARNING'}, "Triangle set missing name attribute")
             continue
 
@@ -75,11 +74,11 @@ def read_triangle_sets(op: 'Import3MF',
             try:
                 index = int(ref.attrib.get("index", "-1"))
                 if index < 0:
-                    log.warning(f"Triangle set '{set_name}' contains negative triangle index")
+                    warn(f"Triangle set '{set_name}' contains negative triangle index")
                     continue
                 triangle_indices.append(index)
             except (KeyError, ValueError) as e:
-                log.warning(f"Triangle set '{set_name}' contains invalid ref: {e}")
+                warn(f"Triangle set '{set_name}' contains invalid ref: {e}")
                 continue
 
         # Handle <refrange startindex="N" endindex="M"/> elements (inclusive range)
@@ -88,21 +87,21 @@ def read_triangle_sets(op: 'Import3MF',
                 start_index = int(refrange.attrib.get("startindex", "-1"))
                 end_index = int(refrange.attrib.get("endindex", "-1"))
                 if start_index < 0 or end_index < 0:
-                    log.warning(f"Triangle set '{set_name}' contains invalid refrange indices")
+                    warn(f"Triangle set '{set_name}' contains invalid refrange indices")
                     continue
                 if end_index < start_index:
-                    log.warning(f"Triangle set '{set_name}' has refrange with end < start")
+                    warn(f"Triangle set '{set_name}' has refrange with end < start")
                     continue
                 # Per spec: range is inclusive on both ends
                 triangle_indices.extend(range(start_index, end_index + 1))
             except (KeyError, ValueError) as e:
-                log.warning(f"Triangle set '{set_name}' contains invalid refrange: {e}")
+                warn(f"Triangle set '{set_name}' contains invalid refrange: {e}")
                 continue
 
         if triangle_indices:
             # Remove duplicates per spec: "A consumer MUST ignore duplicate references"
             triangle_indices = list(dict.fromkeys(triangle_indices))
             triangle_sets[set_name] = triangle_indices
-            log.info(f"Loaded triangle set '{set_name}' with {len(triangle_indices)} triangles")
+            debug(f"Loaded triangle set '{set_name}' with {len(triangle_indices)} triangles")
 
     return triangle_sets

@@ -22,16 +22,15 @@ This module handles:
 - Applying PBR properties to Blender Principled BSDF
 """
 
-import logging
 from typing import Dict, List, TYPE_CHECKING
 
 import bpy
 import bpy_extras.node_shader_utils
 
+from ..utilities import debug, warn
+
 if TYPE_CHECKING:
     from ..import_3mf import Import3MF, ResourceMaterial
-
-log = logging.getLogger(__name__)
 
 
 def read_pbr_metallic_properties(op: 'Import3MF', root, material_ns: Dict[str, str]) -> Dict[str, List[Dict]]:
@@ -80,11 +79,11 @@ def read_pbr_metallic_properties(op: 'Import3MF', root, material_ns: Dict[str, s
 
             prop_dict["name"] = pbmetallic.attrib.get("name", "")
             material_props.append(prop_dict)
-            log.debug(f"Parsed metallic PBR: metallic={prop_dict['metallic']}, roughness={prop_dict['roughness']}")
+            debug(f"Parsed metallic PBR: metallic={prop_dict['metallic']}, roughness={prop_dict['roughness']}")
 
         if material_props:
             props[props_id] = material_props
-            log.info(f"Imported {len(material_props)} metallic display properties (ID: {props_id})")
+            debug(f"Imported {len(material_props)} metallic display properties (ID: {props_id})")
             op.resource_pbr_display_props[props_id] = ResourcePBRDisplayProps(
                 type="metallic",
                 properties=raw_props
@@ -148,12 +147,12 @@ def read_pbr_specular_properties(op: 'Import3MF', root, material_ns: Dict[str, s
 
             prop_dict["name"] = pbspecular.attrib.get("name", "")
             material_props.append(prop_dict)
-            log.debug(f"Parsed specular PBR: glossiness={prop_dict['glossiness']}, "
-                      f"specular={prop_dict['specular_color']}")
+            debug(f"Parsed specular PBR: glossiness={prop_dict['glossiness']}, "
+                  f"specular={prop_dict['specular_color']}")
 
         if material_props:
             props[props_id] = material_props
-            log.info(f"Imported {len(material_props)} specular display properties (ID: {props_id})")
+            debug(f"Imported {len(material_props)} specular display properties (ID: {props_id})")
             op.resource_pbr_display_props[props_id] = ResourcePBRDisplayProps(
                 type="specular",
                 properties=raw_props
@@ -232,12 +231,12 @@ def read_pbr_translucent_properties(op: 'Import3MF', root, material_ns: Dict[str
 
             prop_dict["name"] = translucent.attrib.get("name", "")
             material_props.append(prop_dict)
-            log.debug(f"Parsed translucent PBR: ior={prop_dict['ior']}, "
-                      f"roughness={prop_dict['roughness']}, attenuation={prop_dict['attenuation']}")
+            debug(f"Parsed translucent PBR: ior={prop_dict['ior']}, "
+                  f"roughness={prop_dict['roughness']}, attenuation={prop_dict['attenuation']}")
 
         if material_props:
             props[props_id] = material_props
-            log.info(f"Imported {len(material_props)} translucent display properties (ID: {props_id})")
+            debug(f"Imported {len(material_props)} translucent display properties (ID: {props_id})")
             op.resource_pbr_display_props[props_id] = ResourcePBRDisplayProps(
                 type="translucent",
                 properties=raw_props
@@ -267,7 +266,7 @@ def read_pbr_texture_display_properties(op: 'Import3MF', root, material_ns: Dict
         try:
             prop_id = prop_item.attrib["id"]
         except KeyError:
-            log.warning("Encountered pbspeculartexturedisplayproperties without ID")
+            warn("Encountered pbspeculartexturedisplayproperties without ID")
             continue
 
         if prop_id in op.resource_pbr_texture_displays:
@@ -292,7 +291,7 @@ def read_pbr_texture_display_properties(op: 'Import3MF', root, material_ns: Dict
             basecolor_texid=diffuse_texid,
             factors=factors
         )
-        log.debug(f"Parsed pbspeculartexturedisplayproperties {prop_id}")
+        debug(f"Parsed pbspeculartexturedisplayproperties {prop_id}")
 
     # Parse pbmetallictexturedisplayproperties
     for prop_item in root.iterfind(
@@ -302,7 +301,7 @@ def read_pbr_texture_display_properties(op: 'Import3MF', root, material_ns: Dict
         try:
             prop_id = prop_item.attrib["id"]
         except KeyError:
-            log.warning("Encountered pbmetallictexturedisplayproperties without ID")
+            warn("Encountered pbmetallictexturedisplayproperties without ID")
             continue
 
         if prop_id in op.resource_pbr_texture_displays:
@@ -327,10 +326,10 @@ def read_pbr_texture_display_properties(op: 'Import3MF', root, material_ns: Dict
             basecolor_texid=basecolor_texid,
             factors=factors
         )
-        log.debug(f"Parsed pbmetallictexturedisplayproperties {prop_id} (basecolor={basecolor_texid})")
+        debug(f"Parsed pbmetallictexturedisplayproperties {prop_id} (basecolor={basecolor_texid})")
 
     if op.resource_pbr_texture_displays:
-        log.info(f"Found {len(op.resource_pbr_texture_displays)} textured PBR display properties (passthrough)")
+        debug(f"Found {len(op.resource_pbr_texture_displays)} textured PBR display properties (passthrough)")
 
 
 def apply_pbr_to_principled(op: 'Import3MF',
@@ -353,12 +352,12 @@ def apply_pbr_to_principled(op: 'Import3MF',
     if resource_material.metallic is not None:
         principled.metallic = resource_material.metallic
         has_pbr = True
-        log.debug(f"Applied metallic={resource_material.metallic} to material '{resource_material.name}'")
+        debug(f"Applied metallic={resource_material.metallic} to material '{resource_material.name}'")
 
     if resource_material.roughness is not None:
         principled.roughness = resource_material.roughness
         has_pbr = True
-        log.debug(f"Applied roughness={resource_material.roughness} to material '{resource_material.name}'")
+        debug(f"Applied roughness={resource_material.roughness} to material '{resource_material.name}'")
 
     # Apply specular workflow properties
     if resource_material.specular_color is not None:
@@ -368,8 +367,8 @@ def apply_pbr_to_principled(op: 'Import3MF',
         specular_level = specular_intensity / 0.44
         principled.specular = min(1.0, max(0.0, specular_level))
         has_pbr = True
-        log.debug(f"Applied specular_level={principled.specular} (from color "
-                  f"{resource_material.specular_color}) to material '{resource_material.name}'")
+        debug(f"Applied specular_level={principled.specular} (from color "
+              f"{resource_material.specular_color}) to material '{resource_material.name}'")
 
     # Apply translucent/glass properties
     if resource_material.transmission is not None and resource_material.transmission > 0:
@@ -383,12 +382,12 @@ def apply_pbr_to_principled(op: 'Import3MF',
                         node.inputs['Transmission'].default_value = resource_material.transmission
                     break
         has_pbr = True
-        log.debug(f"Applied transmission={resource_material.transmission} to material '{resource_material.name}'")
+        debug(f"Applied transmission={resource_material.transmission} to material '{resource_material.name}'")
 
     if resource_material.ior is not None:
         principled.ior = resource_material.ior
         has_pbr = True
-        log.debug(f"Applied IOR={resource_material.ior} to material '{resource_material.name}'")
+        debug(f"Applied IOR={resource_material.ior} to material '{resource_material.name}'")
 
     # Apply attenuation as volume absorption
     if resource_material.attenuation is not None:
@@ -410,10 +409,10 @@ def apply_pbr_to_principled(op: 'Import3MF',
                 )
 
             has_pbr = True
-            log.debug(f"Applied attenuation={resource_material.attenuation} to material '{resource_material.name}'")
+            debug(f"Applied attenuation={resource_material.attenuation} to material '{resource_material.name}'")
 
     if has_pbr:
-        log.info(f"Applied PBR properties to material '{resource_material.name}'")
+        debug(f"Applied PBR properties to material '{resource_material.name}'")
 
 
 def apply_pbr_textures_to_material(op: 'Import3MF', material: bpy.types.Material,
@@ -450,7 +449,7 @@ def apply_pbr_textures_to_material(op: 'Import3MF', material: bpy.types.Material
             break
 
     if principled is None:
-        log.warning(f"No Principled BSDF found in material '{material.name}'")
+        warn(f"No Principled BSDF found in material '{material.name}'")
         return False
 
     applied_any = False
@@ -466,7 +465,7 @@ def apply_pbr_textures_to_material(op: 'Import3MF', material: bpy.types.Material
             tex_node.label = "Base Color Map"
             links.new(tex_node.outputs['Color'], principled.inputs['Base Color'])
             applied_any = True
-            log.debug(f"Applied base color texture '{texture.blender_image.name}' to '{material.name}'")
+            debug(f"Applied base color texture '{texture.blender_image.name}' to '{material.name}'")
 
     # Apply metallic texture
     if has_metallic_tex:
@@ -479,7 +478,7 @@ def apply_pbr_textures_to_material(op: 'Import3MF', material: bpy.types.Material
             tex_node.image.colorspace_settings.name = 'Non-Color'
             links.new(tex_node.outputs['Color'], principled.inputs['Metallic'])
             applied_any = True
-            log.debug(f"Applied metallic texture '{texture.blender_image.name}' to '{material.name}'")
+            debug(f"Applied metallic texture '{texture.blender_image.name}' to '{material.name}'")
 
     # Apply roughness texture
     if has_roughness_tex:
@@ -492,7 +491,7 @@ def apply_pbr_textures_to_material(op: 'Import3MF', material: bpy.types.Material
             tex_node.image.colorspace_settings.name = 'Non-Color'
             links.new(tex_node.outputs['Color'], principled.inputs['Roughness'])
             applied_any = True
-            log.debug(f"Applied roughness texture '{texture.blender_image.name}' to '{material.name}'")
+            debug(f"Applied roughness texture '{texture.blender_image.name}' to '{material.name}'")
 
     # Apply specular texture
     if has_specular_tex:
@@ -507,7 +506,7 @@ def apply_pbr_textures_to_material(op: 'Import3MF', material: bpy.types.Material
             elif 'Specular' in principled.inputs:
                 links.new(tex_node.outputs['Color'], principled.inputs['Specular'])
             applied_any = True
-            log.debug(f"Applied specular texture '{texture.blender_image.name}' to '{material.name}'")
+            debug(f"Applied specular texture '{texture.blender_image.name}' to '{material.name}'")
 
     # Apply glossiness texture (invert to roughness)
     if has_glossiness_tex:
@@ -525,9 +524,9 @@ def apply_pbr_textures_to_material(op: 'Import3MF', material: bpy.types.Material
             links.new(tex_node.outputs['Color'], invert_node.inputs['Color'])
             links.new(invert_node.outputs['Color'], principled.inputs['Roughness'])
             applied_any = True
-            log.debug(f"Applied glossiness texture (inverted) '{texture.blender_image.name}' to '{material.name}'")
+            debug(f"Applied glossiness texture (inverted) '{texture.blender_image.name}' to '{material.name}'")
 
     if applied_any:
-        log.info(f"Applied PBR texture maps to material '{material.name}'")
+        debug(f"Applied PBR texture maps to material '{material.name}'")
 
     return applied_any

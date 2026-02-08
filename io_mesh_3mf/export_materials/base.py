@@ -21,7 +21,6 @@ Handles:
 - Face color collection for multi-material export
 """
 
-import logging
 import xml.etree.ElementTree
 from typing import Optional, Dict, List, Tuple
 
@@ -32,8 +31,7 @@ from ..constants import (
     MODEL_NAMESPACE,
     MATERIAL_NAMESPACE,
 )
-
-log = logging.getLogger(__name__)
+from ..utilities import debug, warn, linear_to_srgb
 
 # Orca Slicer paint_color encoding for filament IDs
 # This matches CONST_FILAMENTS in OrcaSlicer's Model.cpp
@@ -77,10 +75,11 @@ def material_to_hex_color(material: bpy.types.Material) -> Optional[str]:
     if color is None:
         color = material.diffuse_color[:3]
 
-    # Blender's diffuse_color is already in sRGB display space - no conversion needed
-    red = min(255, round(color[0] * 255))
-    green = min(255, round(color[1] * 255))
-    blue = min(255, round(color[2] * 255))
+    # Blender stores colors in linear space; 3MF hex colors are sRGB.
+    # Convert linear → sRGB before encoding.
+    red = min(255, max(0, round(linear_to_srgb(color[0]) * 255)))
+    green = min(255, max(0, round(linear_to_srgb(color[1]) * 255)))
+    blue = min(255, max(0, round(linear_to_srgb(color[2]) * 255)))
     return "#%0.2X%0.2X%0.2X" % (red, green, blue)
 
 
@@ -122,7 +121,7 @@ def collect_face_colors(blender_objects: List[bpy.types.Object],
             continue
 
         objects_processed += 1
-        log.info(f"Processing object: {blender_object.name}")
+        debug(f"Processing object: {blender_object.name}")
 
         # Get evaluated mesh with modifiers applied
         if use_mesh_modifiers:
@@ -134,15 +133,15 @@ def collect_face_colors(blender_objects: List[bpy.types.Object],
         try:
             mesh = eval_object.to_mesh()
         except RuntimeError:
-            log.warning(f"Could not get mesh for object: {blender_object.name}")
+            warn(f"Could not get mesh for object: {blender_object.name}")
             continue
 
         if mesh is None:
-            log.warning(f"Mesh is None for object: {blender_object.name}")
+            warn(f"Mesh is None for object: {blender_object.name}")
             continue
 
         # Extract colors from face material assignments
-        log.info(f"Object {blender_object.name}: {len(mesh.vertices)} vertices, {len(mesh.polygons)} faces")
+        debug(f"Object {blender_object.name}: {len(mesh.vertices)} vertices, {len(mesh.polygons)} faces")
 
         # Get all materials used by faces
         for face in mesh.polygons:
@@ -152,7 +151,7 @@ def collect_face_colors(blender_objects: List[bpy.types.Object],
                     color = material_to_hex_color(material)
                     if color:
                         unique_colors.add(color)
-                        log.debug(f"Face {face.index}: material={material.name}, color={color}")
+                        debug(f"Face {face.index}: material={material.name}, color={color}")
 
         eval_object.to_mesh_clear()
 
@@ -164,8 +163,8 @@ def collect_face_colors(blender_objects: List[bpy.types.Object],
     sorted_colors = sorted(unique_colors)
     color_to_index = {color: idx + 1 for idx, color in enumerate(sorted_colors)}
 
-    log.info(f"Collected {len(unique_colors)} unique colors from {objects_processed} objects for Orca export")
-    log.info(f"Colors: {sorted_colors}")
+    debug(f"Collected {len(unique_colors)} unique colors from {objects_processed} objects for Orca export")
+    debug(f"Colors: {sorted_colors}")
 
     # Report to user
     if objects_processed == 0:
@@ -238,7 +237,7 @@ def write_materials(resources_element: xml.etree.ElementTree.Element,
             # Map color hex to colorgroup ID for object/triangle assignment
             name_to_index[color_hex] = colorgroup_id
 
-        log.info(f"Created {len(sorted_colors)} colorgroups for Orca: {name_to_index}")
+        debug(f"Created {len(sorted_colors)} colorgroups for Orca: {name_to_index}")
         return name_to_index, next_resource_id, material_resource_id, None
 
     # Collect PBR data for all materials first
@@ -258,14 +257,14 @@ def write_materials(resources_element: xml.etree.ElementTree.Element,
             if material_name in name_to_index:
                 continue
 
-            # Wrap this material into a principled render node, to convert its color to sRGB.
+            # Read linear color from Blender and convert to sRGB for 3MF hex.
             principled = bpy_extras.node_shader_utils.PrincipledBSDFWrapper(
                 material, is_readonly=True
             )
             color = principled.base_color
-            red = min(255, round(color[0] * 255))
-            green = min(255, round(color[1] * 255))
-            blue = min(255, round(color[2] * 255))
+            red = min(255, max(0, round(linear_to_srgb(color[0]) * 255)))
+            green = min(255, max(0, round(linear_to_srgb(color[1]) * 255)))
+            blue = min(255, max(0, round(linear_to_srgb(color[2]) * 255)))
             alpha = principled.alpha
             if alpha >= 1.0:
                 color_hex = "#%0.2X%0.2X%0.2X" % (red, green, blue)
@@ -310,10 +309,19 @@ def write_materials(resources_element: xml.etree.ElementTree.Element,
 
 def write_prusa_filament_colors(archive, vertex_colors: Dict[str, int]) -> None:
     """
-    Write filament color mapping for PrusaSlicer MMU export.
+    Write filament color mapping for round-trip import.
 
-    Stores colors in Metadata/blender_filament_colors.txt for round-trip import.
-    Format: paint_code=hex_color (one per line)
+    Stores color-to-extruder mapping in Metadata/blender_filament_colors.xml.
+    This is used as a fallback when importing MMU segmentation if no slicer
+    config file is present. Users can still override colors in their slicer.
+
+    Format: XML with extruder elements
+    Example:
+        <?xml version="1.0" encoding="UTF-8"?>
+        <filament_colors>
+          <extruder index="0" color="#FF8000"/>
+          <extruder index="1" color="#DB5182"/>
+        </filament_colors>
 
     :param archive: The 3MF zip archive
     :param vertex_colors: Dictionary of color hex to colorgroup index
@@ -322,22 +330,21 @@ def write_prusa_filament_colors(archive, vertex_colors: Dict[str, int]) -> None:
         return
 
     try:
-        # Sort by colorgroup index to maintain order
+        # Sort by colorgroup index (which maps to extruder index)
         sorted_colors = sorted(vertex_colors.items(), key=lambda x: x[1])
 
-        # Build color map: colorgroup_id -> hex_color
-        color_lines = []
+        # Build XML document
+        root = xml.etree.ElementTree.Element("filament_colors")
         for hex_color, colorgroup_id in sorted_colors:
-            # Map colorgroup_id to paint code
-            if colorgroup_id < len(ORCA_FILAMENT_CODES):
-                paint_code = ORCA_FILAMENT_CODES[colorgroup_id]
-                if paint_code:  # Skip empty (default)
-                    color_lines.append(f"{paint_code}={hex_color}")
+            extruder_elem = xml.etree.ElementTree.SubElement(root, "extruder")
+            extruder_elem.set("index", str(colorgroup_id))
+            extruder_elem.set("color", hex_color.upper())
 
-        if color_lines:
-            color_data = "\n".join(color_lines)
-            with archive.open("Metadata/blender_filament_colors.txt", "w") as f:
-                f.write(color_data.encode('UTF-8'))
-            log.info(f"Wrote {len(color_lines)} filament colors to metadata")
+        if len(sorted_colors) > 0:
+            tree = xml.etree.ElementTree.ElementTree(root)
+            with archive.open("Metadata/blender_filament_colors.xml", "w") as f:
+                tree.write(f, xml_declaration=True, encoding="UTF-8")
+            
+            debug(f"Wrote {len(sorted_colors)} filament color mappings to metadata (fallback only)")
     except Exception as e:
-        log.warning(f"Failed to write filament colors: {e}")
+        warn(f"Failed to write filament colors: {e}")

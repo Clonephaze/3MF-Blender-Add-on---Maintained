@@ -28,6 +28,7 @@ The output format is slicer-agnostic - works for both paint_color and mmu_segmen
 import numpy as np
 from typing import Tuple, List, Dict
 from .hash_segmentation import SegmentationNode, SegmentationEncoder
+from .utilities import debug
 
 # Maximum subdivision depth (6 gives 4^6 = 4096 potential leaf nodes per triangle)
 MAX_SUBDIVISION_DEPTH = 6
@@ -260,29 +261,29 @@ def texture_to_segmentation(
     width, height = image.size
 
     # One-time read from Blender image into numpy for fast access.
-    print(f"  Caching {width}x{height} texture data as numpy array...")
+    debug(f"  Caching {width}x{height} texture data as numpy array...")
     pixel_count = width * height * 4
     pixels_flat = np.empty(pixel_count, dtype=np.float32)
     image.pixels.foreach_get(pixels_flat)
     pixels = pixels_flat.reshape(height, width, 4)
     t_cache = time.perf_counter()
-    print(f"  Cached pixels in {t_cache - t_start:.2f}s")
+    debug(f"  Cached pixels in {t_cache - t_start:.2f}s")
 
     color_to_extruder = {}
-    print(f"  Building color->extruder map from {len(extruder_colors)} colors:")
+    debug(f"  Building color->extruder map from {len(extruder_colors)} colors:")
     for extruder, rgba in extruder_colors.items():
         rgb = (int(rgba[0] * 255), int(rgba[1] * 255), int(rgba[2] * 255))
         color_to_extruder[rgb] = extruder
-        print(f"    Extruder {extruder}: RGB {rgb}")
-    print(f"  Default extruder: {default_extruder}")
+        debug(f"    Extruder {extruder}: RGB {rgb}")
+    debug(f"  Default extruder: {default_extruder}")
 
     # Pre-compute the entire texture to states (critical performance win).
-    print(f"  Building state map ({width}x{height})...")
+    debug(f"  Building state map ({width}x{height})...")
     state_map = _build_state_map(pixels, color_to_extruder, default_extruder)
     t_state = time.perf_counter()
 
     unique_states = np.unique(state_map)
-    print(
+    debug(
         f"  State map built in {t_state - t_cache:.2f}s, unique states: {list(unique_states)}"
     )
 
@@ -293,7 +294,7 @@ def texture_to_segmentation(
     seg_strings = {}
 
     total_faces = sum(1 for p in mesh.polygons if len(p.loop_indices) == 3)
-    print(
+    debug(
         f"  Processing {total_faces} triangles (max_depth={MAX_SUBDIVISION_DEPTH})..."
     )
 
@@ -309,7 +310,7 @@ def texture_to_segmentation(
             elapsed = time.perf_counter() - t_state
             rate = processed / elapsed if elapsed > 0 else 0
             remaining = (total_faces - processed) / rate if rate > 0 else 0
-            print(
+            debug(
                 f"    {processed}/{total_faces} ({rate:.0f}/s, ~{remaining:.0f}s left)"
             )
 
@@ -317,28 +318,6 @@ def texture_to_segmentation(
         uv0 = uv_layer[li[0]].uv
         uv1 = uv_layer[li[1]].uv
         uv2 = uv_layer[li[2]].uv
-
-        if processed <= 3:
-            wm1 = width - 1
-            hm1 = height - 1
-            px0 = pixels[
-                max(0, min(hm1, round(uv0[1] * hm1))),
-                max(0, min(wm1, round(uv0[0] * wm1))),
-            ]
-            px1 = pixels[
-                max(0, min(hm1, round(uv1[1] * hm1))),
-                max(0, min(wm1, round(uv1[0] * wm1))),
-            ]
-            px2 = pixels[
-                max(0, min(hm1, round(uv2[1] * hm1))),
-                max(0, min(wm1, round(uv2[0] * wm1))),
-            ]
-            print(
-                f"      [Triangle {poly.index}] Corner colors: "
-                f"RGB({int(px0[0] * 255)},{int(px0[1] * 255)},{int(px0[2] * 255)}), "
-                f"RGB({int(px1[0] * 255)},{int(px1[1] * 255)},{int(px1[2] * 255)}), "
-                f"RGB({int(px2[0] * 255)},{int(px2[1] * 255)},{int(px2[2] * 255)})"
-            )
 
         tree = _analyze_recursive(
             state_map,
@@ -353,27 +332,16 @@ def texture_to_segmentation(
             MAX_SUBDIVISION_DEPTH,
         )
 
-        if processed <= 10:
-            has_children = len(tree.children) if tree.children else 0
-            will_encode = bool(tree.children or tree.state != 0)
-            print(
-                f"    Triangle poly.index={poly.index}: state={tree.state}, children={has_children}, will_encode={will_encode}"
-            )
-
         if tree.children or tree.state != 0:
             encoder._nibbles = []
             hex_string = encoder.encode(tree)
             if hex_string and hex_string != "0":
                 seg_strings[poly.index] = hex_string
-                if processed <= 10:
-                    print(
-                        f"      -> Stored key {poly.index}, encoded '{hex_string[:20]}...'"
-                    )
 
     t_end = time.perf_counter()
-    print(
+    debug(
         f"  Processed {total_faces} triangles in {t_end - t_state:.1f}s, found {len(seg_strings)} with segmentation"
     )
-    print(f"  Total export time: {t_end - t_start:.1f}s")
+    debug(f"  Total export time: {t_end - t_start:.1f}s")
 
     return seg_strings

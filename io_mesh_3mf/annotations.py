@@ -11,7 +11,6 @@
 
 import collections  # Namedtuple data structure for annotations, and Counter to write optimized content types.
 import json  # To serialize the data for long-term storage in the Blender scene.
-import logging  # Reporting parsing errors.
 import os.path  # To parse target paths in relationships.
 import urllib.parse  # To parse relative target paths in relationships.
 import xml.etree.ElementTree  # To parse the relationships files.
@@ -20,6 +19,7 @@ import zipfile
 
 import bpy  # To store the annotations long-term in the Blender context.
 
+from .utilities import warn
 from .constants import (
     RELS_FOLDER,
     RELS_RELATIONSHIP_FIND,
@@ -103,7 +103,7 @@ class Annotations:
         try:
             root = xml.etree.ElementTree.ElementTree(file=rels_file)
         except xml.etree.ElementTree.ParseError as e:
-            logging.warning(
+            warn(
                 f"Relationship file {rels_file.name} has malformed XML (position {e.position[0]}:{e.position[1]})."
             )
             return  # Skip this file.
@@ -113,7 +113,7 @@ class Annotations:
                 target = relationship_node.attrib["Target"]
                 namespace = relationship_node.attrib["Type"]
             except KeyError as e:
-                logging.warning(f"Relationship missing attribute: {str(e)}")
+                warn(f"Relationship missing attribute: {str(e)}")
                 continue  # Skip this relationship.
             if (
                 namespace == MODEL_REL
@@ -177,7 +177,7 @@ class Annotations:
                 ):
                     # There was already a content type and it is different from this one.
                     # This file now has conflicting content types!
-                    logging.warning(
+                    warn(
                         f"Found conflicting content types for file: {filename}"
                     )
                     for annotation in content_type_annotations:
@@ -408,7 +408,7 @@ class Annotations:
         try:
             annotation_data = json.loads(bpy.data.texts[ANNOTATION_FILE].as_string())
         except json.JSONDecodeError:
-            logging.warning("Annotation file exists, but is not properly formatted.")
+            warn("Annotation file exists, but is not properly formatted.")
             return  # File was meddled with?
 
         for target, annotations in annotation_data.items():
@@ -429,17 +429,17 @@ class Annotations:
                     elif annotation["annotation"] == "content_type_conflict":
                         self.annotations[target].add(ConflictingContentType)
                     else:
-                        logging.warning(
+                        warn(
                             f'Unknown annotation type "{annotation["annotation"]}" encountered.'
                         )
                         continue
             except TypeError:  # Raised when `annotations` is not iterable.
-                logging.warning(
+                warn(
                     f'Annotation for target "{target}" is not properly structured.'
                 )
             except KeyError as e:
                 # Raised when missing the 'annotation' key or a required key belonging to that annotation.
-                logging.warning(
+                warn(
                     f'Annotation for target "{target}" missing key: {str(e)}'
                 )
             if not self.annotations[target]:  # Nothing was added in the end.
