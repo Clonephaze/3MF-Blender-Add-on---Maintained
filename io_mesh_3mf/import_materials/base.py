@@ -20,16 +20,15 @@ This module handles:
 - Material reuse and finding existing materials
 """
 
-import logging
 from typing import Tuple, Optional, TYPE_CHECKING
 
 import bpy
 import bpy_extras.node_shader_utils
 
+from ..utilities import debug, warn
+
 if TYPE_CHECKING:
     from ..import_3mf import Import3MF
-
-log = logging.getLogger(__name__)
 
 
 def srgb_to_linear(value: float) -> float:
@@ -49,30 +48,34 @@ def srgb_to_linear(value: float) -> float:
 
 def parse_hex_color(hex_color: str) -> Tuple[float, float, float, float]:
     """
-    Parse a hex color string to RGBA tuple.
+    Parse a hex color string to RGBA tuple in **linear** color space.
 
-    Hex colors are sRGB. Returns values in 0.0-1.0 range.
+    Hex colors are sRGB.  The RGB components are converted to linear via
+    ``srgb_to_linear()`` so the result can be assigned directly to Blender
+    material properties (e.g. ``principled.base_color``).
+
+    Alpha is NOT converted (it is linear in both spaces).
 
     :param hex_color: Hex color string like "#FF0000" or "FF0000"
-    :return: RGBA tuple with values 0.0-1.0
+    :return: RGBA tuple with values 0.0-1.0 in linear color space
     """
     hex_color = hex_color.lstrip('#')
     try:
         if len(hex_color) == 6:  # RGB
-            r = int(hex_color[0:2], 16) / 255.0
-            g = int(hex_color[2:4], 16) / 255.0
-            b = int(hex_color[4:6], 16) / 255.0
+            r = srgb_to_linear(int(hex_color[0:2], 16) / 255.0)
+            g = srgb_to_linear(int(hex_color[2:4], 16) / 255.0)
+            b = srgb_to_linear(int(hex_color[4:6], 16) / 255.0)
             return (r, g, b, 1.0)
         elif len(hex_color) == 8:  # RGBA
-            r = int(hex_color[0:2], 16) / 255.0
-            g = int(hex_color[2:4], 16) / 255.0
-            b = int(hex_color[4:6], 16) / 255.0
-            a = int(hex_color[6:8], 16) / 255.0
+            r = srgb_to_linear(int(hex_color[0:2], 16) / 255.0)
+            g = srgb_to_linear(int(hex_color[2:4], 16) / 255.0)
+            b = srgb_to_linear(int(hex_color[4:6], 16) / 255.0)
+            a = int(hex_color[6:8], 16) / 255.0  # Alpha is linear, no conversion
             return (r, g, b, a)
     except ValueError:
         pass
 
-    log.warning(f"Could not parse hex color: {hex_color}")
+    warn(f"Could not parse hex color: {hex_color}")
     return (0.8, 0.8, 0.8, 1.0)  # Default gray
 
 
@@ -94,7 +97,7 @@ def find_existing_material(op: 'Import3MF', name: str,
             # Check if colors match (within small tolerance for float comparison)
             existing_color = (*principled.base_color, principled.alpha)
             if all(abs(existing_color[i] - color[i]) < 0.001 for i in range(4)):
-                log.info(f"Reusing existing material: {name}")
+                debug(f"Reusing existing material: {name}")
                 return material
 
     # Try to find any material with matching color (fuzzy name match)
@@ -105,7 +108,7 @@ def find_existing_material(op: 'Import3MF', name: str,
             existing_color = (*principled.base_color, principled.alpha)
             if all(abs(existing_color[i] - color[i]) < color_tolerance for i in range(4)):
                 # Found a material with matching color but different name
-                log.info(f"Reusing material '{mat.name}' for color match (requested name: '{name}')")
+                debug(f"Reusing material '{mat.name}' for color match (requested name: '{name}')")
                 return mat
 
     return None
@@ -132,11 +135,11 @@ def read_materials(op: 'Import3MF', root, material_ns: dict, display_properties:
         try:
             material_id = basematerials_item.attrib["id"]
         except KeyError:
-            log.warning("Encountered a basematerials item without resource ID.")
+            warn("Encountered a basematerials item without resource ID.")
             op.safe_report({'WARNING'}, "Encountered a basematerials item without resource ID")
             continue
         if material_id in op.resource_materials:
-            log.warning(f"Duplicate material ID: {material_id}")
+            warn(f"Duplicate material ID: {material_id}")
             op.safe_report({'WARNING'}, f"Duplicate material ID: {material_id}")
             continue
 
@@ -171,7 +174,7 @@ def read_materials(op: 'Import3MF', root, material_ns: dict, display_properties:
                 # If no scalar data found, check for textured PBR properties
                 if not pbr_data and display_props_id in op.resource_pbr_texture_displays:
                     textured_pbr = op.resource_pbr_texture_displays[display_props_id]
-                    log.debug(f"Material '{name}' has textured PBR: {textured_pbr.type}")
+                    debug(f"Material '{name}' has textured PBR: {textured_pbr.type}")
             elif group_pbr_props_list:
                 pbr_data = group_pbr_props_list[index] if index < len(group_pbr_props_list) else {}
 
@@ -183,12 +186,14 @@ def read_materials(op: 'Import3MF', root, material_ns: dict, display_properties:
                     b2 = ((color_int & 0x0000FF00) >> 8) / 255
                     b3 = ((color_int & 0x00FF0000) >> 16) / 255
                     b4 = ((color_int & 0xFF000000) >> 24) / 255
+                    # 3MF hex colors are sRGB — convert RGB to linear for Blender.
+                    # Alpha is linear in both spaces and is NOT converted.
                     if len(color) == 6:
-                        color = (b3, b2, b1, 1.0)
+                        color = (srgb_to_linear(b3), srgb_to_linear(b2), srgb_to_linear(b1), 1.0)
                     else:
-                        color = (b4, b3, b2, b1)
+                        color = (srgb_to_linear(b4), srgb_to_linear(b3), srgb_to_linear(b2), b1)
                 except ValueError:
-                    log.warning(f"Invalid color for material {name} of resource {material_id}: {color}")
+                    warn(f"Invalid color for material {name} of resource {material_id}: {color}")
                     op.safe_report({'WARNING'}, f"Invalid color for material {name} of resource {material_id}: {color}")
                     color = None
 
@@ -242,10 +247,10 @@ def read_materials(op: 'Import3MF', root, material_ns: dict, display_properties:
             )
 
             if pbr_data:
-                log.debug(f"Material '{name}' has PBR properties: {pbr_data}")
+                debug(f"Material '{name}' has PBR properties: {pbr_data}")
             if textured_pbr:
-                log.debug(f"Material '{name}' has textured PBR: metallic_tex={metallic_texid}, "
-                          f"roughness_tex={roughness_texid}, basecolor_tex={basecolor_texid}")
+                debug(f"Material '{name}' has textured PBR: metallic_tex={metallic_texid}, "
+                      f"roughness_tex={roughness_texid}, basecolor_tex={basecolor_texid}")
 
             index += 1
 
@@ -275,12 +280,12 @@ def _read_colorgroups(op: 'Import3MF', root, material_ns: dict, display_properti
         try:
             colorgroup_id = colorgroup_item.attrib["id"]
         except KeyError:
-            log.warning("Encountered a colorgroup without resource ID.")
+            warn("Encountered a colorgroup without resource ID.")
             op.safe_report({'WARNING'}, "Encountered a colorgroup without resource ID")
             continue
 
         if colorgroup_id in op.resource_materials:
-            log.warning(f"Duplicate material ID: {colorgroup_id}")
+            warn(f"Duplicate material ID: {colorgroup_id}")
             op.safe_report({'WARNING'}, f"Duplicate material ID: {colorgroup_id}")
             continue
 
@@ -300,17 +305,17 @@ def _read_colorgroups(op: 'Import3MF', root, material_ns: dict, display_properti
                 color = color.lstrip("#")
                 try:
                     if len(color) == 6:
-                        red = int(color[0:2], 16) / 255
-                        green = int(color[2:4], 16) / 255
-                        blue = int(color[4:6], 16) / 255
+                        red = srgb_to_linear(int(color[0:2], 16) / 255)
+                        green = srgb_to_linear(int(color[2:4], 16) / 255)
+                        blue = srgb_to_linear(int(color[4:6], 16) / 255)
                         alpha = 1.0
                     elif len(color) == 8:
-                        red = int(color[0:2], 16) / 255
-                        green = int(color[2:4], 16) / 255
-                        blue = int(color[4:6], 16) / 255
-                        alpha = int(color[6:8], 16) / 255
+                        red = srgb_to_linear(int(color[0:2], 16) / 255)
+                        green = srgb_to_linear(int(color[2:4], 16) / 255)
+                        blue = srgb_to_linear(int(color[4:6], 16) / 255)
+                        alpha = int(color[6:8], 16) / 255  # Alpha is linear
                     else:
-                        log.warning(f"Invalid color for colorgroup {colorgroup_id}: #{color}")
+                        warn(f"Invalid color for colorgroup {colorgroup_id}: #{color}")
                         op.safe_report({'WARNING'}, f"Invalid color: #{color}")
                         continue
 
@@ -335,7 +340,7 @@ def _read_colorgroups(op: 'Import3MF', root, material_ns: dict, display_properti
                     index += 1
 
                 except (ValueError, KeyError) as e:
-                    log.warning(f"Invalid color for colorgroup {colorgroup_id}: {e}")
+                    warn(f"Invalid color for colorgroup {colorgroup_id}: {e}")
                     continue
 
         if raw_colors:
@@ -343,10 +348,10 @@ def _read_colorgroups(op: 'Import3MF', root, material_ns: dict, display_properti
                 colors=raw_colors,
                 displaypropertiesid=display_props_id
             )
-            log.info(f"Stored colorgroup {colorgroup_id} for round-trip ({len(raw_colors)} colors)")
+            debug(f"Stored colorgroup {colorgroup_id} for round-trip ({len(raw_colors)} colors)")
 
         if index > 0:
-            log.info(f"Imported colorgroup {colorgroup_id} with {index} colors")
+            debug(f"Imported colorgroup {colorgroup_id} with {index} colors")
             if op.vendor_format == "orca":
                 op.safe_report({'INFO'}, f"Imported Orca color zone: {index} color(s)")
         elif colorgroup_id in op.resource_materials:

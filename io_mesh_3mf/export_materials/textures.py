@@ -23,7 +23,6 @@ Handles:
 - Writing pbmetallictexturedisplayproperties
 """
 
-import logging
 import os
 import tempfile
 import xml.etree.ElementTree
@@ -39,8 +38,7 @@ from ..constants import (
     TEXTURE_REL,
     RELS_NAMESPACE,
 )
-
-log = logging.getLogger(__name__)
+from ..utilities import debug, warn, error
 
 
 def detect_textured_materials(blender_objects: List[bpy.types.Object]) -> Dict[str, Dict]:
@@ -74,7 +72,7 @@ def detect_textured_materials(blender_objects: List[bpy.types.Object]) -> Dict[s
             image_info = _find_base_color_texture(material)
             if image_info:
                 textured_materials[material_name] = image_info
-                log.debug(f"Detected textured material: {material_name}")
+                debug(f"Detected textured material: {material_name}")
 
     return textured_materials
 
@@ -284,7 +282,7 @@ def detect_pbr_textured_materials(blender_objects: List[bpy.types.Object]) -> Di
                 }
                 texture_types = [t for t in ["base_color", "roughness", "metallic", "normal"]
                                  if pbr_materials[material_name][t]]
-                log.debug(f"Detected PBR material '{material_name}' with textures: {texture_types}")
+                debug(f"Detected PBR material '{material_name}' with textures: {texture_types}")
 
     return pbr_materials
 
@@ -351,18 +349,18 @@ def write_textures_to_archive(archive: zipfile.ZipFile,
             os.unlink(tmp_path)
 
             image_to_path[image_name] = full_archive_path
-            log.info(f"Wrote texture '{image_name}' to {archive_path}")
+            debug(f"Wrote texture '{image_name}' to {archive_path}")
 
         except Exception as e:
-            log.warning(f"Failed to write texture '{image_name}': {e}")
+            warn(f"Failed to write texture '{image_name}': {e}")
             # Try alternative: if image is packed, write from packed data
             if image.packed_file:
                 try:
                     archive.writestr(archive_path, image.packed_file.data)
                     image_to_path[image_name] = full_archive_path
-                    log.info(f"Wrote packed texture '{image_name}' to {archive_path}")
+                    debug(f"Wrote packed texture '{image_name}' to {archive_path}")
                 except Exception as e2:
-                    log.error(f"Failed to write packed texture '{image_name}': {e2}")
+                    error(f"Failed to write packed texture '{image_name}': {e2}")
 
     return image_to_path
 
@@ -408,7 +406,7 @@ def write_texture_relationships(archive: zipfile.ZipFile,
             encoding="UTF-8",
         )
 
-    log.info(f"Wrote {len(image_to_path)} texture relationships to {rels_path}")
+    debug(f"Wrote {len(image_to_path)} texture relationships to {rels_path}")
 
 
 def write_texture_resources(resources_element: xml.etree.ElementTree.Element,
@@ -471,7 +469,7 @@ def write_texture_resources(resources_element: xml.etree.ElementTree.Element,
                 attrib=texture_attrib,
             )
             texture_ids[archive_path] = texture_id
-            log.debug(f"Created texture2d ID {texture_id} for {archive_path}")
+            debug(f"Created texture2d ID {texture_id} for {archive_path}")
 
         # Create texture2dgroup for this material
         # Note: tex2coord elements will be added when writing triangles
@@ -496,7 +494,7 @@ def write_texture_resources(resources_element: xml.etree.ElementTree.Element,
             "next_index": 0,
             "precision": precision,
         }
-        log.debug(f"Created texture2dgroup ID {group_id} for material {mat_name}")
+        debug(f"Created texture2dgroup ID {group_id} for material {mat_name}")
 
     return material_to_texture_group, next_resource_id
 
@@ -602,18 +600,18 @@ def write_pbr_textures_to_archive(archive: zipfile.ZipFile,
                 os.unlink(tmp_path)
 
                 image_to_path[image_name] = full_archive_path
-                log.info(f"Wrote PBR texture '{image_name}' to {archive_path}")
+                debug(f"Wrote PBR texture '{image_name}' to {archive_path}")
 
             except Exception as e:
-                log.warning(f"Failed to write PBR texture '{image_name}': {e}")
+                warn(f"Failed to write PBR texture '{image_name}': {e}")
                 # Try packed data if available
                 if image.packed_file:
                     try:
                         archive.writestr(archive_path, image.packed_file.data)
                         image_to_path[image_name] = full_archive_path
-                        log.info(f"Wrote packed PBR texture '{image_name}' to {archive_path}")
+                        debug(f"Wrote packed PBR texture '{image_name}' to {archive_path}")
                     except Exception as e2:
-                        log.error(f"Failed to write packed PBR texture '{image_name}': {e2}")
+                        error(f"Failed to write packed PBR texture '{image_name}': {e2}")
 
     return image_to_path
 
@@ -676,7 +674,7 @@ def write_pbr_texture_display_properties(
                 },
             )
             texture_ids[archive_path] = tex_id
-            log.debug(f"Created texture2d ID {tex_id} for {tex_type}: {archive_path}")
+            debug(f"Created texture2d ID {tex_id} for {tex_type}: {archive_path}")
 
         return texture_ids[archive_path]
 
@@ -720,7 +718,7 @@ def write_pbr_texture_display_properties(
         )
 
         material_to_display_props[mat_name] = display_props_id
-        log.info(
+        debug(
             f"Created pbmetallictexturedisplayproperties ID {display_props_id} for '{mat_name}' "
             f"(basecolor={basecolor_texid or 'none'}, roughness={roughness_texid or 'none'}, "
             f"metallic={metallic_texid or 'none'})"
@@ -731,6 +729,6 @@ def write_pbr_texture_display_properties(
     # Textured PBR takes priority over scalar PBR
     if first_display_props_id and basematerials_element is not None:
         basematerials_element.set("displaypropertiesid", first_display_props_id)
-        log.info(f"Linked basematerials to pbmetallictexturedisplayproperties ID {first_display_props_id}")
+        debug(f"Linked basematerials to pbmetallictexturedisplayproperties ID {first_display_props_id}")
 
     return material_to_display_props, next_resource_id

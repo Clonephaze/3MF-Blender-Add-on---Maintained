@@ -1,4 +1,26 @@
 
+1.4.0 — MMU Paint Suite Improvements
+====
+
+Features
+----
+* **MMU Paint Suite:** New built-in multi-material texture painting system for creating per-triangle filament assignments directly in Blender's 3D Viewport.
+* **Paint Panel:** Dedicated UI panel for initializing, seeing imported colors, changing color zones, adding/removing filament colors, and quickly changing the active paint color.
+* **Improved import dialog:** Better instructions for finding MMU Paint Suite panel after import
+* **Better user feedback:** Filament operations report how many pixels were changed
+
+Bug Fixes
+----
+* **Fixed critical color space mismatch:** 3MF colors are sRGB, Blender materials are linear — now properly converting between them on import, export, and painting
+* **Improved filament operations:** Filament removal and reassignment now provide feedback on pixel counts
+
+Technical
+----
+* Added sRGB ↔ linear color space conversion utilities (`srgb_to_linear()`, `linear_to_srgb()`, `hex_to_linear_rgb()`, `linear_rgb_to_hex()`)
+* Applied conversions throughout: import materials (sRGB → linear), export materials (linear → sRGB), paint panel (all color operations)
+
+---
+
 1.3.2 — Component Instances
 ====
 Features

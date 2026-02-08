@@ -19,16 +19,19 @@ import bpy.utils  # To (un)register the add-on.
 from . import (
     import_3mf,
     export_3mf,
+    paint_panel,
 )
 
 if _needs_reload:
     import importlib
     import_3mf = importlib.reload(import_3mf)
     export_3mf = importlib.reload(export_3mf)
-    print("3MF Format Add-on Reloaded")
+    paint_panel = importlib.reload(paint_panel)
+    pass  # Reloaded
 
 from .export_3mf import Export3MF  # Exports 3MF files.
 from .import_3mf import Import3MF  # Imports 3MF files.
+from .paint_panel import register as register_paint_panel, unregister as unregister_paint_panel
 
 # IDE and Documentation support.
 __all__ = [
@@ -243,8 +246,12 @@ def register() -> None:
     bpy.types.TOPBAR_MT_file_import.append(menu_import)
     bpy.types.TOPBAR_MT_file_export.append(menu_export)
 
+    register_paint_panel()
+
 
 def unregister() -> None:
+    unregister_paint_panel()
+
     for cls in classes:
         bpy.utils.unregister_class(cls)
 

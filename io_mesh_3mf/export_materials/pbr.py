@@ -21,7 +21,6 @@ Handles:
 - Writing translucentdisplayproperties
 """
 
-import logging
 import xml.etree.ElementTree
 from typing import Dict, List, Tuple
 
@@ -29,8 +28,7 @@ import bpy
 import bpy_extras.node_shader_utils
 
 from ..constants import MATERIAL_NAMESPACE
-
-log = logging.getLogger(__name__)
+from ..utilities import debug
 
 
 def extract_pbr_from_material(material: bpy.types.Material,
@@ -203,7 +201,7 @@ def write_pbr_display_properties(resources_element: xml.etree.ElementTree.Elemen
     has_pbr_data = any(has_meaningful_pbr(pbr) for _, pbr in pbr_materials)
 
     if not has_pbr_data:
-        log.debug("No meaningful PBR data to export, skipping display properties")
+        debug("No meaningful PBR data to export, skipping display properties")
         return next_resource_id
 
     # Categorize materials by workflow
@@ -269,7 +267,7 @@ def write_pbr_display_properties(resources_element: xml.etree.ElementTree.Elemen
             )
 
         basematerials_element.set("displaypropertiesid", display_props_id)
-        log.info(f"Exported {len(pbr_materials)} translucent display properties (ID: {display_props_id})")
+        debug(f"Exported {len(pbr_materials)} translucent display properties (ID: {display_props_id})")
 
     elif metallic_materials:
         # Write pbmetallicdisplayproperties for ALL materials
@@ -297,7 +295,7 @@ def write_pbr_display_properties(resources_element: xml.etree.ElementTree.Elemen
             )
 
         basematerials_element.set("displaypropertiesid", display_props_id)
-        log.info(f"Exported {len(pbr_materials)} metallic display properties (ID: {display_props_id})")
+        debug(f"Exported {len(pbr_materials)} metallic display properties (ID: {display_props_id})")
 
     else:
         # Write pbspeculardisplayproperties (dielectric materials)
@@ -331,6 +329,6 @@ def write_pbr_display_properties(resources_element: xml.etree.ElementTree.Elemen
             )
 
         basematerials_element.set("displaypropertiesid", display_props_id)
-        log.info(f"Exported {len(pbr_materials)} specular display properties (ID: {display_props_id})")
+        debug(f"Exported {len(pbr_materials)} specular display properties (ID: {display_props_id})")
 
     return next_resource_id

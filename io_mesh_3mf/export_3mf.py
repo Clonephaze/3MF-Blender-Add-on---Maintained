@@ -18,7 +18,6 @@ This module contains the main Export3MF operator that handles the UI and dispatc
 to format-specific exporters (Standard, Orca Slicer, PrusaSlicer).
 """
 
-import logging
 import mathutils
 import zipfile
 from typing import Optional, Set, Dict
@@ -44,11 +43,10 @@ from .export_formats import (
     OrcaExporter,
     PrusaExporter,
 )
+from .utilities import debug, warn, error
 
 # IDE and Documentation support.
 __all__ = ["Export3MF"]
-
-log = logging.getLogger(__name__)
 
 
 class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
@@ -238,11 +236,11 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         try:
             archive.close()
         except EnvironmentError as e:
-            log.error(f"Unable to complete writing to 3MF archive: {e}")
+            error(f"Unable to complete writing to 3MF archive: {e}")
             self.safe_report({'ERROR'}, f"Unable to complete writing to 3MF archive: {e}")
             return {"CANCELLED"}
 
-        log.info(f"Exported {self.num_written} objects to {format_name}3MF archive {self.filepath}.")
+        debug(f"Exported {self.num_written} objects to {format_name}3MF archive {self.filepath}.")
         self.safe_report({'INFO'}, f"Exported {self.num_written} objects to {self.filepath}")
         return {"FINISHED"}
 
@@ -282,7 +280,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                         {'ERROR'},
                         "No mesh objects selected. Select at least one mesh object to export."
                     )
-                    log.error("Export cancelled: No mesh objects in selection")
+                    error("Export cancelled: No mesh objects in selection")
                     return {"CANCELLED"}
             else:
                 blender_objects = context.scene.objects
@@ -298,7 +296,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                         "Exported geometry contains non-manifold issues. "
                         "This may cause warnings in some slicers."
                     )
-                    log.warning(f"Non-manifold geometry detected in: {non_manifold_objects[0]}")
+                    warn(f"Non-manifold geometry detected in: {non_manifold_objects[0]}")
 
             global_scale = _unit_scale(context, self.global_scale)
 

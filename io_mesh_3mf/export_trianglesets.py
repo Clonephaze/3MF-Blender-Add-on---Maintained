@@ -18,15 +18,13 @@ Handles export of triangle sets (groups of triangles) from Blender mesh attribut
 to 3MF Triangle Sets Extension format.
 """
 
-import logging
 import xml.etree.ElementTree
 from typing import Dict, List
 
 import bpy
 
 from .constants import TRIANGLE_SETS_NAMESPACE
-
-log = logging.getLogger(__name__)
+from .utilities import debug
 
 
 def write_triangle_sets(
@@ -110,4 +108,4 @@ def write_triangle_sets(
                     ref_element.attrib["index"] = str(idx)
             i += 1
 
-        log.info(f"Exported triangle set '{set_name}' with {len(triangle_indices)} triangles")
+        debug(f"Exported triangle set '{set_name}' with {len(triangle_indices)} triangles")

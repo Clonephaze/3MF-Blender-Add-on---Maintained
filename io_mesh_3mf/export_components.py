@@ -18,13 +18,12 @@ This module provides utilities to detect linked duplicates in Blender (objects s
 the same mesh data) and organize them for efficient 3MF component export.
 """
 
-import logging
 from typing import Dict, List
 from dataclasses import dataclass
 
 import bpy
 
-log = logging.getLogger(__name__)
+from .utilities import debug
 
 
 @dataclass
@@ -77,7 +76,7 @@ def detect_linked_duplicates(blender_objects: List[bpy.types.Object]) -> Dict[bp
                 mesh_data=mesh_data,
                 objects=objects
             )
-            log.info(f"Detected component group: {len(objects)} instances of '{mesh_data.name}'")
+            debug(f"Detected component group: {len(objects)} instances of '{mesh_data.name}'")
     
     return component_groups
 
@@ -101,8 +100,8 @@ def should_use_components(component_groups: Dict[bpy.types.Mesh, ComponentGroup]
     # Use components if >10% of objects are instances
     savings_ratio = instanced_objects / total_objects if total_objects > 0 else 0
     
-    log.info(f"Component analysis: {instanced_objects}/{total_objects} objects are instances "
-             f"({savings_ratio*100:.1f}% savings potential)")
+    debug(f"Component analysis: {instanced_objects}/{total_objects} objects are instances "
+          f"({savings_ratio*100:.1f}% savings potential)")
     
     return savings_ratio > 0.1
 

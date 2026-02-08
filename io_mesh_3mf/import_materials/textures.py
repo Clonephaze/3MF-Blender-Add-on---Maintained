@@ -21,7 +21,6 @@ This module handles:
 - Setting up Blender materials with texture nodes
 """
 
-import logging
 import os
 import tempfile
 import zipfile
@@ -29,10 +28,10 @@ from typing import Dict, Optional, TYPE_CHECKING
 
 import bpy
 
+from ..utilities import debug, warn, error
+
 if TYPE_CHECKING:
     from ..import_3mf import Import3MF, ResourceTexture, ResourceMaterial, ResourceTextureGroup
-
-log = logging.getLogger(__name__)
 
 
 def read_textures(op: 'Import3MF', root, material_ns: Dict[str, str]) -> None:
@@ -60,12 +59,12 @@ def read_textures(op: 'Import3MF', root, material_ns: Dict[str, str]) -> None:
         try:
             texture_id = texture_item.attrib["id"]
         except KeyError:
-            log.warning("Encountered a texture2d without resource ID.")
+            warn("Encountered a texture2d without resource ID.")
             op.safe_report({'WARNING'}, "Encountered a texture2d without resource ID")
             continue
 
         if texture_id in op.resource_textures:
-            log.warning(f"Duplicate texture ID: {texture_id}")
+            warn(f"Duplicate texture ID: {texture_id}")
             continue
 
         # Required attributes
@@ -73,12 +72,12 @@ def read_textures(op: 'Import3MF', root, material_ns: Dict[str, str]) -> None:
             path = texture_item.attrib["path"]
             contenttype = texture_item.attrib["contenttype"]
         except KeyError as e:
-            log.warning(f"Texture {texture_id} missing required attribute: {e}")
+            warn(f"Texture {texture_id} missing required attribute: {e}")
             continue
 
         # Validate content type
         if contenttype not in ("image/png", "image/jpeg"):
-            log.warning(f"Texture {texture_id} has unsupported contenttype: {contenttype}")
+            warn(f"Texture {texture_id} has unsupported contenttype: {contenttype}")
             continue
 
         # Optional attributes with defaults
@@ -94,10 +93,10 @@ def read_textures(op: 'Import3MF', root, material_ns: Dict[str, str]) -> None:
             filter=filter_mode,
             blender_image=None
         )
-        log.debug(f"Parsed texture2d {texture_id}: {path} ({contenttype})")
+        debug(f"Parsed texture2d {texture_id}: {path} ({contenttype})")
 
     if op.resource_textures:
-        log.info(f"Found {len(op.resource_textures)} texture2d resources")
+        debug(f"Found {len(op.resource_textures)} texture2d resources")
 
 
 def read_texture_groups(op: 'Import3MF', root, material_ns: Dict[str, str],
@@ -122,22 +121,22 @@ def read_texture_groups(op: 'Import3MF', root, material_ns: Dict[str, str],
         try:
             group_id = group_item.attrib["id"]
         except KeyError:
-            log.warning("Encountered a texture2dgroup without resource ID.")
+            warn("Encountered a texture2dgroup without resource ID.")
             op.safe_report({'WARNING'}, "Encountered a texture2dgroup without resource ID")
             continue
 
         if group_id in op.resource_texture_groups:
-            log.warning(f"Duplicate texture2dgroup ID: {group_id}")
+            warn(f"Duplicate texture2dgroup ID: {group_id}")
             continue
 
         try:
             texid = group_item.attrib["texid"]
         except KeyError:
-            log.warning(f"Texture2dgroup {group_id} missing required texid attribute")
+            warn(f"Texture2dgroup {group_id} missing required texid attribute")
             continue
 
         if texid not in op.resource_textures:
-            log.warning(f"Texture2dgroup {group_id} references unknown texture: {texid}")
+            warn(f"Texture2dgroup {group_id} references unknown texture: {texid}")
             continue
 
         display_props_id = group_item.attrib.get("displaypropertiesid")
@@ -149,11 +148,11 @@ def read_texture_groups(op: 'Import3MF', root, material_ns: Dict[str, str],
                 v = float(coord_item.attrib.get("v", "0"))
                 tex2coords.append((u, v))
             except (ValueError, KeyError) as e:
-                log.warning(f"Invalid tex2coord in group {group_id}: {e}")
+                warn(f"Invalid tex2coord in group {group_id}: {e}")
                 tex2coords.append((0.0, 0.0))
 
         if not tex2coords:
-            log.warning(f"Texture2dgroup {group_id} has no tex2coords")
+            warn(f"Texture2dgroup {group_id} has no tex2coords")
             continue
 
         op.resource_texture_groups[group_id] = ResourceTextureGroup(
@@ -161,10 +160,10 @@ def read_texture_groups(op: 'Import3MF', root, material_ns: Dict[str, str],
             tex2coords=tex2coords,
             displaypropertiesid=display_props_id
         )
-        log.debug(f"Parsed texture2dgroup {group_id}: {len(tex2coords)} UVs referencing texture {texid}")
+        debug(f"Parsed texture2dgroup {group_id}: {len(tex2coords)} UVs referencing texture {texid}")
 
     if op.resource_texture_groups:
-        log.info(f"Found {len(op.resource_texture_groups)} texture2dgroup resources")
+        debug(f"Found {len(op.resource_texture_groups)} texture2dgroup resources")
 
 
 def extract_textures_from_archive(op: 'Import3MF', archive_path: str) -> None:
@@ -193,7 +192,7 @@ def extract_textures_from_archive(op: 'Import3MF', archive_path: str) -> None:
                 tex_path = texture.path.lstrip('/')
 
                 if tex_path not in archive_files:
-                    log.warning(f"Texture file not found in archive: {tex_path}")
+                    warn(f"Texture file not found in archive: {tex_path}")
                     continue
 
                 try:
@@ -229,7 +228,7 @@ def extract_textures_from_archive(op: 'Import3MF', archive_path: str) -> None:
                             blender_image=blender_image
                         )
 
-                        log.info(f"Loaded texture {texture_id}: {image_name}")
+                        debug(f"Loaded texture {texture_id}: {image_name}")
 
                     finally:
                         try:
@@ -238,11 +237,11 @@ def extract_textures_from_archive(op: 'Import3MF', archive_path: str) -> None:
                             pass
 
                 except Exception as e:
-                    log.warning(f"Failed to extract texture {texture_id} ({tex_path}): {e}")
+                    warn(f"Failed to extract texture {texture_id} ({tex_path}): {e}")
                     continue
 
     except (zipfile.BadZipFile, IOError) as e:
-        log.error(f"Failed to read textures from archive: {e}")
+        error(f"Failed to read textures from archive: {e}")
 
 
 def get_or_create_textured_material(op: 'Import3MF', texture_group_id: str,
@@ -333,4 +332,4 @@ def setup_textured_material(op: 'Import3MF', material: bpy.types.Material,
     material["3mf_texture_filter"] = texture.filter or "auto"
     material["3mf_texture_path"] = texture.path
 
-    log.info(f"Created textured material with image '{texture.blender_image.name}'")
+    debug(f"Created textured material with image '{texture.blender_image.name}'")

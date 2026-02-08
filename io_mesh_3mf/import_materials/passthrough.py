@@ -21,15 +21,14 @@ This module handles round-trip support for:
 """
 
 import json
-import logging
 from typing import Dict, TYPE_CHECKING
 
 import bpy
 
+from ..utilities import debug, warn
+
 if TYPE_CHECKING:
     from ..import_3mf import Import3MF
-
-log = logging.getLogger(__name__)
 
 
 def read_composite_materials(op: 'Import3MF', root, material_ns: Dict[str, str]) -> None:
@@ -52,18 +51,18 @@ def read_composite_materials(op: 'Import3MF', root, material_ns: Dict[str, str])
         try:
             composite_id = composite_item.attrib["id"]
         except KeyError:
-            log.warning("Encountered a compositematerials without resource ID.")
+            warn("Encountered a compositematerials without resource ID.")
             continue
 
         if composite_id in op.resource_composites:
-            log.warning(f"Duplicate compositematerials ID: {composite_id}")
+            warn(f"Duplicate compositematerials ID: {composite_id}")
             continue
 
         try:
             matid = composite_item.attrib["matid"]
             matindices = composite_item.attrib["matindices"]
         except KeyError as e:
-            log.warning(f"Compositematerials {composite_id} missing required attribute: {e}")
+            warn(f"Compositematerials {composite_id} missing required attribute: {e}")
             continue
 
         display_props_id = composite_item.attrib.get("displaypropertiesid")
@@ -79,10 +78,10 @@ def read_composite_materials(op: 'Import3MF', root, material_ns: Dict[str, str])
             displaypropertiesid=display_props_id,
             composites=composites
         )
-        log.debug(f"Parsed compositematerials {composite_id}: {len(composites)} composites")
+        debug(f"Parsed compositematerials {composite_id}: {len(composites)} composites")
 
     if op.resource_composites:
-        log.info(f"Found {len(op.resource_composites)} compositematerials resources (passthrough)")
+        debug(f"Found {len(op.resource_composites)} compositematerials resources (passthrough)")
 
 
 def read_multiproperties(op: 'Import3MF', root, material_ns: Dict[str, str]) -> None:
@@ -105,17 +104,17 @@ def read_multiproperties(op: 'Import3MF', root, material_ns: Dict[str, str]) -> 
         try:
             multi_id = multi_item.attrib["id"]
         except KeyError:
-            log.warning("Encountered a multiproperties without resource ID.")
+            warn("Encountered a multiproperties without resource ID.")
             continue
 
         if multi_id in op.resource_multiproperties:
-            log.warning(f"Duplicate multiproperties ID: {multi_id}")
+            warn(f"Duplicate multiproperties ID: {multi_id}")
             continue
 
         try:
             pids = multi_item.attrib["pids"]
         except KeyError:
-            log.warning(f"Multiproperties {multi_id} missing required pids attribute")
+            warn(f"Multiproperties {multi_id} missing required pids attribute")
             continue
 
         blendmethods = multi_item.attrib.get("blendmethods")
@@ -130,10 +129,10 @@ def read_multiproperties(op: 'Import3MF', root, material_ns: Dict[str, str]) -> 
             blendmethods=blendmethods,
             multis=multis
         )
-        log.debug(f"Parsed multiproperties {multi_id}: {len(multis)} multi entries")
+        debug(f"Parsed multiproperties {multi_id}: {len(multis)} multi entries")
 
     if op.resource_multiproperties:
-        log.info(f"Found {len(op.resource_multiproperties)} multiproperties resources (passthrough)")
+        debug(f"Found {len(op.resource_multiproperties)} multiproperties resources (passthrough)")
 
 
 def store_passthrough_materials(op: 'Import3MF') -> None:
@@ -165,7 +164,7 @@ def store_passthrough_materials(op: 'Import3MF') -> None:
                 "displaypropertiesid": cg.displaypropertiesid
             }
         scene["3mf_colorgroups"] = json.dumps(colorgroups_data)
-        log.info(f"Stored {len(colorgroups_data)} colorgroups for round-trip export")
+        debug(f"Stored {len(colorgroups_data)} colorgroups for round-trip export")
 
     # Store composite materials
     if op.resource_composites:
@@ -178,7 +177,7 @@ def store_passthrough_materials(op: 'Import3MF') -> None:
                 "composites": comp.composites
             }
         scene["3mf_compositematerials"] = json.dumps(composites_data)
-        log.info(f"Stored {len(composites_data)} compositematerials for round-trip export")
+        debug(f"Stored {len(composites_data)} compositematerials for round-trip export")
 
     # Store multiproperties
     if op.resource_multiproperties:
@@ -190,7 +189,7 @@ def store_passthrough_materials(op: 'Import3MF') -> None:
                 "multis": mp.multis
             }
         scene["3mf_multiproperties"] = json.dumps(multiprops_data)
-        log.info(f"Stored {len(multiprops_data)} multiproperties for round-trip export")
+        debug(f"Stored {len(multiprops_data)} multiproperties for round-trip export")
 
     # Store texture metadata
     if op.resource_textures:
@@ -205,7 +204,7 @@ def store_passthrough_materials(op: 'Import3MF') -> None:
                 "blender_image": tex.blender_image.name if tex.blender_image else None
             }
         scene["3mf_textures"] = json.dumps(textures_data)
-        log.info(f"Stored {len(textures_data)} texture2d resources for round-trip export")
+        debug(f"Stored {len(textures_data)} texture2d resources for round-trip export")
 
     # Store texture groups
     if op.resource_texture_groups:
@@ -217,7 +216,7 @@ def store_passthrough_materials(op: 'Import3MF') -> None:
                 "displaypropertiesid": group.displaypropertiesid
             }
         scene["3mf_texture_groups"] = json.dumps(groups_data)
-        log.info(f"Stored {len(groups_data)} texture2dgroup resources for round-trip export")
+        debug(f"Stored {len(groups_data)} texture2dgroup resources for round-trip export")
 
     # Store non-textured PBR display properties
     if op.resource_pbr_display_props:
@@ -228,7 +227,7 @@ def store_passthrough_materials(op: 'Import3MF') -> None:
                 "properties": props.properties
             }
         scene["3mf_pbr_display_props"] = json.dumps(pbr_data)
-        log.info(f"Stored {len(pbr_data)} PBR display properties for round-trip export")
+        debug(f"Stored {len(pbr_data)} PBR display properties for round-trip export")
 
     # Store textured PBR display properties
     if op.resource_pbr_texture_displays:
@@ -243,4 +242,4 @@ def store_passthrough_materials(op: 'Import3MF') -> None:
                 "factors": props.factors
             }
         scene["3mf_pbr_texture_displays"] = json.dumps(tex_pbr_data)
-        log.info(f"Stored {len(tex_pbr_data)} textured PBR display properties for round-trip export")
+        debug(f"Stored {len(tex_pbr_data)} textured PBR display properties for round-trip export")

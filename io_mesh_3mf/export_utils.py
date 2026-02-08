@@ -35,7 +35,6 @@ import base64
 import bmesh
 import datetime
 import itertools
-import logging
 import os
 import tempfile
 import xml.etree.ElementTree
@@ -46,6 +45,7 @@ import bpy
 import mathutils
 
 from .annotations import Annotations
+from .utilities import debug, warn, error
 from .constants import (
     MODEL_NAMESPACE,
     MODEL_DEFAULT_UNIT,
@@ -82,8 +82,6 @@ from .export_materials import (  # noqa: F401
 # Re-export from export_trianglesets for backward compatibility
 from .export_trianglesets import write_triangle_sets  # noqa: F401
 
-log = logging.getLogger(__name__)
-
 
 # =============================================================================
 # Archive Management
@@ -110,7 +108,7 @@ def create_archive(filepath: str, safe_report) -> Optional[zipfile.ZipFile]:
         annotations.write_content_types(archive)
         must_preserve(archive)
     except EnvironmentError as e:
-        log.error(f"Unable to write 3MF archive to {filepath}: {e}")
+        error(f"Unable to write 3MF archive to {filepath}: {e}")
         safe_report({'ERROR'}, f"Unable to write 3MF archive to {filepath}: {e}")
         return None
 
@@ -176,9 +174,9 @@ def write_core_properties(archive: zipfile.ZipFile) -> None:
     try:
         with archive.open(CORE_PROPERTIES_LOCATION, "w") as f:
             document.write(f, xml_declaration=True, encoding="UTF-8")
-        log.info("Wrote OPC Core Properties to docProps/core.xml")
+        debug("Wrote OPC Core Properties to docProps/core.xml")
     except Exception as e:
-        log.error(f"Failed to write Core Properties: {e}")
+        error(f"Failed to write Core Properties: {e}")
 
 
 def write_thumbnail(archive: zipfile.ZipFile) -> None:
@@ -193,7 +191,7 @@ def write_thumbnail(archive: zipfile.ZipFile) -> None:
     try:
         # Skip thumbnail generation in background mode (no OpenGL context)
         if bpy.app.background:
-            log.debug("Skipping thumbnail generation in background mode")
+            debug("Skipping thumbnail generation in background mode")
             return
 
         # Thumbnail dimensions (3MF spec recommends these sizes)
@@ -211,7 +209,7 @@ def write_thumbnail(archive: zipfile.ZipFile) -> None:
                 break
 
         if not view3d_area:
-            log.info("No 3D viewport found for thumbnail generation")
+            debug("No 3D viewport found for thumbnail generation")
             return
 
         # Create a temporary file for the render
@@ -251,7 +249,7 @@ def write_thumbnail(archive: zipfile.ZipFile) -> None:
             with archive.open("Metadata/thumbnail.png", "w") as f:
                 f.write(png_data)
 
-            log.info(f"Wrote thumbnail.png ({thumb_width}x{thumb_height}) from viewport render")
+            debug(f"Wrote thumbnail.png ({thumb_width}x{thumb_height}) from viewport render")
 
         finally:
             # Restore original settings
@@ -268,7 +266,7 @@ def write_thumbnail(archive: zipfile.ZipFile) -> None:
                 pass
 
     except Exception as e:
-        log.warning(f"Failed to write thumbnail: {e}")
+        warn(f"Failed to write thumbnail: {e}")
         # Non-critical, don't fail the export
 
 
@@ -451,7 +449,7 @@ def write_triangles(
     :param basematerials_resource_id: The ID of the basematerials resource for per-face material refs.
     :param segmentation_strings: Dict of face_index -> segmentation hash string (for PAINT mode).
     """
-    print(f"[write_triangles] mode={use_orca_format}, slicer={mmu_slicer_format}, seg_strings={len(segmentation_strings) if segmentation_strings else 0}")
+    debug(f"[write_triangles] mode={use_orca_format}, slicer={mmu_slicer_format}, seg_strings={len(segmentation_strings) if segmentation_strings else 0}")
     
     triangles_element = xml.etree.ElementTree.SubElement(
         mesh_element, f"{{{MODEL_NAMESPACE}}}triangles"
@@ -485,14 +483,7 @@ def write_triangles(
     # Track how many segmentation strings we actually write
     seg_strings_written = 0
     
-    # Debug: log first few triangles and their indices
-    if segmentation_strings:
-        print(f"  [write_triangles] First 10 polygon indices in dict: {list(segmentation_strings.keys())[:10]}")
-    
     for tri_idx, triangle in enumerate(triangles):
-        # Debug: log first few triangles to see what indices we have
-        if tri_idx < 5 and segmentation_strings:
-            print(f"  [write_triangles] Triangle loop_idx={tri_idx}, polygon_index={triangle.polygon_index}, in dict={triangle.polygon_index in segmentation_strings}")
         triangle_element = xml.etree.ElementTree.SubElement(
             triangles_element, triangle_name
         )
@@ -510,14 +501,10 @@ def write_triangles(
                     ns_attr = "{http://schemas.slic3r.org/3mf/2017/06}mmu_segmentation"
                     triangle_element.attrib[ns_attr] = seg_string
                     seg_strings_written += 1
-                    if triangle.polygon_index < 5:  # Log first few for debugging
-                        print(f"    Triangle poly={triangle.polygon_index}: writing mmu_segmentation='{seg_string[:20]}...'")
                 else:
                     # Orca format: use paint_color attribute
                     triangle_element.attrib["paint_color"] = seg_string
                     seg_strings_written += 1
-                    if triangle.polygon_index < 5:  # Log first few for debugging
-                        print(f"    Triangle poly={triangle.polygon_index}: writing paint_color='{seg_string[:20]}...'")
                 continue  # Skip other material handling for this triangle
         
         # Handle multi-material color zones (BASEMATERIAL mode only)
@@ -585,7 +572,7 @@ def write_triangles(
 
     # Log summary of segmentation string writing
     if segmentation_strings:
-        print(f"  [write_triangles] Wrote {seg_strings_written} segmentation strings to triangles (had {len(segmentation_strings)} available)")
+        debug(f"  [write_triangles] Wrote {seg_strings_written} segmentation strings to triangles (had {len(segmentation_strings)} available)")
 
 
 # =============================================================================

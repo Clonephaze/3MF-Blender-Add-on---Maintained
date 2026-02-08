@@ -19,7 +19,6 @@ import collections
 import datetime
 import io
 import json
-import logging
 import os
 import re
 import uuid
@@ -46,9 +45,8 @@ from .metadata import Metadata, MetadataEntry
 from .export_components import (
     detect_linked_duplicates,
     should_use_components,
-    get_component_objects,
-    get_non_component_objects,
 )
+from .utilities import debug, warn, error, hex_to_rgb
 from .export_utils import (
     ORCA_FILAMENT_CODES,
     write_core_properties,
@@ -71,8 +69,6 @@ from .export_utils import (
     write_pbr_textures_to_archive,
     write_pbr_texture_display_properties,
 )
-
-log = logging.getLogger(__name__)
 
 
 class BaseExporter:
@@ -112,7 +108,7 @@ class StandardExporter(BaseExporter):
         if self.op.export_triangle_sets:
             from .extensions import TRIANGLE_SETS_EXTENSION
             self.op.extension_manager.activate(TRIANGLE_SETS_EXTENSION.namespace)
-            log.info("Activated Triangle Sets extension")
+            debug("Activated Triangle Sets extension")
 
         # Register all active extension namespaces with ElementTree
         self.op.extension_manager.register_namespaces(xml.etree.ElementTree)
@@ -151,7 +147,7 @@ class StandardExporter(BaseExporter):
                     pbr_material_names.add(mat_name)
 
             if pbr_material_names:
-                log.info(f"Detected PBR textured materials: {list(pbr_material_names)}")
+                debug(f"Detected PBR textured materials: {list(pbr_material_names)}")
                 # Activate Materials Extension
                 from .extensions import MATERIALS_EXTENSION
                 self.op.extension_manager.activate(MATERIALS_EXTENSION.namespace)
@@ -172,7 +168,7 @@ class StandardExporter(BaseExporter):
                         self.op.next_resource_id,
                         basematerials_element
                     )
-                    log.info(f"Created PBR display properties for {len(material_to_display_props)} materials")
+                    debug(f"Created PBR display properties for {len(material_to_display_props)} materials")
 
                     # Store which materials use PBR (triangles should reference basematerials, not texture2dgroup)
                     self.op.pbr_material_names = pbr_material_names
@@ -190,7 +186,7 @@ class StandardExporter(BaseExporter):
         }
 
         if textured_materials_filtered:
-            log.info(f"Detected {len(textured_materials_filtered)} base-color-only textured materials")
+            debug(f"Detected {len(textured_materials_filtered)} base-color-only textured materials")
             # Activate Materials Extension
             from .extensions import MATERIALS_EXTENSION
             self.op.extension_manager.activate(MATERIALS_EXTENSION.namespace)
@@ -209,7 +205,7 @@ class StandardExporter(BaseExporter):
                 self.op.next_resource_id,
                 self.op.coordinate_precision
             )
-            log.info(f"Created {len(self.op.texture_groups)} texture groups")
+            debug(f"Created {len(self.op.texture_groups)} texture groups")
 
         # Write passthrough materials (compositematerials, multiproperties, etc.)
         # These are stored from import for round-trip support
@@ -261,7 +257,7 @@ class StandardExporter(BaseExporter):
             component_groups = detect_linked_duplicates(blender_objects)
             
             if component_groups and should_use_components(component_groups, blender_objects):
-                log.info(f"Using component optimization: {len(component_groups)} component groups detected")
+                debug(f"Using component optimization: {len(component_groups)} component groups detected")
                 self.op.safe_report({'INFO'}, 
                     f"Using component optimization: {len(component_groups)} component groups detected")
                 
@@ -273,8 +269,8 @@ class StandardExporter(BaseExporter):
                         resources_element, representative_obj
                     )
                     group.component_id = component_id
-                    log.info(f"Component definition {component_id}: '{mesh_data.name}' "
-                            f"({len(group.objects)} instances)")
+                    debug(f"Component definition {component_id}: '{mesh_data.name}' "
+                          f"({len(group.objects)} instances)")
             else:
                 # Not enough benefit, export normally
                 component_groups = {}
@@ -360,7 +356,7 @@ class StandardExporter(BaseExporter):
         """
         Write a single Blender object and all of its children to the resources of a 3MF document.
         """
-        log.info(f"write_object_resource called for: {blender_object.name}, type: {blender_object.type}")
+        debug(f"write_object_resource called for: {blender_object.name}, type: {blender_object.type}")
 
         new_resource_id = self.op.next_resource_id
         self.op.next_resource_id += 1
@@ -423,7 +419,7 @@ class StandardExporter(BaseExporter):
             return new_resource_id, mesh_transformation
 
         mesh.calc_loop_triangles()
-        log.info(f"  Got mesh: {len(mesh.vertices)} vertices, {len(mesh.loop_triangles)} triangles")
+        debug(f"  Got mesh: {len(mesh.vertices)} vertices, {len(mesh.loop_triangles)} triangles")
 
         if len(mesh.vertices) > 0:
             if child_objects:
@@ -448,9 +444,9 @@ class StandardExporter(BaseExporter):
             # Find the most common material for this mesh
             most_common_material_list_index = 0
 
-            print(f"[export_formats] write_object_resource: {blender_object.name}, mode={self.op.use_orca_format}, "
+            debug(f"[export_formats] write_object_resource: {blender_object.name}, mode={self.op.use_orca_format}, "
                   f"slicer={self.op.mmu_slicer_format}")
-            print(f"  mesh has {len(mesh.loop_triangles)} triangles, {len(blender_object.material_slots)} material slots")
+            debug(f"  mesh has {len(mesh.loop_triangles)} triangles, {len(blender_object.material_slots)} material slots")
 
             # Check if this object has any textured materials
             has_textured_material = False
@@ -465,12 +461,12 @@ class StandardExporter(BaseExporter):
                 color_counts = {}
                 for triangle in mesh.loop_triangles:
                     triangle_color = get_triangle_color(mesh, triangle, blender_object)
-                    log.info(f"  triangle {triangle.index}: material_index={triangle.material_index}, "
-                             f"color={triangle_color}")
+                    debug(f"  triangle {triangle.index}: material_index={triangle.material_index}, "
+                          f"color={triangle_color}")
                     if triangle_color and triangle_color in self.op.vertex_colors:
                         color_counts[triangle_color] = color_counts.get(triangle_color, 0) + 1
 
-                log.info(f"  color_counts: {color_counts}")
+                debug(f"  color_counts: {color_counts}")
                 if color_counts:
                     most_common_color = max(color_counts, key=color_counts.get)
                     colorgroup_id = self.op.vertex_colors[most_common_color]
@@ -508,35 +504,27 @@ class StandardExporter(BaseExporter):
             
             # Generate segmentation strings from UV texture if in PAINT mode
             segmentation_strings = {}
-            print(f"[export_formats] Checking PAINT export: mode={self.op.use_orca_format}, has_uv={bool(mesh.uv_layers.active)}")
+            debug(f"[export_formats] Checking PAINT export: mode={self.op.use_orca_format}, has_uv={bool(mesh.uv_layers.active)}")
             if self.op.use_orca_format == 'PAINT' and mesh.uv_layers.active:
                 # Check if this mesh was imported with paint texture (has custom properties)
                 # Read from original object's data, not the temporary evaluated mesh
                 original_mesh_data = original_object.data
-                print(f"  PAINT mode active - checking custom properties on '{original_mesh_data.name}'")
-                print(f"  Has 3mf_is_paint_texture: {'3mf_is_paint_texture' in original_mesh_data}")
-                if "3mf_is_paint_texture" in original_mesh_data:
-                    print(f"  Value: {original_mesh_data['3mf_is_paint_texture']}")
+                debug(f"  PAINT mode active - checking custom properties on '{original_mesh_data.name}'")
                 if "3mf_is_paint_texture" in original_mesh_data and original_mesh_data["3mf_is_paint_texture"]:
                     paint_texture = None
                     extruder_colors = {}
                     default_extruder = original_mesh_data.get("3mf_paint_default_extruder", 0)
-                    print(f"  Found paint texture flag, default_extruder={default_extruder}")
+                    debug(f"  Found paint texture flag, default_extruder={default_extruder}")
                     
                     # Get the stored extruder colors
                     if "3mf_paint_extruder_colors" in original_mesh_data:
                         import ast
                         try:
-                            # Parse the stored dict string back to dict
                             extruder_colors_hex = ast.literal_eval(original_mesh_data["3mf_paint_extruder_colors"])
-                            # Convert hex colors to RGB tuples for texture sampling
                             for idx, hex_color in extruder_colors_hex.items():
-                                r = int(hex_color[1:3], 16) / 255.0
-                                g = int(hex_color[3:5], 16) / 255.0
-                                b = int(hex_color[5:7], 16) / 255.0
-                                extruder_colors[idx] = (r, g, b)
+                                extruder_colors[idx] = hex_to_rgb(hex_color)
                         except Exception as e:
-                            print(f"  WARNING: Failed to parse extruder colors: {e}")
+                            debug(f"  WARNING: Failed to parse extruder colors: {e}")
                     
                     # Find the MMU paint texture
                     for mat_slot in original_object.material_slots:
@@ -549,11 +537,7 @@ class StandardExporter(BaseExporter):
                                 break
                     
                     if paint_texture and extruder_colors:
-                        print(f"  Exporting paint texture '{paint_texture.name}' as segmentation (default_extruder={default_extruder})")
-                        print(f"  Image size: {paint_texture.size[0]}x{paint_texture.size[1]}")
-                        print(f"  Color space: {paint_texture.colorspace_settings.name}")
-                        print(f"  Alpha mode: {paint_texture.alpha_mode}")
-                        print(f"  Extruder colors: {extruder_colors}")
+                        debug(f"  Exporting paint texture '{paint_texture.name}' as segmentation")
                         
                         # Import here to avoid circular dependency
                         from .export_hash_segmentation import texture_to_segmentation
@@ -567,19 +551,16 @@ class StandardExporter(BaseExporter):
                                 extruder_colors,
                                 default_extruder
                             )
-                            print(f"  Generated {len(segmentation_strings)} segmentation strings from texture")
+                            debug(f"  Generated {len(segmentation_strings)} segmentation strings from texture")
                         except Exception as e:
-                            print(f"  WARNING: Failed to generate segmentation from texture: {e}")
+                            debug(f"  WARNING: Failed to generate segmentation from texture: {e}")
                             import traceback
                             traceback.print_exc()
                             segmentation_strings = {}
                     else:
-                        if not paint_texture:
-                            print("  WARNING: No paint texture found for export")
-                        if not extruder_colors:
-                            print("  WARNING: No extruder color mapping found for export")
+                        debug("  WARNING: No paint texture or extruder colors found for export")
             
-            print(f"[export_formats] Calling write_triangles with {len(segmentation_strings)} segmentation strings")
+            debug(f"[export_formats] Calling write_triangles with {len(segmentation_strings)} segmentation strings")
             write_triangles(
                 mesh_element,
                 mesh.loop_triangles,
@@ -786,7 +767,7 @@ class OrcaExporter(BaseExporter):
         # Activate Production Extension for Orca compatibility
         self.op.extension_manager.activate(PRODUCTION_EXTENSION.namespace)
         self.op.extension_manager.activate(ORCA_EXTENSION.namespace)
-        log.info("Activated Orca Slicer extensions: Production + BambuStudio")
+        debug("Activated Orca Slicer extensions: Production + BambuStudio")
 
         # Register namespaces
         xml.etree.ElementTree.register_namespace("", MODEL_NAMESPACE)
@@ -798,10 +779,10 @@ class OrcaExporter(BaseExporter):
         self.op.vertex_colors = collect_face_colors(
             blender_objects, self.op.use_mesh_modifiers, self.op.safe_report
         )
-        log.info(f"Orca mode enabled with {len(self.op.vertex_colors)} color zones")
+        debug(f"Orca mode enabled with {len(self.op.vertex_colors)} color zones")
 
         if len(self.op.vertex_colors) == 0:
-            log.warning("No face colors found! Assign materials to faces for color zones.")
+            warn("No face colors found! Assign materials to faces for color zones.")
             self.op.safe_report({'WARNING'},
                                 "No face colors detected. Assign different materials to faces in Edit mode.")
         else:
@@ -914,7 +895,7 @@ class OrcaExporter(BaseExporter):
         try:
             mesh = eval_object.to_mesh()
         except RuntimeError:
-            log.warning(f"Could not get mesh for object: {blender_object.name}")
+            warn(f"Could not get mesh for object: {blender_object.name}")
             return
 
         if mesh is None:
@@ -983,7 +964,7 @@ class OrcaExporter(BaseExporter):
         with archive.open(archive_path, "w") as f:
             f.write(xml_content.encode('UTF-8'))
 
-        log.info(f"Wrote object model: {archive_path}")
+        debug(f"Wrote object model: {archive_path}")
 
     def write_main_model(self, archive: zipfile.ZipFile, object_data: List[dict],
                          build_uuid: str) -> None:
@@ -1074,7 +1055,7 @@ class OrcaExporter(BaseExporter):
         with archive.open(MODEL_LOCATION, "w") as f:
             f.write(xml_content.encode('UTF-8'))
 
-        log.info(f"Wrote main model: {MODEL_LOCATION}")
+        debug(f"Wrote main model: {MODEL_LOCATION}")
 
     def write_model_relationships(self, archive: zipfile.ZipFile, object_data: List[dict]) -> None:
         """Write the 3D/_rels/3dmodel.model.rels file."""
@@ -1101,28 +1082,28 @@ class OrcaExporter(BaseExporter):
         with archive.open("3D/_rels/3dmodel.model.rels", "w") as f:
             f.write(xml_content.encode('UTF-8'))
 
-        log.info("Wrote 3D/_rels/3dmodel.model.rels")
+        debug("Wrote 3D/_rels/3dmodel.model.rels")
 
     def write_orca_metadata(self, archive: zipfile.ZipFile, blender_objects: List[bpy.types.Object]) -> None:
         """Write Orca Slicer compatible metadata files to the archive."""
-        log.info("Writing Orca metadata files...")
+        debug("Writing Orca metadata files...")
 
         try:
             # Write project_settings.config from template with updated colors
             project_settings = self.generate_project_settings()
             with archive.open("Metadata/project_settings.config", "w") as f:
                 f.write(json.dumps(project_settings, indent=4).encode('utf-8'))
-            log.info("Wrote project_settings.config")
+            debug("Wrote project_settings.config")
 
             # Write model_settings.config with object metadata
             model_settings_xml = self.generate_model_settings(blender_objects)
             with archive.open("Metadata/model_settings.config", "w") as f:
                 f.write(model_settings_xml.encode('utf-8'))
-            log.info("Wrote model_settings.config")
+            debug("Wrote model_settings.config")
 
-            log.info(f"Wrote Orca metadata with {len(self.op.vertex_colors)} color zones")
+            debug(f"Wrote Orca metadata with {len(self.op.vertex_colors)} color zones")
         except Exception as e:
-            log.error(f"Failed to write Orca metadata: {e}")
+            error(f"Failed to write Orca metadata: {e}")
             self.op.safe_report({'ERROR'}, f"Failed to write Orca metadata: {e}")
             raise
 
@@ -1233,13 +1214,40 @@ class PrusaExporter(BaseExporter):
 
         # Collect face colors
         self.op.safe_report({'INFO'}, "Collecting face colors for PrusaSlicer export...")
-        self.op.vertex_colors = collect_face_colors(
-            blender_objects, self.op.use_mesh_modifiers, self.op.safe_report
-        )
-        log.info(f"PrusaSlicer mode enabled with {len(self.op.vertex_colors)} color zones")
+        
+        # For PAINT mode, collect colors from paint texture metadata instead of face materials
+        paint_colors_collected = False
+        for blender_object in blender_objects:
+            original_object = blender_object
+            # Handle evaluated objects
+            if hasattr(blender_object, 'original'):
+                original_object = blender_object.original
+            
+            original_mesh_data = original_object.data
+            if "3mf_is_paint_texture" in original_mesh_data and original_mesh_data["3mf_is_paint_texture"]:
+                if "3mf_paint_extruder_colors" in original_mesh_data:
+                    import ast
+                    try:
+                        extruder_colors_hex = ast.literal_eval(original_mesh_data["3mf_paint_extruder_colors"])
+                        # Add all colors from this paint texture to vertex_colors
+                        for idx, hex_color in extruder_colors_hex.items():
+                            if hex_color not in self.op.vertex_colors:
+                                self.op.vertex_colors[hex_color] = idx
+                        paint_colors_collected = True
+                        debug(f"Collected {len(extruder_colors_hex)} colors from paint texture metadata")
+                    except Exception as e:
+                        warn(f"Failed to parse extruder colors from metadata: {e}")
+        
+        # If no paint colors found, fall back to face material colors
+        if not paint_colors_collected:
+            self.op.vertex_colors = collect_face_colors(
+                blender_objects, self.op.use_mesh_modifiers, self.op.safe_report
+            )
+        
+        debug(f"PrusaSlicer mode enabled with {len(self.op.vertex_colors)} color zones")
 
         if len(self.op.vertex_colors) == 0:
-            log.warning("No face colors found! Assign materials to faces for color zones.")
+            warn("No face colors found! Assign materials to faces for color zones.")
             self.op.safe_report({'WARNING'},
                                 "No face colors detected. Assign different materials to faces in Edit mode.")
         else:

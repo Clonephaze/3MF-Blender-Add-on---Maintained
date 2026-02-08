@@ -28,12 +28,11 @@ Format Reference (from PrusaSlicer TriangleSelector.cpp):
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import Optional, List, Tuple
 
-log = logging.getLogger(__name__)
+from .utilities import debug, warn
 
 
 class TriangleState(IntEnum):
@@ -167,12 +166,12 @@ class SegmentationDecoder:
         try:
             node = self._decode_node()
             if self._nibble_index < len(self._hex_string):
-                log.debug(
+                debug(
                     f"Warning: {len(self._hex_string) - self._nibble_index} unused nibbles in segmentation string"
                 )
             return node
         except Exception as e:
-            log.warning(
+            warn(
                 f"Error decoding segmentation string (length {len(hex_string)}): {e}"
             )
             return None
