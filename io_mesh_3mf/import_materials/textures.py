@@ -341,3 +341,129 @@ def setup_textured_material(
     material["3mf_texture_path"] = texture.path
 
     debug(f"Created textured material with image '{texture.blender_image.name}'")
+
+
+def setup_multi_textured_material(
+    op: "Import3MF",
+    material: bpy.types.Material,
+    textures: list,
+    blendmethods: Optional[str] = None,
+) -> None:
+    """
+    Set up a Blender material with multiple Image Texture nodes mixed together.
+
+    Used for multiproperties that reference multiple texture2dgroups.
+    Creates: Texture Coordinate -> Mapping -> Image Textures -> Mix chain -> Principled BSDF
+
+    Per 3MF Materials Extension spec, multiproperties blendmethods:
+    - "mix" (default): Alpha blend / additive
+    - "multiply": Multiplicative blend
+
+    :param op: The Import3MF operator instance.
+    :param material: The Blender material to configure.
+    :param textures: List of ResourceTexture objects to layer.
+    :param blendmethods: Space-separated blend methods from multiproperties (e.g., "mix multiply").
+    """
+    from ..utilities import debug
+
+    if not textures:
+        return
+
+    material.use_nodes = True
+    nodes = material.node_tree.nodes
+    links = material.node_tree.links
+    nodes.clear()
+
+    # Parse blend methods - one per texture layer transition
+    # First layer has no blend method (it's the base), subsequent layers each have one
+    blend_list = blendmethods.split() if blendmethods else []
+
+    # Create output and principled BSDF
+    output = nodes.new("ShaderNodeOutputMaterial")
+    output.location = (300, 100)
+
+    principled = nodes.new("ShaderNodeBsdfPrincipled")
+    principled.location = (0, 100)
+    links.new(principled.outputs["BSDF"], output.inputs["Surface"])
+
+    # Create shared Texture Coordinate and Mapping nodes
+    tex_coord = nodes.new("ShaderNodeTexCoord")
+    tex_coord.location = (-1200, 100)
+
+    mapping = nodes.new("ShaderNodeMapping")
+    mapping.location = (-1000, 100)
+    links.new(tex_coord.outputs["UV"], mapping.inputs["Vector"])
+
+    # Create Image Texture nodes for each texture
+    tex_nodes = []
+    for i, texture in enumerate(textures):
+        tex_node = nodes.new("ShaderNodeTexImage")
+        tex_node.location = (-800, 150 - (i * 300))
+        tex_node.image = texture.blender_image
+        tex_node.interpolation = "Smart"
+
+        # Set texture extension mode
+        if texture.tilestyleu == "clamp" or texture.tilestylev == "clamp":
+            tex_node.extension = "CLIP"
+        elif texture.tilestyleu == "mirror" or texture.tilestylev == "mirror":
+            tex_node.extension = "EXTEND"
+        else:
+            tex_node.extension = "REPEAT"
+
+        # Set interpolation
+        if texture.filter == "nearest":
+            tex_node.interpolation = "Closest"
+
+        # Connect Mapping to texture Vector input
+        links.new(mapping.outputs["Vector"], tex_node.inputs["Vector"])
+        tex_nodes.append(tex_node)
+
+    if len(tex_nodes) == 1:
+        # Single texture - connect directly
+        links.new(tex_nodes[0].outputs["Color"], principled.inputs["Base Color"])
+    else:
+        # Multiple textures - chain Mix nodes
+        # First pair: tex[0] and tex[1]
+        previous_output = tex_nodes[0].outputs["Color"]
+
+        for i in range(1, len(tex_nodes)):
+            mix = nodes.new("ShaderNodeMix")
+            mix.location = (-500 + (i - 1) * 200, 100)
+            mix.data_type = 'RGBA'
+            mix.clamp_factor = True
+            mix.clamp_result = False
+            mix.factor_mode = 'UNIFORM'
+            mix.inputs[0].default_value = 1.0  # Factor
+
+            # Determine blend type from blendmethods
+            # blendmethods has one entry per layer after the first
+            # So blend_list[0] applies between layer 0 and 1, etc.
+            blend_idx = i - 1
+            if blend_idx < len(blend_list):
+                method = blend_list[blend_idx].lower()
+                if method == "multiply":
+                    mix.blend_type = 'MULTIPLY'
+                else:
+                    mix.blend_type = 'ADD'  # "mix" maps to ADD
+            else:
+                mix.blend_type = 'ADD'  # Default
+
+            # Connect inputs: A = previous result, B = current texture
+            links.new(previous_output, mix.inputs[6])       # A_Color
+            links.new(tex_nodes[i].outputs["Color"], mix.inputs[7])  # B_Color
+
+            previous_output = mix.outputs[2]  # Result_Color
+
+        # Connect final Mix output to Principled BSDF Base Color
+        links.new(previous_output, principled.inputs["Base Color"])
+
+    # Store texture metadata for round-trip
+    for i, texture in enumerate(textures):
+        suffix = f"_{i}" if i > 0 else ""
+        material[f"3mf_texture_path{suffix}"] = texture.path
+        material[f"3mf_texture_tilestyleu{suffix}"] = texture.tilestyleu or "wrap"
+        material[f"3mf_texture_tilestylev{suffix}"] = texture.tilestylev or "wrap"
+        material[f"3mf_texture_filter{suffix}"] = texture.filter or "auto"
+
+    tex_names = ", ".join(t.blender_image.name for t in textures if t.blender_image)
+    debug(f"Created multi-textured material with {len(textures)} textures: {tex_names}")

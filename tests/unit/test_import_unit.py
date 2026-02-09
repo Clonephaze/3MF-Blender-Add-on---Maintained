@@ -39,6 +39,7 @@ from io_mesh_3mf.constants import (
     MODEL_NAMESPACE,
     CONTENT_TYPES_LOCATION
 )
+from io_mesh_3mf.utilities import srgb_to_linear  # For color conversion tests
 # To compare the metadata objects created by the code under test.
 from io_mesh_3mf.metadata import Metadata, MetadataEntry
 
@@ -74,6 +75,8 @@ class TestImport3MF(unittest.TestCase):
         self.importer.resource_pbr_texture_displays = {}  # ID -> ResourcePBRTextureDisplay (round-trip)
         self.importer.resource_colorgroups = {}  # ID -> ResourceColorgroup (round-trip)
         self.importer.resource_pbr_display_props = {}  # ID -> ResourcePBRDisplayProps (round-trip)
+        self.importer.object_passthrough_pids = {}  # objectid -> pid for multiproperties passthrough
+        self.importer.textured_to_basematerial_map = {}  # textured ResourceMaterial -> original basematerial
         self.importer.num_loaded = 0
         # Initialize import options (new properties added for extension framework)
         self.importer.import_materials = True
@@ -802,15 +805,16 @@ class TestImport3MF(unittest.TestCase):
         Test reading the color from a material.
         """
         # Ground truth for what each color should translate to when reading from the 3MF document.
+        # RGB components are converted from sRGB (3MF) to linear (Blender). Alpha is NOT converted.
         color_translation = {
             None: None,  # Missing color.
-            "#4080C0": (0x40 / 255, 0x80 / 255, 0xC0 / 255, 1.0),  # Correct case.
-            "4080C0": (0x40 / 255, 0x80 / 255, 0xC0 / 255, 1.0),  # Strictly incorrect, but we'll allow it.
-            "#FFC08040": (1.0, 0xC0 / 255, 0x80 / 255, 0x40 / 255),  # Correct case with alpha.
-            "FFC08040": (1.0, 0xC0 / 255, 0x80 / 255, 0x40 / 255),  # Strictly incorrect. With alpha.
-            "ABCD": (0.0, 0.0, 0xAB / 255, 0xCD / 255),  # Not enough characters. Interpret as web colors.
-            "ABCDEFABCDEF": (0xEF / 255, 0xAB / 255, 0xCD / 255, 0xEF / 255),  # Too many characters.
-            "ffc080": (0xFF / 255, 0xc0 / 255, 0x80 / 255, 1.0),  # Lowercase characters.
+            "#4080C0": (srgb_to_linear(0x40 / 255), srgb_to_linear(0x80 / 255), srgb_to_linear(0xC0 / 255), 1.0),
+            "4080C0": (srgb_to_linear(0x40 / 255), srgb_to_linear(0x80 / 255), srgb_to_linear(0xC0 / 255), 1.0),
+            "#FFC08040": (srgb_to_linear(1.0), srgb_to_linear(0xC0 / 255), srgb_to_linear(0x80 / 255), 0x40 / 255),
+            "FFC08040": (srgb_to_linear(1.0), srgb_to_linear(0xC0 / 255), srgb_to_linear(0x80 / 255), 0x40 / 255),
+            "ABCD": (0.0, 0.0, srgb_to_linear(0xAB / 255), 0xCD / 255),  # Not enough characters.
+            "ABCDEFABCDEF": (srgb_to_linear(0xEF / 255), srgb_to_linear(0xAB / 255), srgb_to_linear(0xCD / 255), 0xEF / 255),
+            "ffc080": (srgb_to_linear(0xFF / 255), srgb_to_linear(0xC0 / 255), srgb_to_linear(0x80 / 255), 1.0),
             "": None,  # Doesn't parse.
             "3MF3MF": None  # Doesn't parse, since M is out of range for a hexadecimal number.
         }
@@ -1024,7 +1028,7 @@ class TestImport3MF(unittest.TestCase):
         object_node = xml.etree.ElementTree.Element(f"{{{MODEL_NAMESPACE}}}object")
         xml.etree.ElementTree.SubElement(object_node, f"{{{MODEL_NAMESPACE}}}mesh")
 
-        triangles, _, _ = self.importer.read_triangles(object_node, None, "")
+        triangles, _, _, _, _, _ = self.importer.read_triangles(object_node, None, "")
         self.assertListEqual(
             triangles,
             [],
@@ -1038,7 +1042,7 @@ class TestImport3MF(unittest.TestCase):
         mesh_node = xml.etree.ElementTree.SubElement(object_node, f"{{{MODEL_NAMESPACE}}}mesh")
         xml.etree.ElementTree.SubElement(mesh_node, f"{{{MODEL_NAMESPACE}}}triangles")
 
-        triangles, _, _ = self.importer.read_triangles(object_node, None, "")
+        triangles, _, _, _, _, _ = self.importer.read_triangles(object_node, None, "")
         self.assertListEqual(
             triangles,
             [],
@@ -1061,7 +1065,7 @@ class TestImport3MF(unittest.TestCase):
             triangle_node.attrib["v2"] = str(triangle[1])
             triangle_node.attrib["v3"] = str(triangle[2])
 
-        reconstructed_triangles, _, _ = self.importer.read_triangles(object_node, None, "")
+        reconstructed_triangles, _, _, _, _, _ = self.importer.read_triangles(object_node, None, "")
         self.assertListEqual(
             reconstructed_triangles,
             triangles,
@@ -1081,7 +1085,7 @@ class TestImport3MF(unittest.TestCase):
         triangle_node.attrib["v2"] = "2"
         # Leave out v3. It's missing then.
 
-        triangles, _, _ = self.importer.read_triangles(object_node, None, "")
+        triangles, _, _, _, _, _ = self.importer.read_triangles(object_node, None, "")
         self.assertListEqual(triangles, [], "The only triangle was invalid, so the output should have no triangles.")
 
     def test_read_triangles_broken_vertex(self):
@@ -1113,7 +1117,7 @@ class TestImport3MF(unittest.TestCase):
         # Doesn't parse as integer! Should make the triangle go missing.
         invalid_index_triangle_node.attrib["v3"] = "doodie"
 
-        triangles, _, _ = self.importer.read_triangles(object_node, None, "")
+        triangles, _, _, _, _, _ = self.importer.read_triangles(object_node, None, "")
         self.assertListEqual(triangles, [], "All triangles are invalid, so the output should have no triangles.")
 
     def test_read_triangles_default_material(self):
@@ -1133,7 +1137,7 @@ class TestImport3MF(unittest.TestCase):
         default_material = io_mesh_3mf.import_3mf.ResourceMaterial(name="PLA", color=None)
         self.importer.resource_materials["material-set"] = {1: default_material}
 
-        _, materials, _ = self.importer.read_triangles(object_node, default_material, "")
+        _, materials, _, _, _, _ = self.importer.read_triangles(object_node, default_material, "")
 
         self.assertListEqual(
             materials,
@@ -1161,7 +1165,7 @@ class TestImport3MF(unittest.TestCase):
             1: default_material
         }
 
-        _, materials, _ = self.importer.read_triangles(object_node, default_material, "")
+        _, materials, _, _, _, _ = self.importer.read_triangles(object_node, default_material, "")
 
         self.assertListEqual(
             materials,
@@ -1192,7 +1196,7 @@ class TestImport3MF(unittest.TestCase):
         }
 
         # Supply a default PID. It should use the indices from the triangles to reference to this PID.
-        _, materials, _ = self.importer.read_triangles(object_node, default_material, "material-set")
+        _, materials, _, _, _, _ = self.importer.read_triangles(object_node, default_material, "material-set")
 
         self.assertListEqual(
             materials,
@@ -1225,7 +1229,7 @@ class TestImport3MF(unittest.TestCase):
         }
 
         # Supply a default PID. It should use the indices from the triangles to reference to this PID.
-        _, materials, _ = self.importer.read_triangles(object_node, default_material, "material-set")
+        _, materials, _, _, _, _ = self.importer.read_triangles(object_node, default_material, "material-set")
 
         self.assertListEqual(
             materials,
@@ -1253,7 +1257,7 @@ class TestImport3MF(unittest.TestCase):
         }
 
         # Supply a default PID. It should use the indices from the triangles to reference to this PID.
-        _, materials, _ = self.importer.read_triangles(object_node, default_material, "material-set")
+        _, materials, _, _, _, _ = self.importer.read_triangles(object_node, default_material, "material-set")
 
         self.assertListEqual(
             materials,
@@ -1282,7 +1286,7 @@ class TestImport3MF(unittest.TestCase):
         }
 
         # Supply a default PID. It should use the indices from the triangles to reference to this PID.
-        _, materials, _ = self.importer.read_triangles(object_node, default_material, "material-set")
+        _, materials, _, _, _, _ = self.importer.read_triangles(object_node, default_material, "material-set")
 
         self.assertListEqual(
             materials,

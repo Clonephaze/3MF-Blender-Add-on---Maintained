@@ -23,7 +23,7 @@ from typing import Tuple
 #  Debug logging
 # ---------------------------------------------------------------------------
 
-DEBUG_MODE = False
+DEBUG_MODE = True
 """Set to True to enable verbose console output for development/debugging."""
 
 

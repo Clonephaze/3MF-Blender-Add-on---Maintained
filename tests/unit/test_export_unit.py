@@ -55,9 +55,11 @@ class TestExport3MF(unittest.TestCase):
         self.exporter.use_mesh_modifiers = False
         self.exporter.coordinate_precision = 4
         self.exporter.export_hidden = False  # Initialize export_hidden property
-        self.exporter.use_orca_format = False  # Initialize Orca format property
-        self.exporter.mmu_slicer_format = 'NONE'  # Initialize MMU slicer format property
+        self.exporter.use_orca_format = "STANDARD"  # Initialize material export mode
+        self.exporter.mmu_slicer_format = "ORCA"  # Initialize MMU slicer format property
         self.exporter.export_triangle_sets = False  # Initialize triangle sets export option
+        self.exporter.use_components = False  # Initialize component optimization option
+        self.exporter.passthrough_id_remap = {}  # Initialize passthrough ID remap
 
         # Initialize state variables that are normally set in execute()
         self.exporter.next_resource_id = 1
@@ -281,13 +283,14 @@ class TestExport3MF(unittest.TestCase):
         This tests various colors with some special properties.
         """
         ground_truth = {
-            (0.1, 0.2, 0.3, 0.4): "#1A334C66",  # Basic color values and rounding.
+            # linear_to_srgb is applied to RGB before hex encoding; alpha is NOT gamma-converted.
+            (0.1, 0.2, 0.3, 0.4): "#597C9566",  # Basic color values with sRGB gamma and alpha.
             (1.0, 1.0, 1.0, 0.5): "#FFFFFF80",  # Maximum color values.
             (0.0, 0.0, 0.0, 0.0): "#00000000",  # Minimum color values.
-            (0.1, 0.2, 0.3, 0.0): "#1A334C00",  # Colors even though the material is completely transparent.
-            (0.5, 0.5, 0.5, 0.5): "#80808080",  # Rounding.
-            (0.5, 0.5, 0.5, 1.0): "#808080",  # Alpha is 100%, so it's omitted.
-            (0.1, 0.2, 0.3, 1.0): "#1A334C",  # Basic color values with 100% alpha.
+            (0.1, 0.2, 0.3, 0.0): "#597C9500",  # Colors even though the material is completely transparent.
+            (0.5, 0.5, 0.5, 0.5): "#BCBCBC80",  # Mid-range linear → sRGB gamma.
+            (0.5, 0.5, 0.5, 1.0): "#BCBCBC",  # Alpha is 100%, so it's omitted.
+            (0.1, 0.2, 0.3, 1.0): "#597C95",  # Basic color values with 100% alpha.
             (2.0, 3.0, 4.0, 1.0): "#FFFFFF",  # Clipped to 100% value.
             (3.0, 4.0, 5.0, 6.0): "#FFFFFF"  # Even alpha is clipped to 100% value, and then omitted.
             # The function doesn't need to deal with color values below 0, since Blender doesn't support those.
@@ -405,6 +408,7 @@ class TestExport3MF(unittest.TestCase):
         the_object.parent = None
         the_object.type = 'MESH'
         the_object.hide_get.return_value = False  # Not hidden
+        the_object.matrix_world = mathutils.Matrix.Identity(4)
 
         with unittest.mock.patch.object(
             io_mesh_3mf.export_formats.StandardExporter,
@@ -447,10 +451,12 @@ class TestExport3MF(unittest.TestCase):
         parent_obj.parent = None
         parent_obj.type = 'MESH'
         parent_obj.hide_get.return_value = False  # Not hidden
+        parent_obj.matrix_world = mathutils.Matrix.Identity(4)
         child_obj = unittest.mock.MagicMock()
         child_obj.parent = parent_obj
         child_obj.type = 'MESH'
         child_obj.hide_get.return_value = False  # Not hidden
+        child_obj.matrix_world = mathutils.Matrix.Identity(4)
 
         with unittest.mock.patch.object(
             io_mesh_3mf.export_formats.StandardExporter,
@@ -587,6 +593,7 @@ class TestExport3MF(unittest.TestCase):
         hidden_object.parent = None
         hidden_object.type = 'MESH'
         hidden_object.hide_get.return_value = True  # Hidden
+        hidden_object.matrix_world = mathutils.Matrix.Identity(4)
 
         with unittest.mock.patch.object(
             io_mesh_3mf.export_formats.StandardExporter,
@@ -619,6 +626,7 @@ class TestExport3MF(unittest.TestCase):
         visible_object.parent = None
         visible_object.type = 'MESH'
         visible_object.hide_get.return_value = False  # Not hidden
+        visible_object.matrix_world = mathutils.Matrix.Identity(4)
 
         with unittest.mock.patch.object(
             io_mesh_3mf.export_formats.StandardExporter,
@@ -648,10 +656,12 @@ class TestExport3MF(unittest.TestCase):
         object1.parent = None
         object1.type = 'MESH'
         object1.hide_get.return_value = False  # Not hidden
+        object1.matrix_world = mathutils.Matrix.Identity(4)
         object2 = unittest.mock.MagicMock()
         object2.parent = None
         object2.type = 'MESH'
         object2.hide_get.return_value = False  # Not hidden
+        object2.matrix_world = mathutils.Matrix.Identity(4)
 
         with unittest.mock.patch.object(
             io_mesh_3mf.export_formats.StandardExporter,
@@ -687,6 +697,7 @@ class TestExport3MF(unittest.TestCase):
         the_object.parent = None
         the_object.type = 'MESH'
         the_object.hide_get.return_value = False  # Not hidden
+        the_object.matrix_world = object_transformation.copy()
 
         with unittest.mock.patch.object(
             io_mesh_3mf.export_formats.StandardExporter,
@@ -724,6 +735,7 @@ class TestExport3MF(unittest.TestCase):
         the_object.type = 'MESH'
         the_object.name = "Acoustic Kitty"
         the_object.hide_get.return_value = False  # Not hidden
+        the_object.matrix_world = mathutils.Matrix.Identity(4)
         the_object["Description"] = MetadataEntry(
             name="Description",
             preserve=False,
@@ -1007,6 +1019,7 @@ class TestExport3MF(unittest.TestCase):
         blender_object = unittest.mock.MagicMock()
         blender_object.matrix_world = mathutils.Matrix.Identity(4)
         blender_object.children = []
+        blender_object.data.get.return_value = None  # No passthrough pid
         mock_material = unittest.mock.MagicMock()
         mock_material.name = "Mock Material"
         blender_object.material_slots = [unittest.mock.MagicMock(material=mock_material)]
@@ -1045,6 +1058,7 @@ class TestExport3MF(unittest.TestCase):
         blender_object = unittest.mock.MagicMock()
         blender_object.matrix_world = mathutils.Matrix.Identity(4)
         blender_object.children = []
+        blender_object.data.get.return_value = None  # No passthrough pid
         material1 = unittest.mock.MagicMock()
         material1.name = "PLA"
         material2 = unittest.mock.MagicMock()

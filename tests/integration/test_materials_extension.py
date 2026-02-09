@@ -702,9 +702,9 @@ class TestMultiproperties(MaterialsExtensionTestCase):
       <m:color color="#FF00FFFF" />
     </m:colorgroup>
     <m:multiproperties id="3" pids="1 2" blendmethods="mix">
-      <m:multi pindices="0 0" />
-      <m:multi pindices="1 1" />
-      <m:multi pindices="0 1" />
+      <multi pindices="0 0" />
+      <multi pindices="1 1" />
+      <multi pindices="0 1" />
     </m:multiproperties>
     {CUBE_MESH}
   </resources>
@@ -763,8 +763,8 @@ class TestMultiproperties(MaterialsExtensionTestCase):
       <m:tex2coord u="1" v="1" />
     </m:texture2dgroup>
     <m:multiproperties id="4" pids="1 3" blendmethods="multiply">
-      <m:multi pindices="0 0" />
-      <m:multi pindices="0 1" />
+      <multi pindices="0 0" />
+      <multi pindices="0 1" />
     </m:multiproperties>
     {CUBE_MESH}
   </resources>
@@ -803,10 +803,10 @@ class TestMultiproperties(MaterialsExtensionTestCase):
       <m:tex2coord u="1" v="1" />
     </m:texture2dgroup>
     <m:multiproperties id="6" pids="1 4">
-      <m:multi pindices="0 0" />
-      <m:multi pindices="0 1" />
-      <m:multi pindices="0 2" />
-      <m:multi pindices="0 3" />
+      <multi pindices="0 0" />
+      <multi pindices="0 1" />
+      <multi pindices="0 2" />
+      <multi pindices="0 3" />
     </m:multiproperties>
     <m:pbmetallicdisplayproperties id="9">
       <m:pbmetallic name="MetalProp" metallicness="1" roughness="0.2" />
@@ -1150,8 +1150,8 @@ class TestCombinedMaterialsExtension(MaterialsExtensionTestCase):
     
     <!-- Multiproperties -->
     <m:multiproperties id="7" pids="1 2" blendmethods="mix">
-      <m:multi pindices="0 0" />
-      <m:multi pindices="1 1" />
+      <multi pindices="0 0" />
+      <multi pindices="1 1" />
     </m:multiproperties>
     
     <!-- PB Metallic Display Properties -->

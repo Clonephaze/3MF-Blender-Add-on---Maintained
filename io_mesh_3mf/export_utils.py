@@ -77,6 +77,7 @@ from .export_materials import (  # noqa: F401
     write_pbr_textures_to_archive,
     write_pbr_texture_display_properties,
     write_passthrough_materials,
+    write_passthrough_textures_to_archive,
 )
 
 # Re-export from export_trianglesets for backward compatibility

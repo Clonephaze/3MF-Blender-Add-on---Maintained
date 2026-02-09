@@ -104,8 +104,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             (
                 "PAINT",
                 "Paint Segmentation",
-                "Export UV-painted regions as hash segmentation for multi-material printing",
-                "(experimental, may be slow)",
+                "Export UV-painted regions as hash segmentation for multi-material printing (experimental, may be slow)",
             ),
         ],
         default="BASEMATERIAL",
@@ -172,12 +171,13 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         orca_header.label(text="Multi-Color Printing", icon="COLORSET_01_VEC")
         orca_row = orca_box.row()
         orca_row.prop(self, "use_orca_format")
-        if self.use_orca_format:
-            # Slicer format dropdown
+        if self.use_orca_format == "PAINT":
+            # Slicer format dropdown — only relevant for MMU paint export
             format_row = orca_box.row()
             format_row.prop(self, "mmu_slicer_format", text="Slicer")
 
-            # Tips
+        # Tips for material modes
+        if self.use_orca_format in ("BASEMATERIAL", "PAINT"):
             info_col = orca_box.column(align=True)
             info_col.scale_y = 0.7
             info_col.label(
@@ -194,9 +194,9 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         layout.prop(self, "use_mesh_modifiers")
         layout.prop(self, "use_components")
 
-        # Triangle Sets - disabled when using Multi-Material (not supported by slicers)
+        # Triangle Sets - disabled when using Paint Segmentation (not supported by slicers)
         triangle_sets_row = layout.row()
-        triangle_sets_row.enabled = not self.use_orca_format
+        triangle_sets_row.enabled = self.use_orca_format != "PAINT"
         triangle_sets_row.prop(self, "export_triangle_sets")
         layout.prop(self, "global_scale")
         layout.prop(self, "coordinate_precision")
@@ -284,6 +284,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             self.vertex_colors = {}  # Maps color hex values to filament indices for Orca export
             self.orca_object_files = []  # List of (path, uuid) for each object model file
             self.material_name_to_index = {}
+            self.passthrough_id_remap = {}  # Maps original passthrough IDs to new IDs
 
             # Initialize extension manager
             self.extension_manager = ExtensionManager()
@@ -323,7 +324,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             global_scale = _unit_scale(context, self.global_scale)
 
             # Dispatch to format-specific exporter
-            if self.use_orca_format:
+            if self.use_orca_format == "PAINT":
                 if self.mmu_slicer_format == "ORCA":
                     exporter = OrcaExporter(self)
                     return exporter.execute(context, archive, blender_objects, global_scale)
@@ -331,7 +332,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                     exporter = PrusaExporter(self)
                     return exporter.execute(context, archive, blender_objects, global_scale)
 
-            # Standard 3MF export (original behavior)
+            # Standard 3MF export — handles STANDARD, BASEMATERIAL, and texture export
             exporter = StandardExporter(self)
             return exporter.execute(context, archive, blender_objects, global_scale)
         finally:

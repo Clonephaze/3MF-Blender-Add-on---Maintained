@@ -70,6 +70,7 @@ from .import_materials import (
     extract_textures_from_archive as _extract_textures_impl,
     get_or_create_textured_material as _get_or_create_textured_material_impl,
     setup_textured_material as _setup_textured_material_impl,
+    setup_multi_textured_material as _setup_multi_textured_material_impl,
     read_pbr_metallic_properties as _read_pbr_metallic_impl,
     read_pbr_specular_properties as _read_pbr_specular_impl,
     read_pbr_translucent_properties as _read_pbr_translucent_impl,
@@ -140,8 +141,11 @@ ResourceMaterial = collections.namedtuple(
         "specular_texid",  # ID of texture2d for specular map
         "glossiness_texid",  # ID of texture2d for glossiness map
         "basecolor_texid",  # ID of texture2d for base color map (from pbmetallictexturedisplayproperties)
+        # Multiproperties multi-texture support
+        "extra_texture_ids",  # List of additional texture2dgroup IDs (for multiproperties with multiple textures)
     ],
     defaults=[
+        None,
         None,
         None,
         None,
@@ -329,8 +333,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             (
                 "PAINT",
                 "Import MMU Paint Data",
-                "Render multi-material segmentation to UV texture for painting",
-                "(experimental, may be slow for large models)",
+                "Render multi-material segmentation to UV texture for painting (experimental, may be slow for large models)",
             ),
             ("NONE", "Geometry Only", "Skip all material and color data"),
         ],
@@ -610,6 +613,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             self.resource_objects = {}
             self.resource_materials = {}
             self.resource_to_material = {}
+            self.textured_to_basematerial_map = {}  # Map textured ResourceMaterial -> original basematerial (for deduplication)
             self.resource_textures = {}  # ID -> ResourceTexture
             self.resource_texture_groups = {}  # ID -> ResourceTextureGroup
             self.resource_composites = {}  # ID -> ResourceComposite (round-trip)
@@ -617,6 +621,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             self.resource_pbr_texture_displays = {}  # ID -> ResourcePBRTextureDisplay (round-trip)
             self.resource_colorgroups = {}  # ID -> ResourceColorgroup (round-trip)
             self.resource_pbr_display_props = {}  # ID -> ResourcePBRDisplayProps (round-trip)
+            self.object_passthrough_pids = {}  # objectid -> pid for objects whose pid references multiproperties
             self.component_instance_cache = {}  # Track component instances: objectid -> (mesh_data, instances_count)
             self.num_loaded = 0
             self.imported_objects = []  # Track all imported objects for grid layout
@@ -777,26 +782,27 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 self._apply_grid_layout()
 
             # Zoom the camera to view the imported objects.
-            for area in bpy.context.screen.areas:
-                if area.type == "VIEW_3D":
-                    for region in area.regions:
-                        if region.type == "WINDOW":
-                            try:
-                                # Since Blender 3.2:
-                                context = bpy.context.copy()
-                                context["area"] = area
-                                context["region"] = region
-                                context["edit_object"] = bpy.context.edit_object
-                                with bpy.context.temp_override(**context):
-                                    bpy.ops.view3d.view_selected()
-                            except AttributeError:  # temp_override doesn't exist before Blender 3.2.
-                                # Before Blender 3.2:
-                                override = {
-                                    "area": area,
-                                    "region": region,
-                                    "edit_object": bpy.context.edit_object,
-                                }
-                                bpy.ops.view3d.view_selected(override)
+            if not bpy.app.background and bpy.context.screen:
+                for area in bpy.context.screen.areas:
+                    if area.type == "VIEW_3D":
+                        for region in area.regions:
+                            if region.type == "WINDOW":
+                                try:
+                                    # Since Blender 3.2:
+                                    context = bpy.context.copy()
+                                    context["area"] = area
+                                    context["region"] = region
+                                    context["edit_object"] = bpy.context.edit_object
+                                    with bpy.context.temp_override(**context):
+                                        bpy.ops.view3d.view_selected()
+                                except AttributeError:  # temp_override doesn't exist before Blender 3.2.
+                                    # Before Blender 3.2:
+                                    override = {
+                                        "area": area,
+                                        "region": region,
+                                        "edit_object": bpy.context.edit_object,
+                                    }
+                                    bpy.ops.view3d.view_selected(override)
 
             self._progress_update(100, "Finalizing import...")
             debug(f"Imported {self.num_loaded} objects from 3MF files.")
@@ -1329,32 +1335,39 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             pindex = object_node.attrib.get("pindex")  # Index within a collection of materials.
             material = None
             if pid is not None and pindex is not None:
-                try:
-                    index = int(pindex)
-                    material = self.resource_materials[pid][index]
-                except KeyError:
-                    # Only warn if materials were supposed to be imported
-                    if self.import_materials != "NONE":
-                        warn(
-                            f"Object with ID {objectid} refers to material collection {pid} with index {pindex}"
-                            f" which doesn't exist."
-                        )
+                # Check if pid references multiproperties (passthrough for round-trip export)
+                if pid in self.resource_multiproperties:
+                    self.object_passthrough_pids[objectid] = pid
+                    debug(f"Object {objectid} references multiproperties pid={pid}")
+                    # Don't try to resolve as basematerial — multiproperties are
+                    # resolved per-triangle in read_triangles via _resolve_multiproperties_material
+                else:
+                    try:
+                        index = int(pindex)
+                        material = self.resource_materials[pid][index]
+                    except KeyError:
+                        # Only warn if materials were supposed to be imported
+                        if self.import_materials != "NONE":
+                            warn(
+                                f"Object with ID {objectid} refers to material collection {pid} with index {pindex}"
+                                f" which doesn't exist."
+                            )
+                            self.safe_report(
+                                {"WARNING"},
+                                f"Object with ID {objectid} refers to material collection {pid} "
+                                f"with index {pindex} which doesn't exist",
+                            )
+                        else:
+                            debug(
+                                f"Object with ID {objectid} refers to material {pid}:{pindex} "
+                                f"(skipped due to import_materials=False)"
+                            )
+                    except ValueError:
+                        warn(f"Object with ID {objectid} specifies material index {pindex}, which is not integer.")
                         self.safe_report(
                             {"WARNING"},
-                            f"Object with ID {objectid} refers to material collection {pid} "
-                            f"with index {pindex} which doesn't exist",
+                            f"Object with ID {objectid} specifies material index {pindex}, which is not integer",
                         )
-                    else:
-                        debug(
-                            f"Object with ID {objectid} refers to material {pid}:{pindex} "
-                            f"(skipped due to import_materials=False)"
-                        )
-                except ValueError:
-                    warn(f"Object with ID {objectid} specifies material index {pindex}, which is not integer.")
-                    self.safe_report(
-                        {"WARNING"},
-                        f"Object with ID {objectid} specifies material index {pindex}, which is not integer",
-                    )
 
             vertices = self.read_vertices(object_node)
             # Pass vertex coordinates to allow PrusaSlicer segmentation subdivision
@@ -1367,6 +1380,20 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 segmentation_strings,
                 default_extruder,
             ) = self.read_triangles(object_node, material, pid, vertices, objectid)
+
+            # Also detect multiproperties references at the TRIANGLE level
+            # (not just object level) for round-trip passthrough export.
+            # The consortium test files reference multiproperties per-triangle, not per-object.
+            if objectid not in self.object_passthrough_pids:
+                for tri_node in object_node.iterfind(
+                    "./3mf:mesh/3mf:triangles/3mf:triangle", MODEL_NAMESPACES
+                ):
+                    tri_pid = tri_node.attrib.get("pid")
+                    if tri_pid and tri_pid in self.resource_multiproperties:
+                        self.object_passthrough_pids[objectid] = tri_pid
+                        debug(f"Object {objectid} has triangle-level multiproperties pid={tri_pid}")
+                        break
+
             components = self.read_components(object_node)
 
             # Check if components have p:path references (Production Extension)
@@ -1729,13 +1756,15 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         pindices_str = multi.get("pindices", "")
         pindices = pindices_str.split() if pindices_str else []
 
-        # pids is the list of property group IDs
-        pids = multiprop.pids if multiprop.pids else []
+        # pids is the list of property group IDs (space-separated string)
+        pids_str = multiprop.pids if multiprop.pids else ""
+        pids = pids_str.split() if pids_str else []
 
         # Find the first basematerial reference (for the material)
-        # and any texture group reference (for UVs)
+        # and any texture group references (for UVs and visual representation)
         material = None
         uvs = None
+        texture_group_ids = []  # Collect all texture group IDs
 
         for i, pid in enumerate(pids):
             if i >= len(pindices):
@@ -1758,6 +1787,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             elif pid in self.resource_texture_groups:
                 texture_group = self.resource_texture_groups[pid]
                 tex2coords = texture_group.tex2coords
+                texture_group_ids.append(pid)  # Store texture group ID
 
                 # For texture groups in multiproperties, p1/p2/p3 map to UV indices
                 # The pindex from pindices is the base, but actual UV varies per vertex
@@ -1776,6 +1806,31 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         if material is None:
             debug(f"Multiproperties {multiprop_id}: no basematerial found, using default")
             material = default_material
+        elif texture_group_ids:
+            # If we have both a basematerial and texture groups, create a new ResourceMaterial
+            # that includes the texture information so the shader can be set up properly
+            debug(f"Multiproperties {multiprop_id}: found {len(texture_group_ids)} texture groups")
+            original_basematerial = material  # Keep reference for deduplication
+            material = ResourceMaterial(
+                name=original_basematerial.name,
+                color=original_basematerial.color,
+                metallic=original_basematerial.metallic,
+                roughness=original_basematerial.roughness,
+                specular_color=original_basematerial.specular_color,
+                glossiness=original_basematerial.glossiness,
+                ior=original_basematerial.ior,
+                attenuation=original_basematerial.attenuation,
+                transmission=original_basematerial.transmission,
+                texture_id=texture_group_ids[0],
+                metallic_texid=None,
+                roughness_texid=None,
+                specular_texid=None,
+                glossiness_texid=None,
+                basecolor_texid=None,
+                extra_texture_ids=tuple(texture_group_ids[1:]) if len(texture_group_ids) > 1 else None,
+            )
+            # Store the mapping between textured and non-textured versions for deduplication
+            self.textured_to_basematerial_map[material] = original_basematerial
 
         return material, uvs
 
@@ -2694,6 +2749,12 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                 mesh.update()
                 resource_object.metadata.store(mesh)
 
+                # Store passthrough multiproperties pid for round-trip export
+                current_objectid = objectid_stack_trace[0] if objectid_stack_trace else None
+                if current_objectid and current_objectid in self.object_passthrough_pids:
+                    mesh["3mf_passthrough_pid"] = self.object_passthrough_pids[current_objectid]
+                    debug(f"Stored passthrough pid={self.object_passthrough_pids[current_objectid]} on mesh")
+
                 # Track if we rendered paint texture (to skip standard material assignment)
                 paint_texture_rendered = False
 
@@ -2822,58 +2883,99 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                         # Add the material to Blender if it doesn't exist yet.
                         # Otherwise create a new material in Blender.
                         if triangle_material not in self.resource_to_material:
-                            # Cache material name to protect Unicode characters from garbage collection
-                            material_name = str(triangle_material.name)
+                            # Check if a textured version of this basematerial was already created
+                            # from multiproperties - if so, reuse it to prevent duplicates
+                            found_textured_version = False
+                            if triangle_material.texture_id is None:  # This is a plain basematerial
+                                # Search for a textured version in the cache
+                                for textured_mat, original_mat in self.textured_to_basematerial_map.items():
+                                    if original_mat == triangle_material and textured_mat in self.resource_to_material:
+                                        # Found the textured version
+                                        self.resource_to_material[triangle_material] = self.resource_to_material[textured_mat]
+                                        found_textured_version = True
+                                        debug(f"Reusing textured material for basematerial '{triangle_material.name}'")
+                                        break
+                            
+                            if not found_textured_version:
+                                # Cache material name to protect Unicode characters from garbage collection
+                                material_name = str(triangle_material.name)
 
-                            # Try to reuse existing material if enabled
-                            # (not for textured materials or PBR textured materials)
-                            material = None
-                            has_pbr_textures = (
-                                triangle_material.basecolor_texid is not None
-                                or triangle_material.metallic_texid is not None
-                                or triangle_material.roughness_texid is not None
-                                or triangle_material.specular_texid is not None
-                                or triangle_material.glossiness_texid is not None
-                            )
+                                # Try to reuse existing material if enabled
+                                # (not for textured materials or PBR textured materials)
+                                material = None
+                                has_pbr_textures = (
+                                    triangle_material.basecolor_texid is not None
+                                    or triangle_material.metallic_texid is not None
+                                    or triangle_material.roughness_texid is not None
+                                    or triangle_material.specular_texid is not None
+                                    or triangle_material.glossiness_texid is not None
+                                )
 
-                            if self.reuse_materials and triangle_material.texture_id is None and not has_pbr_textures:
-                                material = self.find_existing_material(material_name, triangle_material.color)
+                                if self.reuse_materials and triangle_material.texture_id is None and not has_pbr_textures:
+                                    material = self.find_existing_material(material_name, triangle_material.color)
 
-                            # Create new material if not found or reuse disabled
-                            if material is None:
-                                material = bpy.data.materials.new(material_name)
-                                material.use_nodes = True
+                                # Create new material if not found or reuse disabled
+                                if material is None:
+                                    material = bpy.data.materials.new(material_name)
+                                    material.use_nodes = True
 
-                                # Check if this is a textured material
-                                if triangle_material.texture_id is not None:
-                                    # Get texture group and texture
-                                    texture_group = self.resource_texture_groups.get(triangle_material.texture_id)
-                                    if texture_group:
-                                        texture = self.resource_textures.get(texture_group.texid)
-                                        if texture and texture.blender_image:
-                                            # Create material with Image Texture node
-                                            self._setup_textured_material(material, texture)
-                                            # Also apply PBR textures (roughness, metallic, etc.)
-                                            self._apply_pbr_textures_to_material(material, triangle_material)
+                                    if triangle_material.texture_id is not None:
+                                        # Collect all textures (primary + extra from multiproperties)
+                                        all_textures = []
+                                        all_tex_group_ids = [triangle_material.texture_id]
+                                        extra_ids = getattr(triangle_material, 'extra_texture_ids', None)
+                                        if extra_ids:
+                                            all_tex_group_ids.extend(extra_ids)
+
+                                        for tg_id in all_tex_group_ids:
+                                            tg = self.resource_texture_groups.get(tg_id)
+                                            if tg:
+                                                tex = self.resource_textures.get(tg.texid)
+                                                if tex and tex.blender_image:
+                                                    all_textures.append(tex)
+
+                                        if len(all_textures) > 1:
+                                            # Multi-texture setup (multiproperties with multiple texture groups)
+                                            _setup_multi_textured_material_impl(
+                                                self, material, all_textures
+                                            )
+                                        elif len(all_textures) == 1:
+                                            # Single texture
+                                            self._setup_textured_material(material, all_textures[0])
                                         else:
-                                            warn(f"Texture not found for texture group {triangle_material.texture_id}")
+                                            warn(f"No valid textures found for texture groups {all_tex_group_ids}")
+
+                                        # Apply scalar PBR properties (metallic, roughness, etc.)
+                                        principled = bpy_extras.node_shader_utils.PrincipledBSDFWrapper(
+                                            material, is_readonly=False
+                                        )
+                                        self._apply_pbr_to_principled(principled, material, triangle_material)
+
+                                        # Also apply PBR textures (roughness, metallic, etc.)
+                                        self._apply_pbr_textures_to_material(material, triangle_material)
                                     else:
-                                        warn(f"Texture group not found: {triangle_material.texture_id}")
-                                else:
-                                    # Standard color-based material
-                                    principled = bpy_extras.node_shader_utils.PrincipledBSDFWrapper(
-                                        material, is_readonly=False
-                                    )
-                                    principled.base_color = triangle_material.color[:3]
-                                    principled.alpha = triangle_material.color[3]
+                                        # Standard color-based material
+                                        principled = bpy_extras.node_shader_utils.PrincipledBSDFWrapper(
+                                            material, is_readonly=False
+                                        )
+                                        principled.base_color = triangle_material.color[:3]
+                                        principled.alpha = triangle_material.color[3]
 
-                                    # Apply scalar PBR properties from 3MF Materials Extension
-                                    self._apply_pbr_to_principled(principled, material, triangle_material)
+                                        # Apply scalar PBR properties from 3MF Materials Extension
+                                        self._apply_pbr_to_principled(principled, material, triangle_material)
 
-                                    # Apply textured PBR properties (metallic/roughness/specular texture maps)
-                                    self._apply_pbr_textures_to_material(material, triangle_material)
+                                        # Apply textured PBR properties (metallic/roughness/specular texture maps)
+                                        self._apply_pbr_textures_to_material(material, triangle_material)
 
-                            self.resource_to_material[triangle_material] = material
+                                self.resource_to_material[triangle_material] = material
+                                
+                                # If this material was created from multiproperties with textures,
+                                # also cache it under the original basematerial key to prevent duplicates
+                                if triangle_material in self.textured_to_basematerial_map:
+                                    original = self.textured_to_basematerial_map[triangle_material]
+                                    if original not in self.resource_to_material:
+                                        self.resource_to_material[original] = material
+                                        debug("Cached textured material under original basematerial key")
                         else:
                             material = self.resource_to_material[triangle_material]
 
@@ -2929,7 +3031,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             # Apply UV coordinates from texture mapping (3MF Materials Extension)
             if resource_object.triangle_uvs:
                 # Create UV layer for texture coordinates
-                uv_layer = mesh.uv_layers.new(name="3MF_UVMap")
+                uv_layer = mesh.uv_layers.new(name="UVMap")
                 if uv_layer:
                     # Prepare UV data for bulk assignment
                     # Each triangle has 3 loops, each loop needs UV coordinates

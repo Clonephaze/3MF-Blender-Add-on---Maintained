@@ -33,6 +33,7 @@ from .textures import (
     extract_textures_from_archive,
     get_or_create_textured_material,
     setup_textured_material,
+    setup_multi_textured_material,
 )
 from .pbr import (
     read_pbr_metallic_properties,
@@ -60,6 +61,7 @@ __all__ = [
     "extract_textures_from_archive",
     "get_or_create_textured_material",
     "setup_textured_material",
+    "setup_multi_textured_material",
     # pbr
     "read_pbr_metallic_properties",
     "read_pbr_specular_properties",

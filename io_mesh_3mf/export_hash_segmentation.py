@@ -30,8 +30,8 @@ from typing import Tuple, List, Dict
 from .hash_segmentation import SegmentationNode, SegmentationEncoder
 from .utilities import debug
 
-# Maximum subdivision depth (6 gives 4^6 = 4096 potential leaf nodes per triangle)
-MAX_SUBDIVISION_DEPTH = 6
+# Maximum subdivision depth (7 gives 4^7 = 16384 potential leaf nodes per triangle)
+MAX_SUBDIVISION_DEPTH = 7
 
 
 def _build_state_map(
@@ -242,7 +242,8 @@ def _analyze_recursive(
 
 
 def texture_to_segmentation(
-    obj, image, extruder_colors: Dict[int, List[float]], default_extruder: int = 1
+    obj, image, extruder_colors: Dict[int, List[float]], default_extruder: int = 1,
+    progress_callback=None
 ) -> Dict[int, str]:
     """
     Convert object's UV texture to PrusaSlicer segmentation strings.
@@ -251,6 +252,7 @@ def texture_to_segmentation(
     :param image: Painted texture image
     :param extruder_colors: Mapping from extruder index to RGBA color
     :param default_extruder: Default extruder index
+    :param progress_callback: Optional callback(current, total, message) for progress updates
     :return: Dict mapping face_index -> segmentation_hex_string
     """
     import time
@@ -306,6 +308,9 @@ def texture_to_segmentation(
             continue
 
         processed += 1
+        # Progress callback every 500 triangles (more frequent for UI responsiveness)
+        if progress_callback and processed % 500 == 0:
+            progress_callback(processed, total_faces, f"Segmentation: {processed}/{total_faces}")
         if processed % 2000 == 0:
             elapsed = time.perf_counter() - t_state
             rate = processed / elapsed if elapsed > 0 else 0

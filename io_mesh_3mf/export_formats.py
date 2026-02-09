@@ -65,10 +65,173 @@ from .export_utils import (
     write_texture_relationships,
     write_texture_resources,
     write_passthrough_materials,
+    write_passthrough_textures_to_archive,
     detect_pbr_textured_materials,
     write_pbr_textures_to_archive,
     write_pbr_texture_display_properties,
 )
+
+
+def _write_passthrough_triangles(
+    mesh_element: xml.etree.ElementTree.Element,
+    mesh: bpy.types.Mesh,
+    original_pid: str,
+    remapped_pid: str,
+    use_orca_format: str,
+    coordinate_precision: int,
+) -> None:
+    """
+    Write triangles with per-vertex multiproperties indices from the UV map.
+
+    For round-trip export of multiproperties, maps each triangle vertex's UV
+    coordinates back to tex2coord indices in the stored texture2dgroup, then
+    finds the matching multi entry index.
+
+    :param mesh_element: The <mesh> XML element.
+    :param mesh: The Blender mesh with UV data.
+    :param original_pid: The ORIGINAL multiproperties ID (for scene data lookup).
+    :param remapped_pid: The REMAPPED multiproperties ID (for XML output).
+    :param use_orca_format: Material export mode string.
+    :param coordinate_precision: Decimal precision for coordinates.
+    """
+    scene = bpy.context.scene
+
+    # Load multiproperties data to get the multi entries
+    mp_data_str = scene.get("3mf_multiproperties", "{}")
+    try:
+        mp_data = json.loads(mp_data_str)
+    except json.JSONDecodeError:
+        warn("Failed to parse multiproperties for passthrough triangle export")
+        return
+
+    multiprop = mp_data.get(original_pid)
+    if not multiprop:
+        warn(f"Multiproperties {original_pid} not found in passthrough data")
+        return
+
+    # Get the first texture2dgroup pid to use for UV → index mapping
+    pids = multiprop.get("pids", "").split()
+    if not pids:
+        warn("Multiproperties has no pids")
+        return
+
+    # Load texture group data to get tex2coords
+    tg_data_str = scene.get("3mf_texture_groups", "{}")
+    try:
+        tg_data = json.loads(tg_data_str)
+    except json.JSONDecodeError:
+        warn("Failed to parse texture groups for passthrough triangle export")
+        return
+
+    # Find the first texture group pid (skip basematerials pid)
+    tex2coords = None
+    for pid in pids:
+        if pid in tg_data:
+            tex2coords = tg_data[pid].get("tex2coords", [])
+            break
+
+    if not tex2coords:
+        warn("No tex2coords found for passthrough triangle UV mapping")
+        return
+
+    # Build the multi lookup: for each multi entry, store its pindices
+    multis = multiprop.get("multis", [])
+
+    # Build reverse lookup: tex2coord index → multi entry index
+    # In the common case (constant basematerial, shared UV across groups),
+    # multi entry index == tex2coord index for the first texture group
+    # For the general case, build a lookup from first-texture-group-index to multi index
+    tex_idx_to_multi = {}
+    tex_group_position = None  # Which position in pids is the first texture group
+    for i, pid in enumerate(pids):
+        if pid in tg_data:
+            tex_group_position = i
+            break
+
+    if tex_group_position is not None:
+        for multi_idx, m in enumerate(multis):
+            pindices_str = m.get("pindices", "")
+            pindices = pindices_str.split()
+            if tex_group_position < len(pindices):
+                tex_idx = pindices[tex_group_position]
+                # Only store first occurrence (in case of duplicates)
+                if tex_idx not in tex_idx_to_multi:
+                    tex_idx_to_multi[tex_idx] = multi_idx
+
+    # Build UV → tex2coord index lookup with tolerance
+    def find_tex2coord_index(u: float, v: float) -> int:
+        """Find the closest tex2coord index for a UV pair."""
+        best_idx = 0
+        best_dist = float("inf")
+        for idx, coord in enumerate(tex2coords):
+            if isinstance(coord, (list, tuple)) and len(coord) >= 2:
+                du = u - coord[0]
+                dv = v - coord[1]
+                dist = du * du + dv * dv
+                if dist < best_dist:
+                    best_dist = dist
+                    best_idx = idx
+        return best_idx
+
+    # Write triangles
+    triangles_element = xml.etree.ElementTree.SubElement(
+        mesh_element, f"{{{MODEL_NAMESPACE}}}triangles"
+    )
+
+    # Use short attribute names for BASEMATERIAL/PAINT modes
+    if use_orca_format in ("PAINT", "BASEMATERIAL"):
+        v1_name, v2_name, v3_name = "v1", "v2", "v3"
+        p1_name, p2_name, p3_name = "p1", "p2", "p3"
+    else:
+        ns = MODEL_NAMESPACE
+        v1_name = f"{{{ns}}}v1"
+        v2_name = f"{{{ns}}}v2"
+        v3_name = f"{{{ns}}}v3"
+        p1_name = f"{{{ns}}}p1"
+        p2_name = f"{{{ns}}}p2"
+        p3_name = f"{{{ns}}}p3"
+
+    triangle_name = f"{{{MODEL_NAMESPACE}}}triangle"
+    uv_layer = mesh.uv_layers.active
+
+    for triangle in mesh.loop_triangles:
+        tri_elem = xml.etree.ElementTree.SubElement(triangles_element, triangle_name)
+        tri_elem.attrib[v1_name] = str(triangle.vertices[0])
+        tri_elem.attrib[v2_name] = str(triangle.vertices[1])
+        tri_elem.attrib[v3_name] = str(triangle.vertices[2])
+
+        # Set pid to multiproperties ID on each triangle so reimport
+        # correctly enters the multiproperties resolution path
+        if use_orca_format in ("PAINT", "BASEMATERIAL"):
+            tri_elem.attrib["pid"] = str(remapped_pid)
+        else:
+            tri_elem.attrib[f"{{{MODEL_NAMESPACE}}}pid"] = str(remapped_pid)
+
+        # Map UV coordinates to multi entry indices
+        loop_indices = triangle.loops
+        uv_data = uv_layer.data
+
+        uv1 = uv_data[loop_indices[0]].uv
+        uv2 = uv_data[loop_indices[1]].uv
+        uv3 = uv_data[loop_indices[2]].uv
+
+        tex_idx1 = find_tex2coord_index(uv1[0], uv1[1])
+        tex_idx2 = find_tex2coord_index(uv2[0], uv2[1])
+        tex_idx3 = find_tex2coord_index(uv3[0], uv3[1])
+
+        # Map tex2coord index → multi entry index
+        multi_idx1 = tex_idx_to_multi.get(str(tex_idx1), tex_idx1)
+        multi_idx2 = tex_idx_to_multi.get(str(tex_idx2), tex_idx2)
+        multi_idx3 = tex_idx_to_multi.get(str(tex_idx3), tex_idx3)
+
+        tri_elem.attrib[p1_name] = str(multi_idx1)
+        tri_elem.attrib[p2_name] = str(multi_idx2)
+        tri_elem.attrib[p3_name] = str(multi_idx3)
+
+    debug(
+        f"Wrote {len(mesh.loop_triangles)} passthrough triangles "
+        f"with multiproperties UV indices"
+    )
 
 
 class BaseExporter:
@@ -233,11 +396,21 @@ class StandardExporter(BaseExporter):
             )
             debug(f"Created {len(self.op.texture_groups)} texture groups")
 
+        # Write passthrough texture images to the archive BEFORE writing XML references
+        passthrough_image_paths = write_passthrough_textures_to_archive(archive)
+        if passthrough_image_paths:
+            # Write texture relationships for passthrough textures
+            # Convert to {image_name: /archive/path} format for write_texture_relationships
+            passthrough_rel_paths = {
+                path: f"/{path}" for path in passthrough_image_paths
+            }
+            write_texture_relationships(archive, passthrough_rel_paths)
+
         # Write passthrough materials (compositematerials, multiproperties, etc.)
         # These are stored from import for round-trip support
         # IDs are remapped to avoid conflicts with newly created materials
-        self.op.next_resource_id, passthrough_written = write_passthrough_materials(
-            resources_element, self.op.next_resource_id
+        self.op.next_resource_id, passthrough_written, self.op.passthrough_id_remap = (
+            write_passthrough_materials(resources_element, self.op.next_resource_id)
         )
         # Activate Materials Extension if passthrough data was written
         if passthrough_written:
@@ -246,7 +419,10 @@ class StandardExporter(BaseExporter):
             self.op.extension_manager.activate(MATERIALS_EXTENSION.namespace)
 
         self.op._progress_update(15, "Writing objects...")
+        # Set progress range for object writing
+        self.op._progress_range = (15, 95)
         self.write_objects(root, resources_element, blender_objects, global_scale)
+        self.op._progress_range = None
 
         document = xml.etree.ElementTree.ElementTree(root)
         with archive.open(MODEL_LOCATION, "w", force_zip64=True) as f:
@@ -338,7 +514,10 @@ class StandardExporter(BaseExporter):
 
             processed_objects += 1
             if total_objects > 0:
-                progress = min(95, int((processed_objects / total_objects) * 95))
+                # Use progress range if set, otherwise 15-95%
+                progress_range = getattr(self.op, '_progress_range', (15, 95))
+                progress_min, progress_max = progress_range
+                progress = progress_min + int((processed_objects / total_objects) * (progress_max - progress_min))
                 self.op._progress_update(
                     progress, f"Writing {processed_objects}/{total_objects} objects..."
                 )
@@ -501,69 +680,83 @@ class StandardExporter(BaseExporter):
                 f"  mesh has {len(mesh.loop_triangles)} triangles, {len(blender_object.material_slots)} material slots"
             )
 
-            # Check if this object has any textured materials
-            has_textured_material = False
-            if hasattr(self.op, "texture_groups") and self.op.texture_groups:
-                for mat_slot in blender_object.material_slots:
-                    if (
-                        mat_slot.material
-                        and mat_slot.material.name in self.op.texture_groups
-                    ):
-                        has_textured_material = True
-                        break
+            # Check for passthrough multiproperties pid (round-trip export)
+            original_mesh_data = original_object.data
+            passthrough_pid = original_mesh_data.get("3mf_passthrough_pid")
+            use_passthrough = False
 
-            # In BASEMATERIAL mode, use face colors mapped to colorgroup IDs
-            if (
-                self.op.use_orca_format == "BASEMATERIAL"
-                and self.op.vertex_colors
-                and self.op.mmu_slicer_format == "ORCA"
-            ):
-                color_counts = {}
-                for triangle in mesh.loop_triangles:
-                    triangle_color = get_triangle_color(mesh, triangle, blender_object)
-                    debug(
-                        f"  triangle {triangle.index}: material_index={triangle.material_index}, "
-                        f"color={triangle_color}"
-                    )
-                    if triangle_color and triangle_color in self.op.vertex_colors:
-                        color_counts[triangle_color] = (
-                            color_counts.get(triangle_color, 0) + 1
+            if passthrough_pid and hasattr(self.op, "passthrough_id_remap"):
+                id_remap = self.op.passthrough_id_remap
+                remapped_pid = id_remap.get(passthrough_pid, passthrough_pid)
+                object_element.attrib[self.attr("pid")] = str(remapped_pid)
+                object_element.attrib[self.attr("pindex")] = "0"
+                use_passthrough = True
+                debug(f"  Using passthrough multiproperties pid={passthrough_pid} -> {remapped_pid}")
+
+            if not use_passthrough:
+                # Check if this object has any textured materials
+                has_textured_material = False
+                if hasattr(self.op, "texture_groups") and self.op.texture_groups:
+                    for mat_slot in blender_object.material_slots:
+                        if (
+                            mat_slot.material
+                            and mat_slot.material.name in self.op.texture_groups
+                        ):
+                            has_textured_material = True
+                            break
+
+                # In BASEMATERIAL mode, use face colors mapped to colorgroup IDs
+                if (
+                    self.op.use_orca_format == "BASEMATERIAL"
+                    and self.op.vertex_colors
+                    and self.op.mmu_slicer_format == "ORCA"
+                ):
+                    color_counts = {}
+                    for triangle in mesh.loop_triangles:
+                        triangle_color = get_triangle_color(mesh, triangle, blender_object)
+                        debug(
+                            f"  triangle {triangle.index}: material_index={triangle.material_index}, "
+                            f"color={triangle_color}"
                         )
-
-                debug(f"  color_counts: {color_counts}")
-                if color_counts:
-                    most_common_color = max(color_counts, key=color_counts.get)
-                    colorgroup_id = self.op.vertex_colors[most_common_color]
-                    object_element.attrib[self.attr("pid")] = str(colorgroup_id)
-                    object_element.attrib[self.attr("pindex")] = "0"
-                    most_common_material_list_index = colorgroup_id
-            elif not has_textured_material:
-                # Normal material handling - but only if NOT using textured materials
-                # (textured materials use per-triangle pid to reference texture2dgroup)
-                if self.op.material_name_to_index:
-                    material_indices = [
-                        triangle.material_index for triangle in mesh.loop_triangles
-                    ]
-
-                    if material_indices and blender_object.material_slots:
-                        counter = collections.Counter(material_indices)
-                        most_common_material_object_index = counter.most_common(1)[0][0]
-                        most_common_material = blender_object.material_slots[
-                            most_common_material_object_index
-                        ].material
-
-                        if most_common_material is not None:
-                            most_common_material_list_index = (
-                                self.op.material_name_to_index[
-                                    most_common_material.name
-                                ]
+                        if triangle_color and triangle_color in self.op.vertex_colors:
+                            color_counts[triangle_color] = (
+                                color_counts.get(triangle_color, 0) + 1
                             )
-                            object_element.attrib[self.attr("pid")] = str(
-                                self.op.material_resource_id
-                            )
-                            object_element.attrib[self.attr("pindex")] = str(
-                                most_common_material_list_index
-                            )
+
+                    debug(f"  color_counts: {color_counts}")
+                    if color_counts:
+                        most_common_color = max(color_counts, key=color_counts.get)
+                        colorgroup_id = self.op.vertex_colors[most_common_color]
+                        object_element.attrib[self.attr("pid")] = str(colorgroup_id)
+                        object_element.attrib[self.attr("pindex")] = "0"
+                        most_common_material_list_index = colorgroup_id
+                elif not has_textured_material:
+                    # Normal material handling - but only if NOT using textured materials
+                    # (textured materials use per-triangle pid to reference texture2dgroup)
+                    if self.op.material_name_to_index:
+                        material_indices = [
+                            triangle.material_index for triangle in mesh.loop_triangles
+                        ]
+
+                        if material_indices and blender_object.material_slots:
+                            counter = collections.Counter(material_indices)
+                            most_common_material_object_index = counter.most_common(1)[0][0]
+                            most_common_material = blender_object.material_slots[
+                                most_common_material_object_index
+                            ].material
+
+                            if most_common_material is not None:
+                                most_common_material_list_index = (
+                                    self.op.material_name_to_index[
+                                        most_common_material.name
+                                    ]
+                                )
+                                object_element.attrib[self.attr("pid")] = str(
+                                    self.op.material_resource_id
+                                )
+                                object_element.attrib[self.attr("pindex")] = str(
+                                    most_common_material_list_index
+                                )
 
             write_vertices(
                 mesh_element,
@@ -629,6 +822,13 @@ class StandardExporter(BaseExporter):
                         # Import here to avoid circular dependency
                         from .export_hash_segmentation import texture_to_segmentation
 
+                        # Create progress callback for Standard PAINT mode
+                        def std_seg_progress(current, total, message):
+                            if total > 0:
+                                seg_pct = current / total
+                                overall = int(15 + (seg_pct * 80))  # 15-95% range
+                                self.op._progress_update(overall, message)
+
                         try:
                             # Use evaluated object for mesh/UV data access (has calc_loop_triangles called)
                             # Original object's mesh may have empty UV layer data after addon reload
@@ -637,6 +837,7 @@ class StandardExporter(BaseExporter):
                                 paint_texture,
                                 extruder_colors,
                                 default_extruder,
+                                progress_callback=std_seg_progress,
                             )
                             debug(
                                 f"  Generated {len(segmentation_strings)} segmentation strings from texture"
@@ -657,23 +858,31 @@ class StandardExporter(BaseExporter):
             debug(
                 f"[export_formats] Calling write_triangles with {len(segmentation_strings)} segmentation strings"
             )
-            write_triangles(
-                mesh_element,
-                mesh.loop_triangles,
-                most_common_material_list_index,
-                blender_object.material_slots,
-                self.op.material_name_to_index,
-                self.op.use_orca_format,
-                self.op.mmu_slicer_format,
-                self.op.vertex_colors,
-                mesh,
-                blender_object,
-                getattr(self.op, "texture_groups", None),
-                str(self.op.material_resource_id)
-                if self.op.material_resource_id
-                else None,
-                segmentation_strings,  # Pass the generated segmentation strings
-            )
+
+            if use_passthrough and mesh.uv_layers.active:
+                # Write triangles with passthrough multiproperties indices from UV map
+                _write_passthrough_triangles(
+                    mesh_element, mesh, passthrough_pid, remapped_pid,
+                    self.op.use_orca_format, self.op.coordinate_precision,
+                )
+            else:
+                write_triangles(
+                    mesh_element,
+                    mesh.loop_triangles,
+                    most_common_material_list_index,
+                    blender_object.material_slots,
+                    self.op.material_name_to_index,
+                    self.op.use_orca_format,
+                    self.op.mmu_slicer_format,
+                    self.op.vertex_colors,
+                    mesh,
+                    blender_object,
+                    getattr(self.op, "texture_groups", None),
+                    str(self.op.material_resource_id)
+                    if self.op.material_resource_id
+                    else None,
+                    segmentation_strings,  # Pass the generated segmentation strings
+                )
 
             # Write triangle sets if enabled
             if self.op.export_triangle_sets and "3mf_triangle_set" in mesh.attributes:
@@ -903,9 +1112,43 @@ class OrcaExporter(BaseExporter):
 
         # Collect face colors for Orca export
         self.op.safe_report({"INFO"}, "Collecting face colors for Orca export...")
-        self.op.vertex_colors = collect_face_colors(
-            blender_objects, self.op.use_mesh_modifiers, self.op.safe_report
-        )
+
+        # For PAINT mode, collect colors from paint texture metadata instead of face materials
+        paint_colors_collected = False
+        if self.op.use_orca_format == "PAINT":
+            for blender_object in blender_objects:
+                original_object = blender_object
+                if hasattr(blender_object, "original"):
+                    original_object = blender_object.original
+
+                original_mesh_data = original_object.data
+                if (
+                    "3mf_is_paint_texture" in original_mesh_data
+                    and original_mesh_data["3mf_is_paint_texture"]
+                ):
+                    if "3mf_paint_extruder_colors" in original_mesh_data:
+                        import ast
+
+                        try:
+                            extruder_colors_hex = ast.literal_eval(
+                                original_mesh_data["3mf_paint_extruder_colors"]
+                            )
+                            for idx, hex_color in extruder_colors_hex.items():
+                                if hex_color not in self.op.vertex_colors:
+                                    self.op.vertex_colors[hex_color] = idx
+                            paint_colors_collected = True
+                            debug(
+                                f"Collected {len(extruder_colors_hex)} colors from paint texture metadata"
+                            )
+                        except Exception as e:
+                            warn(f"Failed to parse extruder colors from metadata: {e}")
+
+        # If no paint colors found, fall back to face material colors
+        if not paint_colors_collected:
+            self.op.vertex_colors = collect_face_colors(
+                blender_objects, self.op.use_mesh_modifiers, self.op.safe_report
+            )
+
         debug(f"Orca mode enabled with {len(self.op.vertex_colors)} color zones")
 
         if len(self.op.vertex_colors) == 0:
@@ -942,12 +1185,15 @@ class OrcaExporter(BaseExporter):
         # Write individual object model files
         object_data = []
 
+        total_mesh_objects = len(mesh_objects)
         for idx, blender_object in enumerate(mesh_objects):
-            progress = int(((idx + 1) / max(len(mesh_objects), 1)) * 95)
-            self.op._progress_update(
-                progress,
-                f"Exporting {idx + 1}/{len(mesh_objects)}: {blender_object.name}",
-            )
+            # Don't update progress here in PAINT mode - let segmentation callback handle it
+            if self.op.use_orca_format != "PAINT":
+                progress = int(((idx + 1) / total_mesh_objects) * 95)
+                self.op._progress_update(
+                    progress,
+                    f"Exporting {idx + 1}/{total_mesh_objects}: {blender_object.name}",
+                )
             object_counter = idx + 1
             wrapper_id = object_counter * 2
             mesh_id = object_counter * 2 - 1
@@ -967,7 +1213,7 @@ class OrcaExporter(BaseExporter):
 
             # Write the individual object model file
             self.write_object_model(
-                archive, blender_object, object_path, mesh_id, mesh_uuid
+                archive, blender_object, object_path, mesh_id, mesh_uuid, idx, total_mesh_objects
             )
 
             object_data.append(
@@ -986,15 +1232,19 @@ class OrcaExporter(BaseExporter):
             self.op.num_written += 1
 
         # Write main 3dmodel.model with wrapper objects and build items
+        self.op._progress_update(90, "Writing main model...")
         self.write_main_model(archive, object_data, build_uuid)
 
         # Write 3D/_rels/3dmodel.model.rels
+        self.op._progress_update(93, "Writing relationships...")
         self.write_model_relationships(archive, object_data)
 
         # Write Orca metadata files
+        self.op._progress_update(96, "Writing configuration...")
         self.write_orca_metadata(archive, mesh_objects)
 
         # Write thumbnail if available from .blend file
+        self.op._progress_update(99, "Writing thumbnail...")
         write_thumbnail(archive)
 
         self.op._progress_update(100, "Finalizing export...")
@@ -1007,6 +1257,8 @@ class OrcaExporter(BaseExporter):
         object_path: str,
         mesh_id: int,
         mesh_uuid: str,
+        obj_index: int = 0,
+        total_objects: int = 1,
     ) -> None:
         """Write an individual object model file for Orca Slicer."""
         root = xml.etree.ElementTree.Element(
@@ -1075,16 +1327,104 @@ class OrcaExporter(BaseExporter):
                 },
             )
 
+        # Generate segmentation strings from UV texture if in PAINT mode
+        segmentation_strings = {}
+        if self.op.use_orca_format == "PAINT" and mesh.uv_layers.active:
+            # Read from original object's data, not the temporary evaluated mesh
+            original_object = blender_object
+            if hasattr(blender_object, "original"):
+                original_object = blender_object.original
+            original_mesh_data = original_object.data
+
+            if (
+                "3mf_is_paint_texture" in original_mesh_data
+                and original_mesh_data["3mf_is_paint_texture"]
+            ):
+                paint_texture = None
+                extruder_colors = {}
+                default_extruder = original_mesh_data.get(
+                    "3mf_paint_default_extruder", 0
+                )
+
+                # Get the stored extruder colors
+                if "3mf_paint_extruder_colors" in original_mesh_data:
+                    import ast
+
+                    try:
+                        extruder_colors_hex = ast.literal_eval(
+                            original_mesh_data["3mf_paint_extruder_colors"]
+                        )
+                        for idx, hex_color in extruder_colors_hex.items():
+                            extruder_colors[idx] = hex_to_rgb(hex_color)
+                    except Exception as e:
+                        debug(f"  WARNING: Failed to parse extruder colors: {e}")
+
+                # Find the MMU paint texture
+                for mat_slot in original_object.material_slots:
+                    if mat_slot.material and mat_slot.material.use_nodes:
+                        for node in mat_slot.material.node_tree.nodes:
+                            if node.type == "TEX_IMAGE" and node.image:
+                                paint_texture = node.image
+                                break
+                        if paint_texture:
+                            break
+
+                if paint_texture and extruder_colors:
+                    debug(
+                        f"  Exporting paint texture '{paint_texture.name}' as segmentation"
+                    )
+                    from .export_hash_segmentation import texture_to_segmentation
+
+                    # Create progress callback for Orca segmentation
+                    def orca_seg_progress(current, total_val, message):
+                        if total_val > 0:
+                            seg_pct = current / total_val
+                            # Each object gets its share of the 15-90% range
+                            obj_start = 15 + ((obj_index / total_objects) * 75)
+                            obj_end = 15 + (((obj_index + 1) / total_objects) * 75)
+                            overall = int(obj_start + (seg_pct * (obj_end - obj_start)))
+                            self.op._progress_update(overall, f"{blender_object.name}: {message}")
+
+                    try:
+                        segmentation_strings = texture_to_segmentation(
+                            blender_object,
+                            paint_texture,
+                            extruder_colors,
+                            default_extruder,
+                            progress_callback=orca_seg_progress,
+                        )
+                        debug(
+                            f"  Generated {len(segmentation_strings)} segmentation strings"
+                        )
+                    except Exception as e:
+                        debug(
+                            f"  WARNING: Failed to generate segmentation from texture: {e}"
+                        )
+                        import traceback
+
+                        traceback.print_exc()
+                        segmentation_strings = {}
+
         # Triangles with paint_color
         triangles_elem = xml.etree.ElementTree.SubElement(mesh_elem, "triangles")
-        for triangle in mesh.loop_triangles:
+        for tri_idx, triangle in enumerate(mesh.loop_triangles):
             tri_attribs = {
                 "v1": str(triangle.vertices[0]),
                 "v2": str(triangle.vertices[1]),
                 "v3": str(triangle.vertices[2]),
             }
 
-            # Get paint_color from material
+            # Check for segmentation string first (PAINT mode with UV texture)
+            if segmentation_strings and triangle.polygon_index in segmentation_strings:
+                seg_string = segmentation_strings[triangle.polygon_index]
+                if seg_string:
+                    tri_attribs["paint_color"] = seg_string
+                    xml.etree.ElementTree.SubElement(
+                        triangles_elem, "triangle", attrib=tri_attribs
+                    )
+                    continue
+
+            # Fall back to simple paint_color from face material colors
             triangle_color = get_triangle_color(mesh, triangle, blender_object)
             if triangle_color and triangle_color in self.op.vertex_colors:
                 filament_index = self.op.vertex_colors[triangle_color]

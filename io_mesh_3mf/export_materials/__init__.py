@@ -48,6 +48,7 @@ from .textures import (
 
 from .passthrough import (
     write_passthrough_materials,
+    write_passthrough_textures_to_archive,
 )
 
 __all__ = [
@@ -72,4 +73,5 @@ __all__ = [
     "write_pbr_texture_display_properties",
     # Passthrough
     "write_passthrough_materials",
+    "write_passthrough_textures_to_archive",
 ]

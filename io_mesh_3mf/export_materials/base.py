@@ -212,7 +212,7 @@ def collect_face_colors(
 def write_materials(
     resources_element: xml.etree.ElementTree.Element,
     blender_objects: List[bpy.types.Object],
-    use_orca_format: bool,
+    use_orca_format: str,
     vertex_colors: Dict[str, int],
     next_resource_id: int,
     export_pbr: bool = True,
@@ -227,7 +227,7 @@ def write_materials(
 
     :param resources_element: A <resources> node from a 3MF document.
     :param blender_objects: A list of Blender objects that may have materials.
-    :param use_orca_format: Whether to use Orca Slicer format.
+    :param use_orca_format: Material export mode - 'STANDARD', 'BASEMATERIAL', or 'PAINT'.
     :param vertex_colors: Dictionary of color hex to index for Orca mode.
     :param next_resource_id: Next available resource ID.
     :param export_pbr: Whether to export PBR display properties (default True).

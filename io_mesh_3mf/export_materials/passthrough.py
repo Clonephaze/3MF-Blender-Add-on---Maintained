@@ -26,18 +26,110 @@ IDs are remapped to avoid conflicts with newly created materials.
 """
 
 import json
+import os
+import tempfile
 import xml.etree.ElementTree
+import zipfile
 from typing import Dict, Tuple
 
 import bpy
 
-from ..constants import MATERIAL_NAMESPACE
-from ..utilities import debug, warn
+from ..constants import MATERIAL_NAMESPACE, MODEL_NAMESPACE
+from ..utilities import debug, warn, error
+
+
+def write_passthrough_textures_to_archive(archive: zipfile.ZipFile) -> Dict[str, str]:
+    """
+    Write passthrough texture images from Blender data to the 3MF archive.
+
+    This writes the actual image data for texture2d elements that were imported
+    and stored in the scene's passthrough data. The images are retrieved from
+    bpy.data.images using the stored blender_image name.
+
+    Must be called BEFORE write_passthrough_materials() so that image files
+    exist in the archive before their XML references are written.
+
+    :param archive: The 3MF zip archive to write to.
+    :return: Dict mapping archive path -> content type for relationship writing.
+    """
+    scene = bpy.context.scene
+    stored_data = scene.get("3mf_textures")
+    if not stored_data:
+        return {}
+
+    try:
+        texture_data = json.loads(stored_data)
+    except json.JSONDecodeError:
+        warn("Failed to parse stored textures data for image writing")
+        return {}
+
+    image_paths = {}
+
+    for res_id, tex in texture_data.items():
+        path = tex.get("path", "")
+        blender_image_name = tex.get("blender_image")
+        if not path or not blender_image_name:
+            continue
+
+        # Normalize the archive path (remove leading /)
+        archive_path = path.lstrip("/")
+
+        # Skip if already written (e.g., by the standard texture pipeline)
+        existing_names = {info.filename for info in archive.infolist()}
+        if archive_path in existing_names:
+            debug(f"Passthrough texture '{archive_path}' already in archive, skipping")
+            continue
+
+        # Find the Blender image
+        image = bpy.data.images.get(blender_image_name)
+        if image is None:
+            warn(f"Passthrough texture image '{blender_image_name}' not found in bpy.data.images")
+            continue
+
+        # Determine format from path
+        ext = os.path.splitext(archive_path)[1].lower()
+        if ext in (".jpg", ".jpeg"):
+            file_format = "JPEG"
+        else:
+            file_format = "PNG"
+
+        try:
+            # Try saving via Blender's image save API
+            with tempfile.NamedTemporaryFile(suffix=ext or ".png", delete=False) as tmp:
+                tmp_path = tmp.name
+
+            original_filepath = image.filepath_raw
+            image.filepath_raw = tmp_path
+            image.file_format = file_format
+            image.save()
+            image.filepath_raw = original_filepath
+
+            archive.write(tmp_path, archive_path)
+            os.unlink(tmp_path)
+
+            image_paths[archive_path] = tex.get("contenttype", "image/png")
+            debug(f"Wrote passthrough texture image '{blender_image_name}' to {archive_path}")
+
+        except Exception as e:
+            warn(f"Failed to write passthrough texture '{blender_image_name}': {e}")
+            # Fallback: try packed file data
+            if image.packed_file:
+                try:
+                    archive.writestr(archive_path, image.packed_file.data)
+                    image_paths[archive_path] = tex.get("contenttype", "image/png")
+                    debug(f"Wrote packed passthrough texture '{blender_image_name}' to {archive_path}")
+                except Exception as e2:
+                    error(f"Failed to write packed passthrough texture '{blender_image_name}': {e2}")
+
+    if image_paths:
+        debug(f"Wrote {len(image_paths)} passthrough texture images to archive")
+
+    return image_paths
 
 
 def write_passthrough_materials(
     resources_element: xml.etree.ElementTree.Element, next_resource_id: int
-) -> Tuple[int, bool]:
+) -> Tuple[int, bool, Dict[str, str]]:
     """
     Write stored passthrough material data from scene custom properties.
 
@@ -49,7 +141,8 @@ def write_passthrough_materials(
 
     :param resources_element: The <resources> element
     :param next_resource_id: Next available resource ID
-    :return: Tuple of (updated next_resource_id, whether any passthrough data was written)
+    :return: Tuple of (updated next_resource_id, whether any passthrough data was written,
+             id_remap dict mapping original IDs to new IDs)
     """
     scene = bpy.context.scene
     any_written = False
@@ -74,7 +167,7 @@ def write_passthrough_materials(
     ):
         any_written = True
     else:
-        return next_resource_id, False
+        return next_resource_id, False, {}
 
     # Build ID remap table: original_id -> new_id
     # This prevents conflicts with newly created materials
@@ -135,17 +228,23 @@ def write_passthrough_materials(
 
     # Find IDs that would conflict with newly created materials (IDs 1 to next_resource_id-1)
     conflicting_ids = set()
+    non_conflicting_int_ids = set()
     for orig_id in original_ids:
         try:
             id_int = int(orig_id)
             if id_int < next_resource_id:
                 conflicting_ids.add(orig_id)
+            else:
+                non_conflicting_int_ids.add(id_int)
         except ValueError:
             pass
 
     # Only remap conflicting IDs, assign them new unique IDs starting from next_resource_id
+    # Skip over IDs that are already used by non-conflicting original IDs
     if conflicting_ids:
         for orig_id in sorted(conflicting_ids, key=lambda x: int(x) if x.isdigit() else 0):
+            while next_resource_id in non_conflicting_int_ids:
+                next_resource_id += 1
             id_remap[orig_id] = str(next_resource_id)
             next_resource_id += 1
         debug(f"Remapped {len(conflicting_ids)} conflicting passthrough IDs: {id_remap}")
@@ -177,7 +276,7 @@ def write_passthrough_materials(
     # Write textured PBR display properties
     _write_passthrough_pbr_textures(resources_element, scene, id_remap)
 
-    return next_resource_id, any_written
+    return next_resource_id, any_written, id_remap
 
 
 def _write_passthrough_composites(
@@ -481,10 +580,11 @@ def _write_passthrough_multiproperties(
         )
 
         # Write multi children
+        # Note: <multi> elements are in the core namespace, not materials namespace
         for m in multi.get("multis", []):
             xml.etree.ElementTree.SubElement(
                 multi_element,
-                f"{{{MATERIAL_NAMESPACE}}}multi",
+                f"{{{MODEL_NAMESPACE}}}multi",
                 attrib={"pindices": m.get("pindices", "")},
             )
 

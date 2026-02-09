@@ -114,7 +114,8 @@ def read_multiproperties(op: "Import3MF", root, material_ns: Dict[str, str]) -> 
         blendmethods = multi_item.attrib.get("blendmethods")
 
         multis = []
-        for m_item in multi_item.iterfind("./m:multi", material_ns):
+        # Note: <multi> elements are in the core namespace, not materials namespace
+        for m_item in multi_item.iterfind("./3mf:multi", {**MODEL_NAMESPACES, **material_ns}):
             pindices = m_item.attrib.get("pindices", "")
             multis.append({"pindices": pindices})
 
