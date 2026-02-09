@@ -1,7 +1,10 @@
 # Blender 3MF Format
 
-> **Note**  
+> [!NOTE]  
 > This is an actively maintained fork of the [original Blender 3MF add-on](https://github.com/Ghostkeeper/Blender3mfFormat), updated for modern Blender versions (4.2+) and ongoing development.
+
+> [!IMPORTANT]
+> THE ADD-ON IS CURRENTLY UNDER HEAVY MODIFICATION, IF YOU HAVE OR PLAN ON CREATING SCRIPTS THEY WILL NEED TO BE RE-WRITTEN. THE API WILL BE EXPANDED AND MADE EASIER TO USE. THIS **WILL** BE A MAJOR CHANGE THAT BREAKS ALL BACKWARDS COMPATIBILITY WITH API AND CLI SCRIPTS. 3MF IMPORT/EXPORT WILL OF COURSE STILL WORK WITH OLD FILES
 
 This is an add-on for Blender for importing and exporting **3MF (3D Manufacturing Format)** files.
 
