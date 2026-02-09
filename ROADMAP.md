@@ -115,6 +115,27 @@ Features and improvements organized by priority. Complexity ratings help with pl
 
 ---
 
+## 🏗️ Code Architecture
+
+### Import Refactoring
+> Convert `import_3mf.py` (3055 lines, 56 methods) → `import_3mf/` package
+
+| Status | Feature | Complexity | Description |
+|--------|---------|------------|-------------|
+| 📋 | `import_3mf/` package | 🔴 | Convert monolithic file to package with `__init__.py` re-exports |
+| 📋 | `operator.py` | 🟡 | Operator class, properties, draw/invoke/execute, progress (~450 lines) |
+| 📋 | `archive.py` | 🟢 | ZIP/OPC: read_archive, content_types, must_preserve (~190 lines) |
+| 📋 | `geometry.py` | 🟡 | Mesh parsing: read_objects, vertices, triangles, components (~450 lines) |
+| 📋 | `build.py` | 🔴 | Scene construction: build_items, build_object split into sub-functions (~500 lines) |
+| 📋 | `slicer_colors.py` | 🟡 | Orca/Prusa filament colors, paint codes, segmentation (~525 lines) |
+| 📋 | `xml_utils.py` | 🟢 | parse_transformation, unit_scale, detect_vendor, extensions (~200 lines) |
+| 📋 | Free function API | 🟡 | Core parsing as standalone functions (not operator methods) for CLI/addon use |
+| 📋 | Remove thin wrappers | 🟢 | Drop 16 backward-compat wrapper methods (~195 lines) once tests updated |
+
+**Goal:** Enable `from io_mesh_3mf.import_3mf.archive import read_archive` for other addons and CLI scripts, keep `bpy.ops.import_mesh.threemf()` working unchanged.
+
+---
+
 ## ⚡ Performance
 
 | Status | Feature | Complexity | Description |
@@ -172,4 +193,4 @@ Help wanted:
 
 ---
 
-*Current version: 1.2.5*
+*Current version: 1.4.0*
