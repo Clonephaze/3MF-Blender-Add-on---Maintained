@@ -140,6 +140,18 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         default="ORCA",
     )
 
+    subdivision_depth: bpy.props.IntProperty(
+        name="Subdivision Depth",
+        description=(
+            "Maximum recursive subdivision depth for paint segmentation export. "
+            "Higher values capture finer color boundaries but increase export time. "
+            "Each level quadruples the potential leaf nodes per triangle"
+        ),
+        default=7,
+        min=4,
+        max=10,
+    )
+
     def invoke(self, context, event):
         """Initialize properties from preferences when the export dialog is opened."""
         prefs = context.preferences.addons.get(__package__.rsplit(".", 1)[0])
@@ -150,6 +162,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             self.global_scale = prefs.preferences.default_global_scale
             self.use_orca_format = prefs.preferences.default_multi_material_export
             self.export_triangle_sets = prefs.preferences.default_export_triangle_sets
+            self.subdivision_depth = prefs.preferences.default_subdivision_depth
         self.report({"INFO"}, "Exporting, please wait...")
         return super().invoke(context, event)
 
@@ -170,6 +183,8 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             # Slicer format dropdown — only relevant for MMU paint export
             format_row = orca_box.row()
             format_row.prop(self, "mmu_slicer_format", text="Slicer")
+            depth_row = orca_box.row()
+            depth_row.prop(self, "subdivision_depth")
 
         # Tips for material modes
         if self.use_orca_format in ("BASEMATERIAL", "PAINT"):
@@ -218,6 +233,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             export_triangle_sets=self.export_triangle_sets,
             use_components=self.use_components,
             mmu_slicer_format=self.mmu_slicer_format,
+            subdivision_depth=self.subdivision_depth,
         )
         return ExportContext(
             options=options,

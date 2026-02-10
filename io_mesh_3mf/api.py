@@ -664,6 +664,7 @@ def export_3mf(
     export_triangle_sets: bool = False,
     use_components: bool = True,
     mmu_slicer_format: str = "ORCA",
+    subdivision_depth: int = 7,
     on_progress: Optional[ProgressCallback] = None,
     on_warning: Optional[WarningCallback] = None,
 ) -> ExportResult:
@@ -686,6 +687,8 @@ def export_3mf(
     :param use_components: Use component instances for linked duplicates.
     :param mmu_slicer_format: ``"ORCA"`` | ``"PRUSA"`` (only relevant when
         *use_orca_format* is ``"PAINT"``).
+    :param subdivision_depth: Maximum recursive subdivision depth for paint
+        segmentation (4–10, default 7). Higher = finer detail but slower.
     :param on_progress: Optional ``(percentage: int, message: str)`` callback.
     :param on_warning: Optional ``(message: str)`` callback for warnings.
     :return: :class:`ExportResult` with status, written count, and filepath.
@@ -713,6 +716,7 @@ def export_3mf(
         export_triangle_sets=export_triangle_sets,
         use_components=use_components,
         mmu_slicer_format=mmu_slicer_format,
+        subdivision_depth=subdivision_depth,
     )
     ctx = ExportContext(
         options=options,

@@ -123,9 +123,9 @@ class MMUPaintSettings(bpy.types.PropertyGroup):
 #  Helpers
 # ===================================================================
 
-from .common.colors import hex_to_rgb as _rgb_from_hex  # noqa: E402
-from .common.colors import rgb_to_hex as _hex_from_rgb  # noqa: E402
-from .common.colors import srgb_to_linear as _srgb_to_linear  # noqa: E402
+from ..common.colors import hex_to_rgb as _rgb_from_hex  # noqa: E402
+from ..common.colors import rgb_to_hex as _hex_from_rgb  # noqa: E402
+from ..common.colors import srgb_to_linear as _srgb_to_linear  # noqa: E402
 
 
 def _get_paint_image(obj):
@@ -1015,6 +1015,20 @@ class VIEW3D_PT_mmu_paint(bpy.types.Panel):
                 row.operator("mmu.reset_init_filaments", icon="FILE_REFRESH")
                 row.operator("mmu.initialize_painting", icon="PLAY", text="Initialize")
 
+                # Bake to MMU — for procedural/complex materials
+                obj = context.active_object
+                if obj and obj.data.materials and obj.data.materials[0]:
+                    layout.separator()
+                    bake_box = layout.box()
+                    bake_box.label(text="From Existing Material", icon="RENDER_STILL")
+                    bake_row = bake_box.row()
+                    bake_row.scale_y = 1.2
+                    bake_row.operator("mmu.bake_to_mmu", icon="RENDER_STILL")
+                    info = bake_box.column(align=True)
+                    info.scale_y = 0.7
+                    info.label(text="Bake a procedural material to")
+                    info.label(text="discrete filament colors for export")
+
         else:
             # ============================
             #  STATE B: Active palette
@@ -1060,6 +1074,16 @@ class VIEW3D_PT_mmu_paint(bpy.types.Panel):
                     warn_row.label(text="Soft edges will cause banding", icon="ERROR")
                     warn_row.label(text="issues on export")
                     warn_box.operator("mmu.fix_falloff", icon="CHECKMARK")
+
+            # --- Quantize button ---
+            layout.separator()
+            quant_box = layout.box()
+            quant_box.label(text="Cleanup", icon="BRUSH_DATA")
+            quant_box.operator("mmu.quantize_texture", icon="SNAP_ON")
+            info = quant_box.column(align=True)
+            info.scale_y = 0.7
+            info.label(text="Snap all pixels to the nearest")
+            info.label(text="filament color to clean up edges")
 
 
 # ===================================================================

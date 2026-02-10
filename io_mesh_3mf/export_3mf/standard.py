@@ -682,6 +682,7 @@ class StandardExporter(BaseExporter):
                 extruder_colors,
                 default_extruder,
                 progress_callback=seg_progress,
+                max_depth=self.ctx.options.subdivision_depth,
             )
             debug(
                 f"  Generated {len(segmentation_strings)} segmentation strings from texture"

@@ -243,7 +243,7 @@ def _analyze_recursive(
 
 def texture_to_segmentation(
     obj, image, extruder_colors: Dict[int, List[float]], default_extruder: int = 1,
-    progress_callback=None
+    progress_callback=None, max_depth: int = MAX_SUBDIVISION_DEPTH,
 ) -> Dict[int, str]:
     """
     Convert object's UV texture to PrusaSlicer segmentation strings.
@@ -253,6 +253,7 @@ def texture_to_segmentation(
     :param extruder_colors: Mapping from extruder index to RGBA color.
     :param default_extruder: Default extruder index.
     :param progress_callback: Optional callback(current, total, message) for progress updates.
+    :param max_depth: Maximum recursive subdivision depth (4-10, default 7).
     :return: Dict mapping face_index -> segmentation_hex_string.
     """
     import time
@@ -297,7 +298,7 @@ def texture_to_segmentation(
 
     total_faces = sum(1 for p in mesh.polygons if len(p.loop_indices) == 3)
     debug(
-        f"  Processing {total_faces} triangles (max_depth={MAX_SUBDIVISION_DEPTH})..."
+        f"  Processing {total_faces} triangles (max_depth={max_depth})..."
     )
 
     encoder = SegmentationEncoder()
@@ -334,7 +335,7 @@ def texture_to_segmentation(
             uv1[1],
             uv2[0],
             uv2[1],
-            MAX_SUBDIVISION_DEPTH,
+            max_depth,
         )
 
         if tree.children or tree.state != 0:

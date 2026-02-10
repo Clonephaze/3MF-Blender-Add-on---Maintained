@@ -20,7 +20,7 @@ from . import (
     common,
     import_3mf,
     export_3mf,
-    paint_panel,
+    paint,
 )
 
 if _needs_reload:
@@ -29,14 +29,14 @@ if _needs_reload:
     common = importlib.reload(common)
     import_3mf = importlib.reload(import_3mf)
     export_3mf = importlib.reload(export_3mf)
-    paint_panel = importlib.reload(paint_panel)
+    paint = importlib.reload(paint)
     pass  # Reloaded
 
 from .import_3mf import Import3MF
 from .export_3mf import Export3MF
-from .paint_panel import (
-    register as register_paint_panel,
-    unregister as unregister_paint_panel,
+from .paint import (
+    register as register_paint,
+    unregister as unregister_paint,
 )
 
 # IDE and Documentation support.
@@ -217,6 +217,17 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         default=False,
     )
 
+    default_subdivision_depth: bpy.props.IntProperty(
+        name="Subdivision Depth",
+        description=(
+            "Default subdivision depth for paint segmentation export. "
+            "Higher values capture finer color boundaries but increase export time (4-10)"
+        ),
+        default=7,
+        min=4,
+        max=10,
+    )
+
     def draw(self, context):
         layout = self.layout
 
@@ -241,6 +252,7 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         col.prop(self, "default_export_hidden", icon="HIDE_OFF")
         col.prop(self, "default_apply_modifiers", icon="MODIFIER")
         col.prop(self, "default_multi_material_export", icon="COLORSET_01_VEC")
+        col.prop(self, "default_subdivision_depth")
         col.prop(self, "default_export_triangle_sets", icon="OUTLINER_DATA_GP_LAYER")
 
         # Import behavior section
@@ -284,7 +296,7 @@ def register() -> None:
     bpy.types.TOPBAR_MT_file_import.append(menu_import)
     bpy.types.TOPBAR_MT_file_export.append(menu_export)
 
-    register_paint_panel()
+    register_paint()
 
 
 def _remove_menu_entries() -> None:
@@ -309,7 +321,7 @@ def _remove_menu_entries() -> None:
 
 
 def unregister() -> None:
-    unregister_paint_panel()
+    unregister_paint()
 
     _remove_menu_entries()
 

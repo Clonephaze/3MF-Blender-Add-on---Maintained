@@ -47,6 +47,7 @@ class ExportOptions:
     export_triangle_sets: bool = False
     use_components: bool = True
     mmu_slicer_format: str = "ORCA"  # "ORCA" | "PRUSA"
+    subdivision_depth: int = 7  # 4-10, controls paint segmentation detail
 
 
 # ---------------------------------------------------------------------------
