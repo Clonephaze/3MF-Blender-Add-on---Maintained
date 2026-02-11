@@ -343,6 +343,8 @@ def apply_triangle_sets(
         return
 
     mesh["3mf_triangle_set_names"] = set_names
+    # Store original face count to detect topology changes before export
+    mesh["3mf_original_face_count"] = len(mesh.polygons)
 
     attr_name = "3mf_triangle_set"
     if attr_name not in mesh.attributes:

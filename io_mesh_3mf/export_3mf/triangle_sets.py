@@ -24,7 +24,7 @@ from typing import Dict, List
 import bpy
 
 from ..common.constants import TRIANGLE_SETS_NAMESPACE
-from ..common.logging import debug
+from ..common.logging import debug, warn
 
 
 def write_triangle_sets(
@@ -45,6 +45,17 @@ def write_triangle_sets(
 
     set_names = mesh.get("3mf_triangle_set_names", [])
     if not set_names:
+        return
+
+    # CRITICAL: Check if topology has changed since import
+    # If faces were dissolved/merged, triangle indices are meaningless
+    original_face_count = mesh.get("3mf_original_face_count")
+    current_face_count = len(mesh.polygons)
+    if original_face_count is not None and original_face_count != current_face_count:
+        warn(
+            f"Mesh '{mesh.name}' topology changed ({original_face_count} → {current_face_count} faces). "
+            f"Triangle sets are invalid and will not be exported. Original triangle indices are lost."
+        )
         return
 
     # Build mapping of set_index -> list of triangle indices
