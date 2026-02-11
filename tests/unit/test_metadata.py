@@ -1,266 +1,165 @@
-# Blender add-on to import and export 3MF files.
-# Copyright (C) 2020 Ghostkeeper
-# This add-on is free software; you can redistribute it and/or modify it under the terms of the GNU General Public
-# License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later
-# version.
-# This add-on is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
-# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License along with this program; if not, write to the Free
-# Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+"""
+Unit tests for ``io_mesh_3mf.common.metadata``.
 
-# <pep8 compliant>
+Tests the ``Metadata`` container: storage, retrieval, conflict resolution,
+``__contains__``, ``__len__``, ``__bool__``, ``__eq__``, and ``__delitem__``.
 
-import unittest.mock  # To mock away the Blender API.
+The Metadata *class* itself is pure Python (namedtuples / dicts).
+``store()`` and ``retrieve()`` need Blender objects so they are tested
+at the integration level.
+"""
 
-from mock.bpy import MockOperator, MockExportHelper, MockImportHelper
-
-# The import and export classes inherit from classes from the Blender API. These classes would be MagicMocks as well.
-# However their metaclasses are then also MagicMocks, but different instances of MagicMock.
-# Python sees this as that the metaclasses that ImportHelper/ExportHelper inherits from are not the same and raises an
-# error. So here we need to specify that the classes that they inherit from are NOT MagicMock but just an ordinary mock
-# object.
-import bpy.types
-import bpy_extras.io_utils
-bpy.types.Operator = MockOperator
-bpy_extras.io_utils.ImportHelper = MockImportHelper
-bpy_extras.io_utils.ExportHelper = MockExportHelper
-import io_mesh_3mf.metadata
+import unittest
+from io_mesh_3mf.common.metadata import Metadata, MetadataEntry
 
 
-class TestMetadata(unittest.TestCase):
-    """
-    Unit tests for the metadata storage class.
-    """
+class TestMetadataBasics(unittest.TestCase):
+    """Basic dict-like behaviour of Metadata."""
 
-    def setUp(self):
-        """
-        Creates some fixtures to test with.
-        """
-        self.metadata = io_mesh_3mf.metadata.Metadata()
+    def test_empty(self):
+        m = Metadata()
+        self.assertEqual(len(m), 0)
+        self.assertFalse(m)
 
-    def test_store_retrieve(self):
-        """
-        Test the simple storage and retrieval of a metadata entry.
-        """
-        self.metadata["fast"] = "yes, please"
-        self.assertEqual(self.metadata["fast"], "yes, please")
+    def test_set_and_get(self):
+        m = Metadata()
+        entry = MetadataEntry(name="Title", preserve=True, datatype="xs:string", value="Cube")
+        m["Title"] = entry
+        self.assertIn("Title", m)
+        self.assertEqual(m["Title"].value, "Cube")
 
-    def test_store_compatible(self):
-        """
-        Test storing an entry multiple times with compatible values.
-        """
-        self.metadata["duplicate"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="duplicate",
-            preserve=False,
-            datatype="int",
-            value="5")
-        self.metadata["duplicate"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="duplicate",
-            preserve=False,
-            datatype="int",
-            value="5")  # Store twice!
+    def test_len(self):
+        m = Metadata()
+        m["a"] = MetadataEntry(name="a", preserve=False, datatype="", value="1")
+        m["b"] = MetadataEntry(name="b", preserve=False, datatype="", value="2")
+        self.assertEqual(len(m), 2)
 
-        self.assertEqual(self.metadata["duplicate"].name, "duplicate", "The name was the same, still \"duplicate\".")
-        self.assertFalse(
-            self.metadata["duplicate"].preserve,
-            "Neither of the entries needed to be preserved, so it still doesn't need to be preserved.")
-        self.assertEqual(self.metadata["duplicate"].datatype, "int", "The data type was the same, still \"int\".")
-        self.assertEqual(self.metadata["duplicate"].value, "5", "The value was the same, still \"5\".")
+    def test_bool_true(self):
+        m = Metadata()
+        m["x"] = MetadataEntry(name="x", preserve=False, datatype="", value="v")
+        self.assertTrue(m)
 
-    def test_override_preserve(self):
-        """
-        Tests the overriding of the preserve attribute if metadata entries are compatible.
-        """
-        self.metadata["duplicate"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="duplicate",
-            preserve=False,
-            datatype="int",
-            value="5")
-        self.metadata["duplicate"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="duplicate",
-            preserve=True,
-            datatype="int",
-            value="5")  # Preserve the duplicate!
+    def test_delete(self):
+        m = Metadata()
+        m["key"] = MetadataEntry(name="key", preserve=False, datatype="", value="val")
+        del m["key"]
+        self.assertNotIn("key", m)
+        self.assertEqual(len(m), 0)
 
-        self.assertTrue(
-            self.metadata["duplicate"].preserve,
-            "If any of the duplicates needs to be preserved, the entry indicates that it needs to be preserved.")
 
-        self.metadata["duplicate"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="duplicate",
-            preserve=False,
-            datatype="int",
-            value="5")
-        self.assertTrue(
-            self.metadata["duplicate"].preserve,
-            "An older entry needed to be preserved, so even if the later entry didn't, it still needs to be preserved.")
+class TestMetadataConflicts(unittest.TestCase):
+    """Conflict resolution when the same key is set twice."""
 
-    def test_store_incompatible_value(self):
-        """
-        Tests storing metadata entries that are incompatible with each other because they have different values.
-        """
-        self.metadata["duplicate"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="duplicate",
-            preserve=False,
-            datatype="int",
-            value="5")
-        self.metadata["duplicate"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="duplicate",
-            preserve=False,
-            datatype="int",
-            value="6")  # Different value!
+    def test_same_value_no_conflict(self):
+        m = Metadata()
+        e1 = MetadataEntry(name="k", preserve=False, datatype="xs:string", value="same")
+        e2 = MetadataEntry(name="k", preserve=False, datatype="xs:string", value="same")
+        m["k"] = e1
+        m["k"] = e2
+        self.assertIn("k", m)
+        self.assertEqual(m["k"].value, "same")
 
-        self.assertNotIn("duplicate", self.metadata, "It should appear to be removed from the storage.")
+    def test_different_value_creates_conflict(self):
+        m = Metadata()
+        e1 = MetadataEntry(name="k", preserve=False, datatype="xs:string", value="aaa")
+        e2 = MetadataEntry(name="k", preserve=False, datatype="xs:string", value="bbb")
+        m["k"] = e1
+        m["k"] = e2
+        # Key is now conflicting — __contains__ returns False
+        self.assertNotIn("k", m)
         with self.assertRaises(KeyError):
-            print("Getting this value should be impossible:", self.metadata["duplicate"])
+            _ = m["k"]
 
-        self.metadata["duplicate"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="duplicate",
-            preserve=False,
-            datatype="int",
-            value="5")  # Add it again.
+    def test_different_datatype_creates_conflict(self):
+        m = Metadata()
+        e1 = MetadataEntry(name="k", preserve=False, datatype="xs:string", value="x")
+        e2 = MetadataEntry(name="k", preserve=False, datatype="xs:int", value="x")
+        m["k"] = e1
+        m["k"] = e2
+        self.assertNotIn("k", m)
 
-        self.assertNotIn("duplicate", self.metadata, "Since there's conflicts, it should not add it to the storage.")
-        with self.assertRaises(KeyError):
-            print("Getting this value should be impossible:", self.metadata["duplicate"])
+    def test_conflict_is_sticky(self):
+        """Once conflicted, adding again doesn't un-conflict."""
+        m = Metadata()
+        e1 = MetadataEntry(name="k", preserve=False, datatype="", value="a")
+        e2 = MetadataEntry(name="k", preserve=False, datatype="", value="b")
+        e3 = MetadataEntry(name="k", preserve=False, datatype="", value="a")
+        m["k"] = e1
+        m["k"] = e2  # conflict
+        m["k"] = e3  # attempt to re-set
+        self.assertNotIn("k", m)
 
-    def test_store_incompatible_type(self):
-        """
-        Tests storing metadata entries that are incompatible with each other because they have different types.
-        """
-        self.metadata["duplicate"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="duplicate",
-            preserve=False,
-            datatype="int",
-            value="5")
-        self.metadata["duplicate"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="duplicate",
-            preserve=False,
-            datatype="float",
-            value="5")  # Different data type!
+    def test_conflicted_entry_excluded_from_len(self):
+        m = Metadata()
+        m["a"] = MetadataEntry(name="a", preserve=False, datatype="", value="1")
+        m["b"] = MetadataEntry(name="b", preserve=False, datatype="", value="2")
+        m["b"] = MetadataEntry(name="b", preserve=False, datatype="", value="3")  # conflict
+        self.assertEqual(len(m), 1)
 
-        self.assertNotIn("duplicate", self.metadata, "It should appear to be removed from the storage.")
-        with self.assertRaises(KeyError):
-            print("Getting this value should be impossible:", self.metadata["duplicate"])
 
-        self.metadata["duplicate"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="duplicate",
-            preserve=False,
-            datatype="float",
-            value="5")  # Add it again.
+class TestMetadataPreserve(unittest.TestCase):
+    """Preserve flag upgrade."""
 
-        self.assertNotIn("duplicate", self.metadata, "Since there's conflicts, it should not add it to the storage.")
-        with self.assertRaises(KeyError):
-            print("Getting this value should be impossible:", self.metadata["duplicate"])
+    def test_preserve_upgraded(self):
+        """If same value is set twice and second has preserve=True, upgrade to True."""
+        m = Metadata()
+        e1 = MetadataEntry(name="k", preserve=False, datatype="xs:string", value="v")
+        e2 = MetadataEntry(name="k", preserve=True, datatype="xs:string", value="v")
+        m["k"] = e1
+        m["k"] = e2
+        self.assertTrue(m["k"].preserve)
 
-    def test_values(self):
-        """
-        Test getting the metadata values.
-        """
-        self.metadata["hollow"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="hollow",
-            preserve=True,
-            datatype="bool",
-            value="True")
-        self.metadata["conflicting"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="conflicting",
-            preserve=False,
-            datatype="int",
-            value="5")
-        self.metadata["conflicting"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="conflicting",
-            preserve=False,
-            datatype="float",
-            value="5.0")  # Should not show up in the values.
-        self.metadata["author"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="author",
-            preserve=False,
-            datatype="string",
-            value="Ghostkeeper")
-        self.metadata["author"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="author",
-            preserve=False,
-            datatype="string",
-            value="Ghostkeeper")  # Duplicate, but not conflicting.
+    def test_preserve_not_downgraded(self):
+        """preserve=True should not be downgraded by a preserve=False entry."""
+        m = Metadata()
+        e1 = MetadataEntry(name="k", preserve=True, datatype="xs:string", value="v")
+        e2 = MetadataEntry(name="k", preserve=False, datatype="xs:string", value="v")
+        m["k"] = e1
+        m["k"] = e2
+        # Still True because the value hasn't changed — no upgrade happens,
+        # but the existing entry already has preserve=True.
+        self.assertTrue(m["k"].preserve)
 
-        num_entries = 0  # Count how many, to prevent listing duplicates twice or something.
-        for entry in self.metadata.values():
-            self.assertIn(
-                entry.name,
-                {"hollow", "author"},
-                "The \"hollow\" and \"author\" entries need to be stored. "
-                "Not \"conflicting\" because there was a conflict.")
-            num_entries += 1
-        self.assertEqual(
-            num_entries,
-            2,
-            "There were two valid entries: \"hollow\" and \"author\". "
-            "\"conflicting\" shouldn't show up at all and there should only be one \"author\".")
 
-    def test_unicode_metadata_name(self):
-        """
-        Test storing and retrieving metadata with Unicode names.
-        """
-        unicode_name = "作者"
-        self.metadata[unicode_name] = io_mesh_3mf.metadata.MetadataEntry(
-            name=unicode_name,
-            preserve=True,
-            datatype="xs:string",
-            value="张三")
+class TestMetadataEquality(unittest.TestCase):
 
-        self.assertIn(unicode_name, self.metadata)
-        self.assertEqual(self.metadata[unicode_name].name, unicode_name)
-        self.assertEqual(self.metadata[unicode_name].value, "张三")
+    def test_equal_empty(self):
+        self.assertEqual(Metadata(), Metadata())
 
-    def test_unicode_metadata_value(self):
-        """
-        Test storing and retrieving metadata with Unicode values.
-        """
-        japanese_value = "青いマテリアル"
-        self.metadata["material"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="material",
-            preserve=True,
-            datatype="xs:string",
-            value=japanese_value)
+    def test_equal_with_data(self):
+        m1, m2 = Metadata(), Metadata()
+        entry = MetadataEntry(name="a", preserve=False, datatype="", value="1")
+        m1["a"] = entry
+        m2["a"] = entry
+        self.assertEqual(m1, m2)
 
-        self.assertEqual(self.metadata["material"].value, japanese_value)
+    def test_not_equal_different_data(self):
+        m1, m2 = Metadata(), Metadata()
+        m1["a"] = MetadataEntry(name="a", preserve=False, datatype="", value="1")
+        m2["a"] = MetadataEntry(name="a", preserve=False, datatype="", value="2")
+        self.assertNotEqual(m1, m2)
 
-    def test_unicode_metadata_compatibility(self):
-        """
-        Test that Unicode metadata entries are properly compared for compatibility.
-        """
-        korean_value = "테스트 값"
-        self.metadata["테스트"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="테스트",
-            preserve=True,
-            datatype="xs:string",
-            value=korean_value)
+    def test_not_equal_to_non_metadata(self):
+        m = Metadata()
+        self.assertNotEqual(m, "string")
 
-        # Store again with same Unicode value - should be compatible
-        self.metadata["테스트"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="테스트",
-            preserve=True,
-            datatype="xs:string",
-            value=korean_value)
 
-        self.assertIn("테스트", self.metadata)
-        self.assertEqual(self.metadata["테스트"].value, korean_value)
+class TestMetadataValues(unittest.TestCase):
 
-    def test_unicode_metadata_conflict(self):
-        """
-        Test that conflicting Unicode metadata entries are properly detected.
-        """
-        self.metadata["項目"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="項目",
-            preserve=True,
-            datatype="xs:string",
-            value="値一")
+    def test_values_iterator(self):
+        m = Metadata()
+        m["x"] = MetadataEntry(name="x", preserve=False, datatype="", value="1")
+        m["y"] = MetadataEntry(name="y", preserve=False, datatype="", value="2")
+        vals = list(m.values())
+        self.assertEqual(len(vals), 2)
 
-        # Store again with different Unicode value - should conflict
-        self.metadata["項目"] = io_mesh_3mf.metadata.MetadataEntry(
-            name="項目",
-            preserve=True,
-            datatype="xs:string",
-            value="値二")
+    def test_values_skips_conflicts(self):
+        m = Metadata()
+        m["x"] = MetadataEntry(name="x", preserve=False, datatype="", value="1")
+        m["x"] = MetadataEntry(name="x", preserve=False, datatype="", value="2")  # conflict
+        vals = list(m.values())
+        self.assertEqual(len(vals), 0)
 
-        self.assertNotIn("項目", self.metadata, "Conflicting Unicode values should not be stored")
+
+if __name__ == "__main__":
+    unittest.main()

@@ -18,7 +18,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from tests.integration.test_base import Blender3mfTestCase
+from test_base import Blender3mfTestCase
 
 
 class Test3MFConsortiumSamples(Blender3mfTestCase):

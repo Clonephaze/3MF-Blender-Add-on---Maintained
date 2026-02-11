@@ -16,6 +16,7 @@ The goal is simple: make **Blender a reliable, spec-compliant tool in real 3MF w
 
 ## Status
 
+- **Version 2.0.0** — Major architecture restructure with public API
 - Compatible with **Blender 4.2+**
 - Actively maintained
 
@@ -29,6 +30,7 @@ For Blender versions **2.80–3.6**, see the [original releases](https://github.
 - Material and color support using modern Blender material APIs
 - Embedded viewport thumbnails in exported 3MF files
 - Correct handling of units and build structure
+- **Public API** for programmatic/headless workflows (see [API.md](API.md))
 - Multiple 3MF spec-compliant extensions:
   - Core Materials (basematerials)
   - Production Extension (multi-object builds, color zones)
@@ -114,18 +116,42 @@ Built-in multi-material texture painting system for creating per-triangle filame
 
 ---
 
+## Programmatic API
+
+Version 2.0.0 introduces a public Python API for headless/programmatic use without `bpy.ops`:
+
+```python
+from io_mesh_3mf.api import import_3mf, export_3mf, inspect_3mf
+
+# Inspect without importing
+info = inspect_3mf("model.3mf")
+print(info.unit, info.num_objects, info.num_triangles_total)
+
+# Import
+result = import_3mf("model.3mf", import_materials="PAINT")
+print(result.status, result.num_loaded)
+
+# Export specific objects
+result = export_3mf("output.3mf", objects=my_objects, use_orca_format="BASEMATERIAL")
+
+# Batch operations
+from io_mesh_3mf.api import batch_import
+results = batch_import(["a.3mf", "b.3mf"], target_collection="Imports")
+```
+
+Full documentation: **[API.md](API.md)**
+
+---
+
 ## Development & Contributing
 
-Current features and roadmap are in **[ROADMAP.md](ROADMAP.md)**
-
-- Completed: PrusaSlicer MMU export, Orca Slicer compatibility, automatic thumbnails
-- In progress: Triangle Sets Extension
+Current features and roadmap are in **[ROADMAP.md](ROADMAP.md)** | Full changelog in **[CHANGELOG.md](CHANGELOG.md)**
 
 ---
 
 ## 3MF Specification Support
 
-This add-on targets **3MF Core Specification v1.3.0** but is ready for v1.4.0. It includes checks to warn or stop on 1.4-specific conditions, which currently pass since 1.3.0 does not enforce them.
+This add-on targets **3MF Core Specification v1.4.0**. It includes checks to warn or stop on specification-specific conditions.
 
 ### Behavior Notes
 

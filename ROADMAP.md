@@ -39,8 +39,9 @@ Features and improvements organized by priority. Complexity ratings help with pl
 
 | Status | Feature | Complexity | Description |
 |--------|---------|------------|-------------|
-| ✅ | Import Triangle Sets | 🟡 | Map to Blender face maps |
-| ✅ | Export Triangle Sets | 🟡 | Export face maps as triangle sets |
+| ✅ | Import Triangle Sets | 🟡 | Read triangle sets as face attributes |
+| ✅ | Export Triangle Sets | 🟡 | Auto-export when attribute exists |
+| 💭 | Triangle Sets UI Panel | 🟡 | Create/edit sets in Blender (face selection → named groups) |
 
 ---
 
@@ -78,8 +79,8 @@ Features and improvements organized by priority. Complexity ratings help with pl
 ### Scene
 | Status | Feature | Complexity | Description |
 |--------|---------|------------|-------------|
-| 📋 | Collections → Components | 🟡 | Map hierarchy to 3MF structure |
-| 📋 | Instances | 🟡 | Linked duplicates as component refs |
+| ✅ | Collections → Components | 🟡 | Map hierarchy to 3MF structure |
+| ✅ | Instances | 🟡 | Linked duplicates as component refs |
 
 ### Thumbnails
 | Status | Feature | Complexity | Description |
@@ -117,22 +118,18 @@ Features and improvements organized by priority. Complexity ratings help with pl
 
 ## 🏗️ Code Architecture
 
-### Import Refactoring
-> Convert `import_3mf.py` (3055 lines, 56 methods) → `import_3mf/` package
+### Import/Export Restructure (✅ Completed in 2.0.0)
+> Monolithic files converted to clean sub-packages with public API
 
 | Status | Feature | Complexity | Description |
 |--------|---------|------------|-------------|
-| 📋 | `import_3mf/` package | 🔴 | Convert monolithic file to package with `__init__.py` re-exports |
-| 📋 | `operator.py` | 🟡 | Operator class, properties, draw/invoke/execute, progress (~450 lines) |
-| 📋 | `archive.py` | 🟢 | ZIP/OPC: read_archive, content_types, must_preserve (~190 lines) |
-| 📋 | `geometry.py` | 🟡 | Mesh parsing: read_objects, vertices, triangles, components (~450 lines) |
-| 📋 | `build.py` | 🔴 | Scene construction: build_items, build_object split into sub-functions (~500 lines) |
-| 📋 | `slicer_colors.py` | 🟡 | Orca/Prusa filament colors, paint codes, segmentation (~525 lines) |
-| 📋 | `xml_utils.py` | 🟢 | parse_transformation, unit_scale, detect_vendor, extensions (~200 lines) |
-| 📋 | Free function API | 🟡 | Core parsing as standalone functions (not operator methods) for CLI/addon use |
-| 📋 | Remove thin wrappers | 🟢 | Drop 16 backward-compat wrapper methods (~195 lines) once tests updated |
-
-**Goal:** Enable `from io_mesh_3mf.import_3mf.archive import read_archive` for other addons and CLI scripts, keep `bpy.ops.import_mesh.threemf()` working unchanged.
+| ✅ | `import_3mf/` package | 🔴 | Operator, context, archive, geometry, builder, scene, slicer, materials |
+| ✅ | `export_3mf/` package | 🔴 | Operator, context, archive, geometry, standard/orca/prusa exporters |
+| ✅ | `common/` package | 🟡 | Shared types, constants, colors, logging, XML, units, segmentation, extensions |
+| ✅ | Context dataclasses | 🟡 | `ImportContext` / `ExportContext` replace mutable operator state |
+| ✅ | Public API (`api.py`) | 🔴 | `import_3mf()`, `export_3mf()`, `inspect_3mf()`, batch ops, building blocks |
+| ✅ | Free function API | 🟡 | Core parsing as standalone functions for CLI/addon use |
+| ✅ | Remove thin wrappers | 🟢 | Dropped backward-compat wrapper methods |
 
 ---
 
@@ -150,7 +147,8 @@ Features and improvements organized by priority. Complexity ratings help with pl
 
 | Status | Feature | Complexity | Description |
 |--------|---------|------------|-------------|
-| 📋 | User Guide | 🟡 | Usage documentation |
+| ✅ | User Guide | 🟡 | Usage documentation |
+| ✅ | API Documentation | 🟡 | Public API reference (API.md) |
 
 ---
 
@@ -169,9 +167,7 @@ Features and improvements organized by priority. Complexity ratings help with pl
 ### Lower Priority
 *Nice to have*
 
-- [ ] Texture 2D support
 - [ ] Cura support
-- [ ] Collections → Components
 - [ ] Organize Properties Panel
 - [ ] Better Progress Indicators
 
@@ -193,4 +189,4 @@ Help wanted:
 
 ---
 
-*Current version: 1.4.0*
+*Current version: 2.0.0*
