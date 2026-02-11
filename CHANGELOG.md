@@ -56,7 +56,6 @@ Technical
 * **Dedicated MMU_Paint UV layer** — Paint initialization and import create/use a dedicated "MMU_Paint" UV layer for segmentation data, keeping painted UVs separate from material texture UVs.
 * **Limited Dissolve pre-unwrap** — Bake and initialize paths run `bmesh.ops.dissolve_limit` (~2° tolerance) before UV unwrap to merge coplanar triangles, giving faces more UV space and reducing blurriness in painted regions.
 * **Segmentation rasterizer improvements** — Add `expand_px` support for per-edge normalized threshold expansion (eliminates 1-pixel gaps at Lightmap Pack UV island boundaries). UV-method-aware gap closing: 2 dilation passes for Smart UV, 6 passes for Lightmap Pack.
-* **Cycles bake optimizations** — Bake temporarily sets `cycles.samples=1`, attempts GPU compute, and rewires material to Emission shader (EMIT bake skips BSDF/lighting for 5–10× speed). Restores original settings on success or failure.
 * **Component EMPTY recursion** — Component child handling now recurses into EMPTY hierarchies and only exports MESH/EMPTY children when assembling 3MF component definitions.
 * **Mesh collection helper** — New `collect_mesh_objects()` recursively gathers MESH objects from scene collections and nested EMPTY hierarchies. Replaces ad-hoc mesh filtering across operator, materials, and exporter modules.
 
