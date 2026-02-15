@@ -10,6 +10,10 @@ Bug Fixes
 ----
 * **Triangle set topology guard** — Record original face count on import (`3mf_original_face_count`). Export skips triangle sets with a warning when topology has changed (e.g. faces dissolved), preventing corrupt triangle indices.
 
+Technical
+----
+* Changed compression level for ZIP archives to 3 (from default 9) to reduce export times on large files. This provides a good balance between file size and export speed, especially for complex models with many textures.
+
 ---
 
 2.0.0 — Architecture Restructure & Public API

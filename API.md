@@ -114,6 +114,9 @@ Export Blender objects to a 3MF file.
 | `export_triangle_sets` | `bool` | `False` | Export face maps as triangle sets |
 | `use_components` | `bool` | `True` | Use component instances for linked duplicates |
 | `mmu_slicer_format` | `str` | `"ORCA"` | `"ORCA"` or `"PRUSA"` (for `PAINT` mode) |
+| `subdivision_depth` | `int` | `7` | Max recursion depth for paint segmentation (4-10, higher = finer detail) |
+| `project_template` | `str \| None` | `None` | Path to custom JSON template for Orca `project_settings.config` |
+| `object_settings` | `dict \| None` | `None` | Per-object Orca setting overrides (see below) |
 | `on_progress` | `callable` | `None` | `(percentage: int, message: str)` callback |
 | `on_warning` | `callable` | `None` | `(message: str)` callback for warnings |
 
@@ -155,6 +158,31 @@ result = export_3mf(
     use_selection=True,
 )
 ```
+
+**Example — Custom Orca project template with per-object settings:**
+
+```python
+# Use a custom printer/filament profile extracted from Orca Slicer
+result = export_3mf(
+    "/output/custom_printer.3mf",
+    use_orca_format="PAINT",
+    mmu_slicer_format="ORCA",
+    project_template="/templates/bambu_x1c_asa.json",  # Custom printer config
+    object_settings={
+        supports_obj: {
+            "layer_height": "0.12",
+            "wall_loops": "2",
+            "sparse_infill_density": "10%",
+        },
+        detail_part: {
+            "layer_height": "0.08",
+            "outer_wall_speed": "50",
+        },
+    },
+)
+```
+
+> **Getting custom templates:** Export a project from Orca Slicer as `.3mf`, open the archive with a ZIP tool, and extract `Metadata/project_settings.config`. This JSON file contains all printer, filament, and print settings. The addon patches `filament_colour` automatically based on your painted objects.
 
 ---
 

@@ -446,10 +446,13 @@ class OrcaExporter(BaseExporter):
         )
 
         # Metadata
+        # Use BambuStudio application name so Bambu Studio recognizes the file
+        # as a full project (not just geometry). Orca Slicer does the same.
+        # All rights reserved to Bambu Lab for the application name
         meta_app = xml.etree.ElementTree.SubElement(
             root, "metadata", attrib={"name": "Application"}
         )
-        meta_app.text = "Blender-3MF-OrcaExport"
+        meta_app.text = "BambuStudio-2.3.0"
 
         meta_version = xml.etree.ElementTree.SubElement(
             root, "metadata", attrib={"name": "BambuStudio:3mfVersion"}

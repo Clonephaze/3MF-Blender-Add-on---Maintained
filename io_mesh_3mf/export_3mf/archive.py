@@ -52,7 +52,8 @@ def create_archive(filepath: str, safe_report: Callable) -> Optional[zipfile.Zip
     """
     try:
         archive = zipfile.ZipFile(
-            filepath, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
+            # Use compression for smaller file sizes, but level 3 to avoid excessive write times on large files.
+            filepath, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=3
         )
 
         # Store the file annotations we got from imported 3MF files.
