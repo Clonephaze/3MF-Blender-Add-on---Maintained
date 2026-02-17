@@ -1,3 +1,25 @@
+2.0.2 — Multi-Material Auto-Detection & Bed Center Offset
+====
+
+Bug Fixes
+----
+* **Multi-material export regression** — Objects with multiple materials now correctly export per-face color data using the Orca format (`paint_color` attributes). A previous simplification from 3 export modes to 2 broke the export, causing multi-material objects to silently export as standard basematerials that slicers ignored.
+* **Geometry Nodes material slot detection** — Material slots created by Geometry Nodes `Set Material` nodes are now detected via depsgraph evaluation. Previously, only the original (unevaluated) object was checked, so GN-assigned materials were invisible to the exporter.
+* **Evaluated object material lookups** — `get_triangle_color()` and `collect_face_colors()` now use the evaluated object's material slots when mesh modifiers are applied, matching the evaluated mesh data.
+
+Features
+----
+* **Bed center offset for built-in template** — The Orca exporter auto-offsets object positions to the bed center (128, 128 mm) when using the built-in Bambu Lab A1 template (bottom-left origin). Custom templates passed via `project_template_path` get no offset — the caller needs to handle positioning themselves.
+* **Updated built-in project template** — Replaced `orca_project_template.json` with a Bambu Lab A1 profile (256×256 mm bed) that eliminates warning popups on import into Orca Slicer.
+
+Technical
+----
+* Export dispatch now evaluates objects via `context.evaluated_depsgraph_get()` to detect multi-material assignments before choosing StandardExporter vs OrcaExporter.
+* `ExportOptions.use_orca_format` default changed from `"BASEMATERIAL"` to `"STANDARD"`.
+* Removed all `BASEMATERIAL` references from API and documentation.
+
+---
+
 2.0.1 — Orca Per-Object Settings & Triangle Set Safety
 ====
 
