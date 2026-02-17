@@ -110,7 +110,7 @@ Export Blender objects to a 3MF file.
 | `global_scale` | `float` | `1.0` | Scale multiplier |
 | `use_mesh_modifiers` | `bool` | `True` | Apply modifiers before export |
 | `coordinate_precision` | `int` | `9` | Decimal precision for vertex coordinates |
-| `use_orca_format` | `str` | `"BASEMATERIAL"` | `"STANDARD"`, `"BASEMATERIAL"`, or `"PAINT"` |
+| `use_orca_format` | `str` | `"STANDARD"` | `"STANDARD"` or `"PAINT"` |
 | `export_triangle_sets` | `bool` | `False` | Export face maps as triangle sets |
 | `use_components` | `bool` | `True` | Use component instances for linked duplicates |
 | `mmu_slicer_format` | `str` | `"ORCA"` | `"ORCA"` or `"PRUSA"` (for `PAINT` mode) |
@@ -142,8 +142,6 @@ cubes = [o for o in bpy.data.objects if o.type == "MESH" and "Cube" in o.name]
 result = export_3mf(
     "/output/cubes.3mf",
     objects=cubes,
-    use_orca_format="BASEMATERIAL",
-    mmu_slicer_format="ORCA",
 )
 print(f"Exported {result.num_written} objects")
 ```
@@ -293,7 +291,6 @@ results = batch_export(
         ("spheres.3mf", spheres),
         ("everything.3mf", None),  # None = all scene objects
     ],
-    use_orca_format="BASEMATERIAL",
 )
 ```
 
@@ -446,8 +443,6 @@ if result.status == "FINISHED":
     export_result = export_3mf(
         output_path,
         objects=result.objects,
-        use_orca_format="BASEMATERIAL",
-        mmu_slicer_format="ORCA",
     )
     print(f"Converted: {export_result.num_written} objects → {output_path}")
 ```
@@ -462,10 +457,8 @@ blender --background --python convert_to_orca.py -- input.3mf
 
 | `use_orca_format` | `mmu_slicer_format` | Output Format |
 |-------------------|---------------------|---------------|
-| `"STANDARD"` | — | Spec-compliant single-model 3MF, geometry only |
-| `"BASEMATERIAL"` | `"ORCA"` | Standard 3MF with basematerials + colorgroups |
-| `"BASEMATERIAL"` | `"PRUSA"` | Standard 3MF with basematerials |
-| `"PAINT"` | `"ORCA"` | Multi-file Orca/Bambu structure with `paint_color` attributes |
+| `"STANDARD"` | — | Auto-detects: single-material → spec-compliant basematerials; multi-material → Orca `paint_color` |
+| `"PAINT"` | `"ORCA"` | Multi-file Orca/Bambu structure with `paint_color` from UV paint textures |
 | `"PAINT"` | `"PRUSA"` | Single-file with `slic3rpe:mmu_segmentation` hash strings |
 
 ---

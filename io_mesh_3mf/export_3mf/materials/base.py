@@ -117,6 +117,7 @@ def get_triangle_color(
     mesh: bpy.types.Mesh,
     triangle: bpy.types.MeshLoopTriangle,
     blender_object: bpy.types.Object,
+    eval_object: bpy.types.Object = None,
 ) -> Optional[str]:
     """
     Get the color for a specific triangle from its face's material assignment.
@@ -124,10 +125,13 @@ def get_triangle_color(
     :param mesh: The mesh containing the triangle.
     :param triangle: The triangle to get the color for.
     :param blender_object: The object the mesh belongs to.
+    :param eval_object: The evaluated object (for Geometry Nodes material slots).
+        Falls back to *blender_object* when not provided.
     :return: Hex color string like "#RRGGBB" or None if no color.
     """
-    if triangle.material_index < len(blender_object.material_slots):
-        material = blender_object.material_slots[triangle.material_index].material
+    slot_source = eval_object if eval_object is not None else blender_object
+    if triangle.material_index < len(slot_source.material_slots):
+        material = slot_source.material_slots[triangle.material_index].material
         return material_to_hex_color(material)
     return None
 
@@ -178,9 +182,13 @@ def collect_face_colors(
         debug(f"Object {blender_object.name}: {len(mesh.vertices)} vertices, {len(mesh.polygons)} faces")
 
         # Get all materials used by faces
+        # Use the evaluated object's material slots when available, because
+        # Geometry Nodes "Set Material" nodes only create slots on the
+        # evaluated depsgraph copy.
+        slot_source = eval_object if use_mesh_modifiers else blender_object
         for face in mesh.polygons:
-            if face.material_index < len(blender_object.material_slots):
-                material = blender_object.material_slots[face.material_index].material
+            if face.material_index < len(slot_source.material_slots):
+                material = slot_source.material_slots[face.material_index].material
                 if material:
                     color = material_to_hex_color(material)
                     if color:

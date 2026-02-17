@@ -828,10 +828,21 @@ def export_3mf(
 
     scale = export_unit_scale(context, global_scale)
 
-    # Check if any mesh has multi-material face assignments
-    has_multi_materials = any(
-        len(obj.material_slots) > 1 for obj in mesh_objects
-    ) if mesh_objects else False
+    # Check if any mesh has multi-material face assignments.
+    # Must check EVALUATED objects because Geometry Nodes "Set Material"
+    # nodes only create material slots on the evaluated depsgraph copy.
+    has_multi_materials = False
+    if mesh_objects and use_mesh_modifiers:
+        depsgraph = context.evaluated_depsgraph_get()
+        for obj in mesh_objects:
+            eval_obj = obj.evaluated_get(depsgraph)
+            if len(eval_obj.material_slots) > 1:
+                has_multi_materials = True
+                break
+    elif mesh_objects:
+        has_multi_materials = any(
+            len(obj.material_slots) > 1 for obj in mesh_objects
+        )
 
     # Dispatch to exporter.
     try:

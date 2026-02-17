@@ -276,12 +276,21 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
 
             global_scale = export_unit_scale(context, ctx.options.global_scale)
 
-            # Check if any mesh has multi-material face assignments
-            # (more than one material slot = face-level material data that
-            # slicers need in Orca/paint_color format, not spec basematerials)
-            has_multi_materials = any(
-                len(obj.material_slots) > 1 for obj in mesh_objects
-            ) if mesh_objects else False
+            # Check if any mesh has multi-material face assignments.
+            # Must check EVALUATED objects because Geometry Nodes "Set Material"
+            # nodes only create material slots on the evaluated depsgraph copy.
+            has_multi_materials = False
+            if mesh_objects and ctx.options.use_mesh_modifiers:
+                depsgraph = context.evaluated_depsgraph_get()
+                for obj in mesh_objects:
+                    eval_obj = obj.evaluated_get(depsgraph)
+                    if len(eval_obj.material_slots) > 1:
+                        has_multi_materials = True
+                        break
+            elif mesh_objects:
+                has_multi_materials = any(
+                    len(obj.material_slots) > 1 for obj in mesh_objects
+                )
 
             # Dispatch to format-specific exporter
             if ctx.options.use_orca_format == "PAINT":

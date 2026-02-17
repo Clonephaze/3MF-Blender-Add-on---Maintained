@@ -204,6 +204,17 @@ class OrcaExporter(BaseExporter):
 
             ctx.num_written += 1
 
+        # Apply bed center offset to transformations (built-in template only)
+        bed_offset_x, bed_offset_y = self._get_bed_center_offset()
+        if bed_offset_x != 0.0 or bed_offset_y != 0.0:
+            for od in object_data:
+                od["transformation"][0][3] += bed_offset_x
+                od["transformation"][1][3] += bed_offset_y
+            debug(
+                f"Applied bed center offset ({bed_offset_x}, {bed_offset_y}) mm "
+                f"to {len(object_data)} objects"
+            )
+
         # Write main 3dmodel.model with wrapper objects and build items
         ctx._progress_update(90, "Writing main model...")
         self.write_main_model(archive, object_data, build_uuid)
@@ -399,7 +410,7 @@ class OrcaExporter(BaseExporter):
                     continue
 
             # Fall back to simple paint_color from face material colors
-            triangle_color = get_triangle_color(mesh, triangle, blender_object)
+            triangle_color = get_triangle_color(mesh, triangle, blender_object, eval_object)
             if triangle_color and triangle_color in ctx.vertex_colors:
                 filament_index = ctx.vertex_colors[triangle_color]
                 if filament_index < len(ORCA_FILAMENT_CODES):
@@ -613,6 +624,22 @@ class OrcaExporter(BaseExporter):
             error(f"Failed to write Orca metadata: {e}")
             ctx.safe_report({"ERROR"}, f"Failed to write Orca metadata: {e}")
             raise
+
+    # Built-in template bed center (Bambu Lab A1: 256x256 mm, origin bottom-left)
+    _BED_CENTER_X = 128.0
+    _BED_CENTER_Y = 128.0
+
+    def _get_bed_center_offset(self) -> tuple:
+        """Return bed center offset for the built-in project template.
+
+        The built-in template (Bambu Lab A1) uses a bottom-left origin.
+        Custom templates get no offset — the caller handles positioning.
+
+        :return: ``(offset_x, offset_y)`` in millimeters.
+        """
+        if self.ctx.project_template_path:
+            return (0.0, 0.0)
+        return (self._BED_CENTER_X, self._BED_CENTER_Y)
 
     def generate_project_settings(self) -> dict:
         """Generate project_settings.config by loading template and updating filament colors.
