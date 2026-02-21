@@ -1,3 +1,15 @@
+2.1.0 — Bake to MMU & Auto-Detect Colors
+====
+
+Features
+----
+* **Auto-detect colors from textures & vertex colors** — "Detect from Materials" now analyzes Image Textures and Color Attributes, not just shader node trees. Prompts for how many colors to extract (2-16).
+* **HSV-based color detection** — Bins pixels by hue x saturation (ignoring brightness) so shadow/highlight variants merge into one palette entry. Picks natural-looking representatives using 75th-percentile brightness.
+* **Hue-aware quantization** — Bake-to-MMU uses weighted HSV distance so shadowed regions match the correct hue rather than snapping to black.
+* **Custom thumbnail generation** — Export dialog now has a Thumbnail section with three modes: Automatic (renders a clean elevated 3/4 view with grid/gizmos/overlays hidden), Custom Image (embed any image file), or None (skip thumbnail). Resolution is configurable (64-1024 px). Camera automatically frames all exported objects.
+
+---
+
 2.0.2 — Multi-Material Auto-Detection & Bed Center Offset
 ====
 

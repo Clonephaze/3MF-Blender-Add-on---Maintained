@@ -216,6 +216,26 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         max=10,
     )
 
+    default_thumbnail_mode: bpy.props.EnumProperty(
+        name="Thumbnail",
+        description="Default thumbnail mode for 3MF export",
+        items=[
+            ("AUTO", "Automatic", "Render a clean preview from an elevated 3/4 angle"),
+            ("CUSTOM", "Custom Image", "Use a custom image file as the thumbnail"),
+            ("NONE", "None", "Do not include a thumbnail"),
+        ],
+        default="AUTO",
+    )
+
+    default_thumbnail_resolution: bpy.props.IntProperty(
+        name="Thumbnail Resolution",
+        description="Default thumbnail size in pixels (square)",
+        default=256,
+        min=64,
+        max=1024,
+        step=64,
+    )
+
     def draw(self, context):
         layout = self.layout
 
@@ -241,6 +261,11 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         col.prop(self, "default_apply_modifiers", icon="MODIFIER")
         col.prop(self, "default_multi_material_export", icon="COLORSET_01_VEC")
         col.prop(self, "default_subdivision_depth")
+        col.separator()
+        col.label(text="Thumbnail:", icon="IMAGE_DATA")
+        col.prop(self, "default_thumbnail_mode")
+        if self.default_thumbnail_mode == "AUTO":
+            col.prop(self, "default_thumbnail_resolution")
 
         # Import behavior section
         import_box = layout.box()

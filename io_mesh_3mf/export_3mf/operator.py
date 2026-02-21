@@ -44,6 +44,21 @@ from .standard import StandardExporter
 __all__ = ["Export3MF"]
 
 
+def _thumbnail_image_items(self, context):
+    """Dynamic enum callback listing images in the current .blend file."""
+    items = []
+    for img in bpy.data.images:
+        # Skip internal renders, viewers, and zero-pixel images.
+        if img.type in {"RENDER_RESULT", "COMPOSITING"}:
+            continue
+        items.append((img.name, img.name, "", "IMAGE_DATA", len(items)))
+    # Always offer a "Custom File Path" option at the end.
+    items.append(
+        ("__CUSTOM_PATH__", "Custom File Path", "Enter a file path manually", "FILEBROWSER", len(items))
+    )
+    return items
+
+
 class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
     """
     Operator that exports a 3MF file from Blender.
@@ -140,6 +155,51 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         max=10,
     )
 
+    thumbnail_mode: bpy.props.EnumProperty(
+        name="Thumbnail",
+        description="How to generate the preview thumbnail embedded in the 3MF file",
+        items=[
+            (
+                "AUTO",
+                "Automatic",
+                "Render a clean preview from an elevated 3/4 angle with grid and gizmos hidden",
+            ),
+            (
+                "CUSTOM",
+                "Custom Image",
+                "Use a custom image file as the thumbnail",
+            ),
+            (
+                "NONE",
+                "None",
+                "Do not include a thumbnail in the 3MF file",
+            ),
+        ],
+        default="AUTO",
+    )
+
+    thumbnail_resolution: bpy.props.IntProperty(
+        name="Resolution",
+        description="Thumbnail width and height in pixels (square)",
+        default=256,
+        min=64,
+        max=1024,
+        step=64,
+    )
+
+    thumbnail_image: bpy.props.EnumProperty(
+        name="Image",
+        description="Choose an image from the current .blend file to use as the thumbnail",
+        items=_thumbnail_image_items,
+    )
+
+    thumbnail_image_path: bpy.props.StringProperty(
+        name="Path",
+        description="Path to a custom image file to use as the thumbnail",
+        default="",
+        subtype="FILE_PATH",
+    )
+
     def invoke(self, context, event):
         """Initialize properties from preferences when the export dialog is opened."""
         prefs = context.preferences.addons.get(__package__.rsplit(".", 1)[0])
@@ -150,6 +210,8 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             self.global_scale = prefs.preferences.default_global_scale
             self.use_orca_format = prefs.preferences.default_multi_material_export
             self.subdivision_depth = prefs.preferences.default_subdivision_depth
+            self.thumbnail_mode = prefs.preferences.default_thumbnail_mode
+            self.thumbnail_resolution = prefs.preferences.default_thumbnail_resolution
         self.report({"INFO"}, "Exporting, please wait...")
         return super().invoke(context, event)
 
@@ -185,6 +247,21 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
 
         layout.separator()
 
+        # Thumbnail section
+        thumb_box = layout.box()
+        thumb_box.use_property_split = False
+        thumb_header = thumb_box.row()
+        thumb_header.label(text="Thumbnail", icon="IMAGE_DATA")
+        thumb_box.row().prop(self, "thumbnail_mode", expand=True)
+        if self.thumbnail_mode == "AUTO":
+            thumb_box.prop(self, "thumbnail_resolution")
+        elif self.thumbnail_mode == "CUSTOM":
+            thumb_box.prop(self, "thumbnail_image", text="")
+            if self.thumbnail_image == "__CUSTOM_PATH__":
+                thumb_box.prop(self, "thumbnail_image_path", text="")
+
+        layout.separator()
+
         # Standard options
         layout.prop(self, "use_selection")
         layout.prop(self, "export_hidden")
@@ -215,6 +292,13 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             use_components=self.use_components,
             mmu_slicer_format=self.mmu_slicer_format,
             subdivision_depth=self.subdivision_depth,
+            thumbnail_mode=self.thumbnail_mode,
+            thumbnail_resolution=self.thumbnail_resolution,
+            thumbnail_image=(
+                self.thumbnail_image_path
+                if self.thumbnail_image == "__CUSTOM_PATH__"
+                else self.thumbnail_image
+            ),
         )
         return ExportContext(
             options=options,

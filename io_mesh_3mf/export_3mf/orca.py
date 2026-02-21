@@ -227,9 +227,9 @@ class OrcaExporter(BaseExporter):
         ctx._progress_update(96, "Writing configuration...")
         self.write_orca_metadata(archive, mesh_objects, object_data)
 
-        # Write thumbnail if available from .blend file
+        # Write thumbnail
         ctx._progress_update(99, "Writing thumbnail...")
-        write_thumbnail(archive)
+        write_thumbnail(archive, ctx, list(blender_objects))
 
         ctx._progress_update(100, "Finalizing export...")
         return ctx.finalize_export(archive, "Orca-compatible ")

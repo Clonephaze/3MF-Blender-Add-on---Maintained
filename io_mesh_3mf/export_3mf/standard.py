@@ -220,7 +220,7 @@ class StandardExporter(BaseExporter):
             document.write(f, xml_declaration=True, encoding="UTF-8")
 
         write_core_properties(archive)
-        write_thumbnail(archive)
+        write_thumbnail(archive, ctx, list(blender_objects))
 
         ctx._progress_update(100, "Finalizing export...")
         return ctx.finalize_export(archive)

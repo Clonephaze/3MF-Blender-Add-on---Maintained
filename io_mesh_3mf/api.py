@@ -671,6 +671,9 @@ def export_3mf(
     use_components: bool = True,
     mmu_slicer_format: str = "ORCA",
     subdivision_depth: int = 7,
+    thumbnail_mode: str = "AUTO",
+    thumbnail_resolution: int = 256,
+    thumbnail_image: str = "",
     project_template: Optional[str] = None,
     object_settings: Optional[Dict] = None,
     on_progress: Optional[ProgressCallback] = None,
@@ -698,6 +701,11 @@ def export_3mf(
         *use_orca_format* is ``"PAINT"``).
     :param subdivision_depth: Maximum recursive subdivision depth for paint
         segmentation (4–10, default 7). Higher = finer detail but slower.
+    :param thumbnail_mode: ``"AUTO"`` (render clean preview), ``"CUSTOM"``
+        (use *thumbnail_image*), or ``"NONE"`` (no thumbnail).
+    :param thumbnail_resolution: Width and height in pixels for AUTO mode
+        (default 256).
+    :param thumbnail_image: Absolute path to an image file for CUSTOM mode.
     :param project_template: Absolute path to a JSON file to use as the Orca
         ``project_settings.config`` instead of the built-in template.  The
         addon loads this file, patches ``filament_colour`` and resizes
@@ -752,6 +760,9 @@ def export_3mf(
         use_components=use_components,
         mmu_slicer_format=mmu_slicer_format,
         subdivision_depth=subdivision_depth,
+        thumbnail_mode=thumbnail_mode,
+        thumbnail_resolution=thumbnail_resolution,
+        thumbnail_image=thumbnail_image,
     )
     ctx = ExportContext(
         options=options,

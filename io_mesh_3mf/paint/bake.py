@@ -47,12 +47,109 @@ from ..common.logging import debug, error
 #  Helpers
 # ---------------------------------------------------------------------------
 
+def _rgb_to_hsv(rgb):
+    """Convert an (..., 3) float32 RGB array to HSV in-place-safe.
+
+    H is in [0, 1] (cyclic), S and V in [0, 1].
+    Uses the standard max/min algorithm, fully vectorized with numpy.
+    """
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    maxc = np.maximum(np.maximum(r, g), b)
+    minc = np.minimum(np.minimum(r, g), b)
+    delta = maxc - minc
+
+    # Value
+    v = maxc
+
+    # Saturation (0 where maxc == 0)
+    safe_maxc = np.where(maxc > 0, maxc, 1.0)
+    s = np.where(maxc > 0, delta / safe_maxc, 0.0)
+
+    # Hue
+    h = np.zeros_like(maxc)
+    mask = delta > 0
+    # Red is max
+    idx = mask & (maxc == r)
+    h[idx] = ((g[idx] - b[idx]) / delta[idx]) % 6.0
+    # Green is max
+    idx = mask & (maxc == g)
+    h[idx] = ((b[idx] - r[idx]) / delta[idx]) + 2.0
+    # Blue is max
+    idx = mask & (maxc == b)
+    h[idx] = ((r[idx] - g[idx]) / delta[idx]) + 4.0
+    h = h / 6.0  # normalise to [0, 1]
+
+    return np.stack([h, s, v], axis=-1).astype(np.float32)
+
+
+def _hue_aware_distance(pixel_hsv, palette_hsv, pixel_rgb, palette_rgb):
+    """Compute a perceptual distance that strongly weights chromaticity.
+
+    For **chromatic** pixels (saturation > 0.08) we use a weighted HSV
+    distance where hue and saturation dominate:
+
+        d² = W_H·Δh² + W_S·Δs² + W_V·Δv²
+
+    Hue is cyclic (wraps at 1.0) so Δh = min(|h1-h2|, 1-|h1-h2|).
+
+    For **achromatic** pixels (greys, near-black) hue is meaningless so
+    we fall back to plain Euclidean RGB distance.
+
+    Returns an (..., N) float32 distance array (one value per palette color).
+    """
+    # Weights chosen so that baked-in shadows (large ΔV) do NOT
+    # overpower chromaticity.  A typical shadow drops V by 0.5–0.7 →
+    # contribution = 0.05 × 0.25 = 0.0125, while a meaningful hue
+    # shift of ΔH=0.05 contributes 6.0 × 0.0025 = 0.015.  Hue wins.
+    # Achromatic pixels (black/white/grey) fall back to Euclidean RGB
+    # via the saturation-based alpha blend, so V still matters there.
+    W_H = 6.0   # Hue — dominant, keeps shadowed-red ≠ black
+    W_S = 4.0   # Saturation — colourful vs grey
+    W_V = 0.05  # Value/brightness — near-zero, shadows become irrelevant
+
+    # pixel_hsv: (..., 1, 3)   palette_hsv: (1, 1, N, 3)
+    dh = np.abs(pixel_hsv[..., 0:1] - palette_hsv[..., 0:1])
+    dh = np.minimum(dh, 1.0 - dh)  # cyclic wrap
+    ds = pixel_hsv[..., 1:2] - palette_hsv[..., 1:2]
+    dv = pixel_hsv[..., 2:3] - palette_hsv[..., 2:3]
+
+    hsv_dist = W_H * dh ** 2 + W_S * ds ** 2 + W_V * dv ** 2
+    hsv_dist = hsv_dist[..., 0]  # squeeze last dim
+
+    # RGB fallback for achromatic pixels
+    rgb_dist = np.sum(
+        (pixel_rgb - palette_rgb) ** 2, axis=-1
+    )
+
+    # Per-pixel saturation and value (from the pixel, not the palette)
+    # pixel_hsv is (..., 1, 3) — take [..., 0, 1] / [..., 0, 2] to
+    # collapse the palette dim, giving (...) which broadcasts cleanly
+    # against hsv_dist's (..., N) shape.
+    sat = pixel_hsv[..., 0, 1]  # (...)
+    val = pixel_hsv[..., 0, 2]  # (...)
+    sat = np.broadcast_to(sat[..., np.newaxis], hsv_dist.shape)
+    val = np.broadcast_to(val[..., np.newaxis], hsv_dist.shape)
+
+    # Blend: chromatic AND sufficiently bright pixels use HSV distance,
+    # dark or achromatic pixels fall back to Euclidean RGB.
+    # Without the value gate, near-black pixels (e.g. RGB 0.03,0.01,0.01)
+    # can have high saturation but garbage hue, causing noise speckling.
+    sat_alpha = np.clip(sat / 0.08, 0.0, 1.0)
+    val_alpha = np.clip(val / 0.12, 0.0, 1.0)
+    alpha = sat_alpha * val_alpha
+    return (alpha * hsv_dist + (1.0 - alpha) * rgb_dist).astype(np.float32)
+
+
 def _quantize_pixels(
     pixels: np.ndarray,
     filament_colors: list,
 ) -> int:
     """
     Snap every pixel in the image to the nearest filament color.
+
+    Uses a hue-dominant perceptual distance so that shadowed regions
+    (e.g. dark red in shadow) still match the correct chromaticity
+    rather than being pulled toward black or grey.
 
     Operates in-place on the (H, W, 4) float32 array.
 
@@ -66,6 +163,9 @@ def _quantize_pixels(
     palette = np.array(filament_colors, dtype=np.float32)  # (N, 3)
     n_colors = len(palette)
 
+    # Pre-compute palette HSV once
+    palette_hsv = _rgb_to_hsv(palette)  # (N, 3)
+
     changed = 0
     chunk_size = 256  # Keep memory bounded for large textures
 
@@ -75,12 +175,20 @@ def _quantize_pixels(
         chunk_rgb = chunk[:, :, :3]    # (chunk_h, W, 3)
         chunk_h = chunk_rgb.shape[0]
 
-        # Expand for broadcasting: (chunk_h, W, 1, 3) vs (1, 1, N, 3)
-        expanded = chunk_rgb.reshape(chunk_h, width, 1, 3)
-        palette_expanded = palette.reshape(1, 1, n_colors, 3)
+        # Convert chunk to HSV
+        chunk_hsv = _rgb_to_hsv(chunk_rgb)  # (chunk_h, W, 3)
 
-        # Sum of squared differences (Euclidean-ish, no sqrt needed)
-        dists = np.sum((expanded - palette_expanded) ** 2, axis=3)  # (chunk_h, W, N)
+        # Expand for broadcasting: (chunk_h, W, 1, 3) vs (1, 1, N, 3)
+        expanded_hsv = chunk_hsv.reshape(chunk_h, width, 1, 3)
+        expanded_rgb = chunk_rgb.reshape(chunk_h, width, 1, 3)
+        palette_hsv_exp = palette_hsv.reshape(1, 1, n_colors, 3)
+        palette_rgb_exp = palette.reshape(1, 1, n_colors, 3)
+
+        # Hue-aware distance: (chunk_h, W, N)
+        dists = _hue_aware_distance(
+            expanded_hsv, palette_hsv_exp,
+            expanded_rgb, palette_rgb_exp,
+        )
         nearest_idx = np.argmin(dists, axis=2)  # (chunk_h, W)
 
         # Build the new color values
@@ -102,7 +210,7 @@ def _ensure_uv_unwrap(obj, context):
     Uses the UV method selected in MMUPaintSettings (Smart UV Project by
     default, Lightmap Pack as an option).
 
-    A Limited Dissolve pass (angle ~2°) is applied first to merge coplanar
+    A Limited Dissolve pass (angle ~0.5°) is applied first to merge coplanar
     triangles — this gives each remaining face more UV space and reduces
     blurriness, especially with Lightmap Pack.
 
@@ -135,12 +243,12 @@ def _ensure_uv_unwrap(obj, context):
     context.view_layer.objects.active = obj
 
     # Limited Dissolve merges coplanar triangles, giving each face more
-    # UV space and reducing blurriness.  ~2° is conservative enough to
-    # preserve all intentional geometry detail.
+    # UV space and reducing blurriness.  ~0.5° is tight enough to only
+    # merge truly flat faces while leaving curved surfaces intact.
     bm = bmesh.new()
     bm.from_mesh(mesh)
     bmesh.ops.dissolve_limit(
-        bm, angle_limit=0.0349,
+        bm, angle_limit=0.00873,
         verts=bm.verts, edges=bm.edges,
     )
     bm.to_mesh(mesh)
@@ -190,7 +298,12 @@ def _get_texture_size(mesh, override_size=0):
 
 
 def _get_filament_colors_from_settings(context):
-    """Read the init_filaments list from MMUPaintSettings, return list of (r,g,b) tuples."""
+    """Read the init_filaments list from MMUPaintSettings.
+
+    Returns list of (r, g, b) tuples in **sRGB**, matching the colour
+    space of ``image.pixels`` for sRGB-tagged images (Blender's default
+    for newly-created images).
+    """
     settings = context.scene.mmu_paint
     colors = []
     for item in settings.init_filaments:

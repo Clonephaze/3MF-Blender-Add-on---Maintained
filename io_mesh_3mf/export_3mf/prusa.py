@@ -172,7 +172,7 @@ class PrusaExporter(BaseExporter):
         write_core_properties(archive)
 
         # Write thumbnail
-        write_thumbnail(archive)
+        write_thumbnail(archive, ctx, list(blender_objects))
 
         ctx._progress_update(100, "Finalizing export...")
         return ctx.finalize_export(archive, "PrusaSlicer-compatible ")

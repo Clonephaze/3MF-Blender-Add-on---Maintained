@@ -943,44 +943,148 @@ def _has_color_attribute_node(obj):
     return False
 
 
-def _bin_srgb_pixels(srgb):
-    """Bin an (N, 3) sRGB array into 16-level histogram bins.
+def _srgb_to_hsv_array(srgb):
+    """Convert an (N, 3) sRGB array to HSV.  H in [0, 1] (cyclic), S/V in [0, 1]."""
+    r, g, b = srgb[:, 0], srgb[:, 1], srgb[:, 2]
+    maxc = np.maximum(np.maximum(r, g), b)
+    minc = np.minimum(np.minimum(r, g), b)
+    delta = maxc - minc
+    v = maxc
+    safe_maxc = np.where(maxc > 0, maxc, 1.0)
+    s = np.where(maxc > 0, delta / safe_maxc, 0.0)
+    h = np.zeros_like(maxc)
+    mask = delta > 0
+    idx = mask & (maxc == r)
+    h[idx] = ((g[idx] - b[idx]) / delta[idx]) % 6.0
+    idx = mask & (maxc == g)
+    h[idx] = ((b[idx] - r[idx]) / delta[idx]) + 2.0
+    idx = mask & (maxc == b)
+    h[idx] = ((r[idx] - g[idx]) / delta[idx]) + 4.0
+    h = h / 6.0  # normalise to [0, 1]
+    return np.stack([h, s, v], axis=-1).astype(np.float32)
 
-    Returns ``(bin_colors, bin_counts)`` where *bin_colors* is an (M, 3)
-    float32 array of sRGB center values per bin and *bin_counts* is the
-    corresponding (M,) count array, both sorted by descending frequency.
+
+def _bin_pixels_hsv(srgb):
+    """Bin an (N, 3) sRGB array by **Hue × Saturation**, ignoring brightness.
+
+    Chromatic pixels (S >= 0.10) are placed into ``HUE_BINS × SAT_BINS``
+    buckets.  Achromatic pixels (S < 0.10) are placed into ``VAL_BINS``
+    grey-scale buckets.  This merges shadow/highlight variants of the
+    same hue into one bin, which is far better for photo-realistic textures
+    with baked-in lighting.
+
+    Returns ``(bin_colors, bin_counts)`` where *bin_colors* is (M, 3) sRGB
+    center-values and *bin_counts* is (M,), both sorted descending by count.
+    The representative sRGB color of each HS bin is the **median** brightness
+    at full saturation → natural-looking palette entry.
     """
-    BIN_LEVELS = 16
-    binned = (srgb * (BIN_LEVELS - 0.001)).astype(np.uint16)
-    bin_ids = (
-        binned[:, 0].astype(np.uint32) * BIN_LEVELS * BIN_LEVELS
-        + binned[:, 1].astype(np.uint32) * BIN_LEVELS
-        + binned[:, 2].astype(np.uint32)
-    )
+    HUE_BINS = 18
+    SAT_BINS = 6
+    VAL_BINS = 8
+    ACHROMATIC_THR = 0.10
 
-    unique_bins, counts = np.unique(bin_ids, return_counts=True)
+    hsv = _srgb_to_hsv_array(srgb)  # (N, 3)
+    is_chromatic = hsv[:, 1] >= ACHROMATIC_THR
+
+    # ----- chromatic bins (HS, ignore V) ---------------------------------
+    chrom_hsv = hsv[is_chromatic]
+    chrom_srgb = srgb[is_chromatic]
+
+    h_idx = (chrom_hsv[:, 0] * (HUE_BINS - 0.001)).astype(np.uint16)
+    s_idx = np.clip(
+        ((chrom_hsv[:, 1] - ACHROMATIC_THR) / (1.0 - ACHROMATIC_THR) * (SAT_BINS - 0.001)).astype(np.uint16),
+        0, SAT_BINS - 1,
+    )
+    chrom_bin_ids = h_idx.astype(np.uint32) * SAT_BINS + s_idx.astype(np.uint32)
+
+    # offset of 1 so bin 0 is reserved for the achromatic range
+    chrom_bin_ids += 1
+
+    # ----- achromatic bins (value only) ----------------------------------
+    achrom_hsv = hsv[~is_chromatic]
+    achrom_srgb = srgb[~is_chromatic]
+    v_idx = (achrom_hsv[:, 2] * (VAL_BINS - 0.001)).astype(np.uint16)
+    # IDs 0 is unused; achromatic range uses negative to avoid clash —
+    # actually just use a separate ID space above chromatic max.
+    ACHROM_OFFSET = np.uint32(HUE_BINS * SAT_BINS + 1)
+    achrom_bin_ids = v_idx.astype(np.uint32) + ACHROM_OFFSET
+
+    # ----- merge and count -----------------------------------------------
+    all_bin_ids = np.concatenate([chrom_bin_ids, achrom_bin_ids]) if len(achrom_bin_ids) else chrom_bin_ids
+    all_srgb = np.concatenate([chrom_srgb, achrom_srgb]) if len(achrom_srgb) else chrom_srgb
+    all_hsv = np.concatenate([chrom_hsv, achrom_hsv]) if len(achrom_hsv) else chrom_hsv
+
+    unique_bins, inv, counts = np.unique(all_bin_ids, return_inverse=True, return_counts=True)
     order = np.argsort(-counts)
     unique_bins = unique_bins[order]
     counts = counts[order]
 
-    # Convert bin indices back to sRGB center values
+    # Build a representative sRGB color per bin.
+    # For chromatic bins: take median V at the bin's center H/S → vivid.
+    # For achromatic bins: simple grey at the bin's center V.
     colors = np.empty((len(unique_bins), 3), dtype=np.float32)
-    for i, bid in enumerate(unique_bins):
-        colors[i, 0] = (int(bid) // (BIN_LEVELS * BIN_LEVELS) + 0.5) / BIN_LEVELS
-        colors[i, 1] = ((int(bid) // BIN_LEVELS) % BIN_LEVELS + 0.5) / BIN_LEVELS
-        colors[i, 2] = (int(bid) % BIN_LEVELS + 0.5) / BIN_LEVELS
 
+    for out_i, bid in enumerate(unique_bins):
+        mask = all_bin_ids == bid
+        member_srgb = all_srgb[mask]
+        member_hsv = all_hsv[mask]
+        # Representative color: median hue/sat (stable), but 75th
+        # percentile brightness.  On 3D models shadows cover more
+        # surface area than highlights, so the median V is too dark.
+        # The 75th percentile picks the "typical lit surface" color.
+        med_srgb = np.median(member_srgb, axis=0)
+        v_75 = np.percentile(member_hsv[:, 2], 75)
+        med_v = np.median(member_hsv[:, 2])
+        # Scale the median sRGB toward the brighter representative:
+        #   if med_v > 0 boost each channel by (v_75 / med_v),
+        #   clamped to [0, 1].
+        if med_v > 0.01:
+            boost = min(v_75 / med_v, 2.0)
+            colors[out_i] = np.clip(med_srgb * boost, 0.0, 1.0)
+        else:
+            colors[out_i] = med_srgb
+
+    debug(f"[Detect] _bin_pixels_hsv: {len(srgb)} pixels → {len(unique_bins)} HS/V bins "  # noqa: E501
+          f"(chromatic={int(np.sum(is_chromatic))}, achromatic={int(np.sum(~is_chromatic))})")
     return colors, counts
+
+
+def _hs_distance(colors_a, colors_b_row):
+    """Cyclic Hue-Saturation distance between (N,3) and (3,) sRGB arrays.
+
+    Converts to HSV, then computes  √(W_H·Δh² + W_S·Δs²)  with cyclic
+    hue wrapping.  Achromatic entries (S < 0.10) use Euclidean RGB
+    distance instead so that black/white/grey are handled correctly.
+    """
+    W_H = 6.0
+    W_S = 3.0
+
+    hsv_a = _srgb_to_hsv_array(colors_a)  # (N, 3)
+    hsv_b = _srgb_to_hsv_array(colors_b_row.reshape(1, 3))  # (1, 3)
+
+    dh = np.abs(hsv_a[:, 0] - hsv_b[0, 0])
+    dh = np.minimum(dh, 1.0 - dh)
+    ds = hsv_a[:, 1] - hsv_b[0, 1]
+
+    hsv_dist = np.sqrt(W_H * dh ** 2 + W_S * ds ** 2)
+
+    # RGB fallback for achromatic pixels
+    rgb_dist = np.sqrt(np.sum((colors_a - colors_b_row) ** 2, axis=1))
+
+    # Blend: use HSV for chromatic, RGB for achromatic
+    sat = hsv_a[:, 1]
+    alpha = np.clip(sat / 0.10, 0.0, 1.0)
+    return alpha * hsv_dist + (1.0 - alpha) * rgb_dist
 
 
 def _select_diverse_colors(bin_colors, bin_counts, num_colors):
     """Greedily pick *num_colors* that are both frequent AND visually diverse.
 
-    1. First pick = the most frequent bin.
-    2. Each subsequent pick maximises  ``frequency_weight × min_distance``
-       where *min_distance* is the Euclidean sRGB distance to the nearest
-       already-selected color.  This prevents selecting multiple bins of
-       the same hue even when they dominate the histogram.
+    1. First pick = most frequent bin.
+    2. Each subsequent pick maximises ``frequency_weight × min_distance``
+       where *min_distance* is the **HS-dominant distance** (cyclic hue +
+       saturation, with RGB fallback for greys) to the nearest already-
+       selected color.
 
     Returns a list of ``(r, g, b)`` sRGB tuples.
     """
@@ -990,11 +1094,7 @@ def _select_diverse_colors(bin_colors, bin_counts, num_colors):
     if n <= num_colors:
         return [tuple(bin_colors[i]) for i in range(n)]
 
-    # Normalise counts to [0, 1] then take sqrt so that frequency
-    # still matters but doesn't drown out color diversity.  Without
-    # this, multiple near-identical grey bins outscore a distinct but
-    # less frequent skin-tone bin.
-    max_count = float(bin_counts[0])  # already sorted descending
+    max_count = float(bin_counts[0])
     weights = np.sqrt(bin_counts.astype(np.float64) / max_count)
 
     debug(f"[Detect] _select_diverse_colors: {n} bins, picking {num_colors}")
@@ -1003,17 +1103,15 @@ def _select_diverse_colors(bin_colors, bin_counts, num_colors):
         c = bin_colors[i]
         debug(f"    bin[{i}] sRGB ({c[0]:.3f}, {c[1]:.3f}, {c[2]:.3f})  count={bin_counts[i]}  weight={weights[i]:.4f}")
 
-    selected_indices = [0]  # start with the most frequent
-    # Track min distance from each candidate to any selected color
+    selected_indices = [0]
     min_dists = np.full(n, np.inf, dtype=np.float64)
 
     for step in range(num_colors - 1):
         last_sel = bin_colors[selected_indices[-1]]
-        # Update min distances with the distance to the last picked color
-        dists = np.sqrt(np.sum((bin_colors - last_sel) ** 2, axis=1))
+        # HS-dominant distance to the latest picked color
+        dists = _hs_distance(bin_colors, last_sel)
         min_dists = np.minimum(min_dists, dists)
 
-        # Score = frequency_weight * distance (exclude already selected)
         scores = weights * min_dists
         for idx in selected_indices:
             scores[idx] = -1.0
@@ -1077,7 +1175,7 @@ def _extract_texture_colors(image, num_colors):
     if srgb.size == 0:
         return []
 
-    bin_colors, bin_counts = _bin_srgb_pixels(srgb)
+    bin_colors, bin_counts = _bin_pixels_hsv(srgb)
     debug(f"[Detect]   Unique bins: {len(bin_colors)}")
     return _select_diverse_colors(bin_colors, bin_counts, num_colors)
 
@@ -1085,7 +1183,7 @@ def _extract_texture_colors(image, num_colors):
 def _extract_vertex_colors(obj, num_colors):
     """Extract the *num_colors* most dominant vertex colors from *obj*.
 
-    Reads the active color attribute and applies the same histogram
+    Reads the active color attribute and applies the same HSV histogram
     binning + diversity-weighted selection as ``_extract_texture_colors``.
     """
     if not _has_vertex_colors(obj):
@@ -1123,7 +1221,7 @@ def _extract_vertex_colors(obj, num_colors):
         debug("[Detect]   All pixels were near-white, nothing left")
         return []
 
-    bin_colors, bin_counts = _bin_srgb_pixels(srgb)
+    bin_colors, bin_counts = _bin_pixels_hsv(srgb)
     debug(f"[Detect]   Unique bins: {len(bin_colors)}")
     return _select_diverse_colors(bin_colors, bin_counts, num_colors)
 
