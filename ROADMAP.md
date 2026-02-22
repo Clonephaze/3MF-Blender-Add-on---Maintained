@@ -43,32 +43,7 @@ Features and improvements organized by priority. Complexity ratings help with pl
 ### Geometry
 | Status | Feature | Complexity | Description |
 |--------|---------|------------|-------------|
-| 💭 | Sharp Edges | 🟡 | Preserve via edge marks |
-
----
-
-## 💾 Metadata
-
-| Status | Feature | Complexity | Description |
-|--------|---------|------------|-------------|
-| 📋 | Vendor Metadata | 🟡 | Preserve vendor metadata on re-export |
-| ✅ | Metadata Panel | 🟡 | UI to view/edit 3MF metadata |
-
----
-
-## 🖥️ User Experience
-
-### Export
-| Status | Feature | Complexity | Description |
-|--------|---------|------------|-------------|
-| ✅ | Export Presets | 🟡 | Save/load configurations |
-| ✅ | Compression Level | 🟢 | Adjustable ZIP compression |
-
-
-### UI
-| Status | Feature | Complexity | Description |
-|--------|---------|------------|-------------|
-| ✅ | Properties Panel | 🟡 | Sidebar panel for 3MF data |
+| 💭 | Sharp Edges | 🟡 | Preserve via edge marks 
 
 ---
 
@@ -97,7 +72,6 @@ Features and improvements organized by priority. Complexity ratings help with pl
 - [ ] Triangle Sets UI for Custom Assignment
 - [ ] Sharp Edge Preservation Method/Options
 - [ ] Project Config Preservation/Editing
-- [x] Custom Metadata Editing/Adding/Viewing
 - [ ] Better Progress Indicators (Blender import/export helpers block main thread)
 - [ ] Seam/support painting formats (No idea if we can add this in any way slicers support it)
 ---
