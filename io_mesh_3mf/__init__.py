@@ -317,7 +317,14 @@ def menu_export(self, _) -> None:
     self.layout.operator(Export3MF.bl_idname, text="3D Manufacturing Format (.3mf)")
 
 
-classes = (ThreeMFPreferences, EXPORT_MT_threemf_presets, EXPORT_OT_threemf_preset, Import3MF, Export3MF, ThreeMF_FH_import)
+classes = (
+    ThreeMFPreferences,
+    EXPORT_MT_threemf_presets,
+    EXPORT_OT_threemf_preset,
+    Import3MF,
+    Export3MF,
+    ThreeMF_FH_import,
+)
 
 
 def register() -> None:

@@ -404,7 +404,7 @@ def _select_diverse_colors(bin_colors, bin_counts, num_colors):
             scores[idx] = -1.0
         best = int(np.argmax(scores))
         c = bin_colors[best]
-        debug(f"    Step {step+1}: picked bin[{best}] sRGB ({c[0]:.3f}, {c[1]:.3f}, {c[2]:.3f})  "
+        debug(f"    Step {step + 1}: picked bin[{best}] sRGB ({c[0]:.3f}, {c[1]:.3f}, {c[2]:.3f})  "
               f"count={bin_counts[best]}  min_dist={min_dists[best]:.4f}  score={scores[best]:.4f}")
         selected_indices.append(best)
 
@@ -493,12 +493,12 @@ def _extract_vertex_colors(obj, num_colors):
     # Sample first few values for debugging
     debug("[Detect]   First 5 raw linear RGB values:")
     for i in range(min(5, len(rgb))):
-        debug(f"    [{i}] ({rgb[i,0]:.4f}, {rgb[i,1]:.4f}, {rgb[i,2]:.4f})")
+        debug(f"    [{i}] ({rgb[i, 0]:.4f}, {rgb[i, 1]:.4f}, {rgb[i, 2]:.4f})")
 
     srgb = _linear_to_srgb_array(rgb)
     debug("[Detect]   First 5 sRGB values:")
     for i in range(min(5, len(srgb))):
-        debug(f"    [{i}] ({srgb[i,0]:.4f}, {srgb[i,1]:.4f}, {srgb[i,2]:.4f})")
+        debug(f"    [{i}] ({srgb[i, 0]:.4f}, {srgb[i, 1]:.4f}, {srgb[i, 2]:.4f})")
 
     # Discard near-white pixels (bare/untextured regions)
     near_white = np.all(srgb > 0.94, axis=1)
