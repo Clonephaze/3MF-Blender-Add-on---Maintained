@@ -1,3 +1,21 @@
+2.2.0 — Metadata Panel, Export Presets & Compression
+====
+
+Features
+----
+* **3MF Metadata Panel** — New `VIEW3D > 3MF > Metadata` sidebar panel (Object mode) to view and edit 3MF metadata. Editable standard fields (Title, Designer, Description, Copyright, LicenseTerms), read-only fields (Application, CreationDate, ModificationDate), custom entries, per-object metadata, and stashed config indicator.
+* **Export presets** — Save and load named export configurations from the export dialog preset dropdown. Persist across sessions via Blender's built-in preset system.
+* **Adjustable compression level** — Compression slider (0–9) in the export dialog, addon preferences, and public API. Default 3 for good speed/size balance.
+* **Slicer config preservation** — Slicer configs (`project_settings.config`, `Slic3r_PE.config`, etc.) are stashed on import and round-tripped on re-export, preserving printer profiles and filament settings through Blender workflows.
+
+Technical
+----
+* Slicer configs stored in Blender text blocks under `.3mf_config/` prefix (Base85 encoded). Stash invalidated if configs differ across multiple imported files.
+* `paint/panel.py` (1499 lines) split into focused submodules: `helpers.py`, `properties.py`, `color_detection.py`, `operators.py`, `mmu_panel.py`.
+* New `panels/` package for non-paint sidebar panels; metadata panel is the first module.
+
+---
+
 2.1.0 — Bake to MMU & Auto-Detect Colors
 ====
 

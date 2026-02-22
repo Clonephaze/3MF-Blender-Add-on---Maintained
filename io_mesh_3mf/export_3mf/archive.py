@@ -39,7 +39,7 @@ from ..common.constants import (
 )
 
 
-def create_archive(filepath: str, safe_report: Callable) -> Optional[zipfile.ZipFile]:
+def create_archive(filepath: str, safe_report: Callable, compression_level: int = 3) -> Optional[zipfile.ZipFile]:
     """
     Creates an empty 3MF archive.
 
@@ -48,12 +48,12 @@ def create_archive(filepath: str, safe_report: Callable) -> Optional[zipfile.Zip
 
     :param filepath: The path to write the file to.
     :param safe_report: Callable for reporting errors/warnings.
+    :param compression_level: ZIP deflate compression level (0=store, 9=max). Default 3.
     :return: A zip archive that other functions can add things to.
     """
     try:
         archive = zipfile.ZipFile(
-            # Use compression for smaller file sizes, but level 3 to avoid excessive write times on large files.
-            filepath, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=3
+            filepath, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=compression_level
         )
 
         # Store the file annotations we got from imported 3MF files.

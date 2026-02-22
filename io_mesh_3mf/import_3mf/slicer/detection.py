@@ -32,7 +32,7 @@ def detect_vendor(
     """Detect if a 3MF file was created by a specific vendor slicer.
 
     :param root: The root element of the 3MF model document.
-    :return: Vendor identifier (e.g. ``"orca"``) or ``None`` for standard 3MF.
+    :return: Vendor identifier (``"orca"`` | ``"prusa"`` | ``None``) for standard 3MF.
     """
     # Check for BambuStudio / Orca Slicer specific metadata
     for metadata_node in root.iterfind("./3mf:metadata", MODEL_NAMESPACES):
@@ -45,6 +45,12 @@ def detect_vendor(
             if "orca" in app_name or "bambu" in app_name:
                 debug(f"Detected Orca/Bambu format from Application: {metadata_node.text}")
                 return "orca"
+            if "prusaslicer" in app_name or "slic3r" in app_name or "superslicer" in app_name:
+                debug(f"Detected PrusaSlicer format from Application: {metadata_node.text}")
+                return "prusa"
+        if name.startswith("slic3rpe:"):
+            debug(f"Detected PrusaSlicer format from metadata: {name}")
+            return "prusa"
 
     # Check for BambuStudio namespace in root attributes
     for attr_name in root.attrib:

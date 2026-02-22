@@ -10,6 +10,7 @@ Features and improvements organized by priority. Complexity ratings help with pl
 
 | Symbol | Meaning |
 |--------|---------|
+| ✅ | Done |
 | 📋 | Planned |
 | 💭 | Needs Research |
 
@@ -19,117 +20,30 @@ Features and improvements organized by priority. Complexity ratings help with pl
 
 ## 📦 3MF Extensions
 
-### Materials Extension v1.2.1
-> `http://schemas.microsoft.com/3dmanufacturing/material/2015/02`
-
-| Status | Feature | Complexity | Description |
-|--------|---------|------------|-------------|
-| ✅ | Full Passthrough Support | 🟡 | All element types preserved for round-trip |
-| ✅ | Color Groups | 🟡 | `<colorgroup>` with color arrays |
-| ✅ | Texture 2D / 2D Groups | 🔴 | Texture definitions with UV coordinates |
-| ✅ | Composite Materials | 🟡 | Material blending definitions |
-| ✅ | Multiproperties | 🟡 | Multiple property assignments |
-| ✅ | Active PBR Metallic | 🟡 | Metallic/roughness applied to Principled BSDF |
-| ✅ | Active PBR Specular | 🟡 | Specular/glossiness applied to Principled BSDF |
-| ✅ | Active Translucent | 🟡 | IOR/transmission/attenuation applied to glass materials |
-| ✅ | Textured PBR Display | 🔴 | Full node setup with metallic/roughness texture maps |
-
 ### Triangle Sets Extension
 > `http://schemas.microsoft.com/3dmanufacturing/trianglesets/2021/07`
 
 | Status | Feature | Complexity | Description |
 |--------|---------|------------|-------------|
-| ✅ | Import Triangle Sets | 🟡 | Read triangle sets as face attributes |
-| ✅ | Export Triangle Sets | 🟡 | Auto-export when attribute exists |
 | 💭 | Triangle Sets UI Panel | 🟡 | Create/edit sets in Blender (face selection → named groups) |
 
 ---
 
 ## 🖨️ Slicer Compatibility
 
-### Orca Slicer / BambuStudio
-| Status | Feature | Complexity | Description |
-|--------|---------|------------|-------------|
-| 💭 | Object Settings | 🟡 | Per-object print settings preservation |
-
-### PrusaSlicer / SuperSlicer
-| Status | Feature | Complexity | Description |
-|--------|---------|------------|-------------|
-| 💭 | Object Config | 🟡 | `slic3rpe:` per-object attributes |
-
 ### Cura
 | Status | Feature | Complexity | Description |
 |--------|---------|------------|-------------|
-| 📋 | Cura Settings | 🟡 | `cura:` namespace support |
+| 💭 | MMU Research Needed | 🔴 | Import/Export of cura MMU Data Needed
 
 ---
 
 ## 🎨 Blender Integration
 
-### Materials
-| Status | Feature | Complexity | Description |
-|--------|---------|------------|-------------|
-| 💭 | Alpha/Transparency | 🟢 | RGBA support with blend modes |
-
 ### Geometry
 | Status | Feature | Complexity | Description |
 |--------|---------|------------|-------------|
-| 💭 | Sharp Edges | 🟡 | Preserve via edge marks |
-
-### Scene
-| Status | Feature | Complexity | Description |
-|--------|---------|------------|-------------|
-| ✅ | Collections → Components | 🟡 | Map hierarchy to 3MF structure |
-| ✅ | Instances | 🟡 | Linked duplicates as component refs |
-
-### Thumbnails
-| Status | Feature | Complexity | Description |
-|--------|---------|------------|-------------|
-| 📋 | Custom Thumbnail | 🟢 | Use custom image file |
-| 📋 | Resolution Option | 🟢 | Configurable size |
-
----
-
-## 💾 Metadata
-
-| Status | Feature | Complexity | Description |
-|--------|---------|------------|-------------|
-| 📋 | Custom Metadata | 🟡 | Preserve vendor metadata on re-export |
-| 📋 | Metadata Panel | 🟡 | UI to view/edit 3MF metadata |
-| 📋 | Blender Info | 🟢 | Export Blender version, author |
-
----
-
-## 🖥️ User Experience
-
-### Export
-| Status | Feature | Complexity | Description |
-|--------|---------|------------|-------------|
-| 📋 | Export Presets | 🟡 | Save/load configurations |
-| 📋 | Compression Level | 🟢 | Adjustable ZIP compression |
-
-
-### UI
-| Status | Feature | Complexity | Description |
-|--------|---------|------------|-------------|
-| 💭 | Properties Panel | 🟡 | Sidebar panel for 3MF data |
-
----
-
-## 🏗️ Code Architecture
-
-### Import/Export Restructure (✅ Completed in 2.0.0)
-> Monolithic files converted to clean sub-packages with public API
-
-| Status | Feature | Complexity | Description |
-|--------|---------|------------|-------------|
-| ✅ | `import_3mf/` package | 🔴 | Operator, context, archive, geometry, builder, scene, slicer, materials |
-| ✅ | `export_3mf/` package | 🔴 | Operator, context, archive, geometry, standard/orca/prusa exporters |
-| ✅ | `common/` package | 🟡 | Shared types, constants, colors, logging, XML, units, segmentation, extensions |
-| ✅ | Context dataclasses | 🟡 | `ImportContext` / `ExportContext` replace mutable operator state |
-| ✅ | Public API (`api.py`) | 🔴 | `import_3mf()`, `export_3mf()`, `inspect_3mf()`, batch ops, building blocks |
-| ✅ | Free function API | 🟡 | Core parsing as standalone functions for CLI/addon use |
-| ✅ | Remove thin wrappers | 🟢 | Dropped backward-compat wrapper methods |
+| 💭 | Sharp Edges | 🟡 | Preserve via edge marks 
 
 ---
 
@@ -147,37 +61,19 @@ Features and improvements organized by priority. Complexity ratings help with pl
 
 | Status | Feature | Complexity | Description |
 |--------|---------|------------|-------------|
-| ✅ | User Guide | 🟡 | Usage documentation |
-| ✅ | API Documentation | 🟡 | Public API reference (API.md) |
+| 📋 | User Guide | 🟡 | Usage documentation (Needs Improvement) |
+| 📋 | API Documentation | 🟡 | Public API reference (Needs Improvement) |
 
 ---
 
-## 🚀 Priority Tiers
-
-### High Priority
-*Core functionality and features*
-
-- [ ] Custom thumbnail option (Camera angles, resolution)
-
-### Medium Priority
-*Quality of life improvements*
-
-- [ ] Compression level option
-
-### Lower Priority
-*Nice to have*
-
-- [ ] Cura support
-- [ ] Organize Properties Panel
-- [ ] Better Progress Indicators
-
 ### Research Needed
-*Requires investigation before committing*
+*Requires investigation*
 
-- [ ] PrusaSlicer Volumetric Paint (Per-vertex paint bucket encoding - requires reverse-engineering proprietary format)
+- [ ] Triangle Sets UI for Custom Assignment
+- [ ] Sharp Edge Preservation Method/Options
+- [ ] Project Config Preservation/Editing
+- [ ] Better Progress Indicators (Blender import/export helpers block main thread)
 - [ ] Seam/support painting formats (No idea if we can add this in any way slicers support it)
-- [ ] Material settings round-trip (Extra material settings, etc, for full re-import)
-
 ---
 
 ## 🤝 Contributing
@@ -189,4 +85,4 @@ Help wanted:
 
 ---
 
-*Current version: 2.0.0*
+*Current version: 2.2.0*
