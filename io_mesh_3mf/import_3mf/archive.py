@@ -45,6 +45,7 @@ __all__ = [
     "read_content_types",
     "assign_content_types",
     "must_preserve",
+    "stash_slicer_configs",
     "load_external_model",
 ]
 
@@ -241,6 +242,91 @@ def must_preserve(
                 else:
                     handle = bpy.data.texts.new(filename)
                     handle.write(file_contents)
+
+
+# ---------------------------------------------------------------------------
+# stash_slicer_configs
+# ---------------------------------------------------------------------------
+
+# Config files to preserve for round-trip export.
+_SLICER_CONFIG_FILES = (
+    "Metadata/project_settings.config",     # Orca Slicer / BambuStudio
+    "Metadata/model_settings.config",       # Orca Slicer / BambuStudio
+    "Metadata/Slic3r_PE.config",            # PrusaSlicer / SuperSlicer
+    "Metadata/Slic3r_PE_model.config",      # PrusaSlicer / SuperSlicer
+)
+
+_CONFIG_STASH_PREFIX = ".3mf_config/"
+
+
+def stash_slicer_configs(ctx: "ImportContext", archive_path: str) -> None:
+    """Stash slicer configuration files from the archive for round-trip export.
+
+    Reads known slicer config files and stores them in Blender text blocks
+    under the ``.3mf_config/`` prefix, using the same Base85 encoding as
+    :func:`must_preserve`.  On re-export, the Orca and Prusa exporters
+    check for stashed configs and use them as the base template instead of
+    regenerating from scratch.
+
+    Multi-file conflict handling: if the same config file appears with
+    different content across multiple imports, the stashed copy is removed
+    (conflicting configs cannot be merged).
+
+    :param ctx: The import context.
+    :param archive_path: Filesystem path to the ``.3mf`` archive.
+    """
+    try:
+        with zipfile.ZipFile(archive_path, "r") as archive:
+            namelist = set(archive.namelist())
+            for config_path in _SLICER_CONFIG_FILES:
+                if config_path not in namelist:
+                    continue
+
+                try:
+                    raw = archive.read(config_path)
+                except Exception as e:
+                    debug(f"Could not read {config_path}: {e}")
+                    continue
+
+                file_contents = base64.b85encode(raw).decode("UTF-8")
+                text_name = f"{_CONFIG_STASH_PREFIX}{config_path}"
+
+                if text_name in bpy.data.texts:
+                    existing = bpy.data.texts[text_name].as_string()
+                    if existing == file_contents:
+                        continue  # Identical — nothing to do.
+                    if existing == conflicting_mustpreserve_contents:
+                        continue  # Already marked conflicting.
+                    # Different content — mark as conflicting.
+                    bpy.data.texts[text_name].clear()
+                    bpy.data.texts[text_name].write(conflicting_mustpreserve_contents)
+                    debug(f"Conflicting slicer config: {config_path}")
+                    continue
+
+                handle = bpy.data.texts.new(text_name)
+                handle.write(file_contents)
+                debug(f"Stashed slicer config: {config_path}")
+
+    except (zipfile.BadZipFile, IOError) as e:
+        debug(f"Could not read slicer configs from {archive_path}: {e}")
+
+
+def get_stashed_config(config_path: str) -> bytes | None:
+    """Retrieve a previously stashed slicer config file.
+
+    :param config_path: The original archive path (e.g. ``"Metadata/project_settings.config"``).
+    :return: Raw file bytes, or ``None`` if not stashed or conflicting.
+    """
+    text_name = f"{_CONFIG_STASH_PREFIX}{config_path}"
+    if text_name not in bpy.data.texts:
+        return None
+    contents = bpy.data.texts[text_name].as_string()
+    if contents == conflicting_mustpreserve_contents:
+        return None
+    try:
+        return base64.b85decode(contents.encode("UTF-8"))
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------------------

@@ -365,6 +365,9 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         annotations.add_content_types(files_by_content_type)
         archive_mod.must_preserve(ctx, files_by_content_type, annotations)
 
+        # Stash slicer config files for round-trip export.
+        archive_mod.stash_slicer_configs(ctx, path)
+
         # Parse each model file.
         for model_file in files_by_content_type.get(MODEL_MIMETYPE, []):
             try:

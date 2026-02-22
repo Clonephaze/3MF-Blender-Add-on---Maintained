@@ -531,6 +531,9 @@ def import_3mf(
     annotations_obj.add_content_types(files_by_content_type)
     archive_mod.must_preserve(ctx, files_by_content_type, annotations_obj)
 
+    # Stash slicer config files for round-trip export.
+    archive_mod.stash_slicer_configs(ctx, filepath)
+
     if on_progress:
         on_progress(15, "Parsing model files…")
 
@@ -667,6 +670,7 @@ def export_3mf(
     global_scale: float = 1.0,
     use_mesh_modifiers: bool = True,
     coordinate_precision: int = 9,
+    compression_level: int = 3,
     use_orca_format: str = "STANDARD",
     use_components: bool = True,
     mmu_slicer_format: str = "ORCA",
@@ -693,6 +697,9 @@ def export_3mf(
     :param global_scale: Scale multiplier (default 1.0).
     :param use_mesh_modifiers: Apply modifiers before exporting.
     :param coordinate_precision: Decimal precision for vertex coordinates.
+    :param compression_level: ZIP deflate compression level (0–9, default 3).
+        0 = no compression (fastest, largest), 9 = max compression (slowest,
+        smallest). 3 balances speed and file size.
     :param use_orca_format: ``"STANDARD"`` | ``"PAINT"``.  When
         *project_template* or *object_settings* is provided, the Orca
         exporter is used automatically even if this is ``"STANDARD"``.
@@ -756,6 +763,7 @@ def export_3mf(
         global_scale=global_scale,
         use_mesh_modifiers=use_mesh_modifiers,
         coordinate_precision=coordinate_precision,
+        compression_level=compression_level,
         use_orca_format=use_orca_format,
         use_components=use_components,
         mmu_slicer_format=mmu_slicer_format,
@@ -799,7 +807,7 @@ def export_3mf(
         on_progress(10, "Creating archive…")
 
     # Create archive.
-    archive = create_archive(filepath, ctx.safe_report)
+    archive = create_archive(filepath, ctx.safe_report, ctx.options.compression_level)
     if archive is None:
         result.status = "CANCELLED"
         return result

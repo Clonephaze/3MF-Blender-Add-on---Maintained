@@ -27,6 +27,7 @@ import bpy
 import bpy.props
 import bpy.types
 import bpy_extras.io_utils
+from bl_operators.presets import AddPresetBase
 
 from ..common.extensions import ExtensionManager
 from ..common.logging import debug, warn, error
@@ -41,7 +42,51 @@ from .prusa import PrusaExporter
 from .standard import StandardExporter
 
 # IDE and Documentation support.
-__all__ = ["Export3MF"]
+__all__ = ["Export3MF", "EXPORT_MT_threemf_presets", "EXPORT_OT_threemf_preset"]
+
+
+# ---------------------------------------------------------------------------
+# Export Presets
+# ---------------------------------------------------------------------------
+
+class EXPORT_MT_threemf_presets(bpy.types.Menu):
+    """Preset menu for 3MF export settings."""
+
+    bl_label = "3MF Export Presets"
+    preset_subdir = "operator/export_mesh.threemf"
+    preset_operator = "script.execute_preset"
+    draw = bpy.types.Menu.draw_preset
+
+
+class EXPORT_OT_threemf_preset(AddPresetBase, bpy.types.Operator):
+    """Add or remove a 3MF export preset."""
+
+    bl_idname = "export_mesh.threemf_preset_add"
+    bl_label = "Add 3MF Export Preset"
+    preset_menu = "EXPORT_MT_threemf_presets"
+
+    # Presets are stored as Python scripts in:
+    #   <blender_config>/scripts/presets/operator/export_mesh.threemf/
+    preset_subdir = "operator/export_mesh.threemf"
+
+    preset_defines = [
+        "op = bpy.context.active_operator",
+    ]
+
+    preset_values = [
+        "op.use_selection",
+        "op.export_hidden",
+        "op.global_scale",
+        "op.use_mesh_modifiers",
+        "op.coordinate_precision",
+        "op.compression_level",
+        "op.use_orca_format",
+        "op.use_components",
+        "op.mmu_slicer_format",
+        "op.subdivision_depth",
+        "op.thumbnail_mode",
+        "op.thumbnail_resolution",
+    ]
 
 
 def _thumbnail_image_items(self, context):
@@ -96,6 +141,16 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         default=9,
         min=0,
         max=12,
+    )
+    compression_level: bpy.props.IntProperty(
+        name="Compression",
+        description=(
+            "ZIP deflate compression level. 0 = no compression (fastest, largest file), "
+            "9 = maximum compression (slowest, smallest file). Default 3 balances speed and size"
+        ),
+        default=3,
+        min=0,
+        max=9,
     )
     use_orca_format: bpy.props.EnumProperty(
         name="Material Export Mode",
@@ -205,6 +260,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         prefs = context.preferences.addons.get(__package__.rsplit(".", 1)[0])
         if prefs and prefs.preferences:
             self.coordinate_precision = prefs.preferences.default_coordinate_precision
+            self.compression_level = prefs.preferences.default_compression_level
             self.export_hidden = prefs.preferences.default_export_hidden
             self.use_mesh_modifiers = prefs.preferences.default_apply_modifiers
             self.global_scale = prefs.preferences.default_global_scale
@@ -221,54 +277,56 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         layout.use_property_split = True
         layout.use_property_decorate = False
 
-        # Multi-color printing section
-        orca_box = layout.box()
-        orca_box.use_property_split = False
-        orca_header = orca_box.row()
-        orca_header.label(text="Multi-Color Printing", icon="COLORSET_01_VEC")
-        orca_row = orca_box.row()
-        orca_row.prop(self, "use_orca_format")
-        if self.use_orca_format == "PAINT":
-            # Slicer format dropdown — only relevant for MMU paint export
-            format_row = orca_box.row()
-            format_row.prop(self, "mmu_slicer_format", text="Slicer")
-            depth_row = orca_box.row()
-            depth_row.prop(self, "subdivision_depth")
+        # Preset selector row
+        preset_row = layout.row(align=True)
+        preset_row.menu(EXPORT_MT_threemf_presets.__name__, text=EXPORT_MT_threemf_presets.bl_label)
+        preset_row.operator(EXPORT_OT_threemf_preset.bl_idname, text="", icon="ADD")
+        preset_row.operator(EXPORT_OT_threemf_preset.bl_idname, text="", icon="REMOVE").remove_active = True
 
-        # Tips for material modes
-        if self.use_orca_format == "STANDARD":
-            info_col = orca_box.column(align=True)
-            info_col.scale_y = 0.7
-            info_col.label(
-                text="Tip: Assign materials to faces in Edit Mode",
-                icon="INFO",
-            )
-            info_col.label(text="Each color = filament slot in slicer")
+        # --- Multi-Color Printing ---
+        header, body = layout.panel("EXPORT_3MF_multi_color", default_closed=False)
+        header.label(text="Multi-Color Printing", icon="COLORSET_01_VEC")
+        if body:
+            body.use_property_split = False
+            body.prop(self, "use_orca_format")
+            if self.use_orca_format == "PAINT":
+                body.prop(self, "mmu_slicer_format", text="Slicer")
+                body.prop(self, "subdivision_depth")
+            elif self.use_orca_format == "STANDARD":
+                tip = body.column(align=True)
+                tip.scale_y = 0.7
+                tip.label(text="Assign materials to faces in Edit Mode.", icon="INFO")
+                tip.label(text="Each color becomes a filament slot in the slicer.")
 
-        layout.separator()
+        # --- Geometry ---
+        header, body = layout.panel("EXPORT_3MF_geometry", default_closed=False)
+        header.label(text="Geometry", icon="MESH_DATA")
+        if body:
+            col = body.column(align=True)
+            col.prop(self, "use_selection")
+            col.prop(self, "export_hidden")
+            col.prop(self, "use_mesh_modifiers")
+            col.prop(self, "use_components")
+            col.separator()
+            col.prop(self, "global_scale")
+            col.prop(self, "coordinate_precision")
 
-        # Thumbnail section
-        thumb_box = layout.box()
-        thumb_box.use_property_split = False
-        thumb_header = thumb_box.row()
-        thumb_header.label(text="Thumbnail", icon="IMAGE_DATA")
-        thumb_box.row().prop(self, "thumbnail_mode", expand=True)
-        if self.thumbnail_mode == "AUTO":
-            thumb_box.prop(self, "thumbnail_resolution")
-        elif self.thumbnail_mode == "CUSTOM":
-            thumb_box.prop(self, "thumbnail_image", text="")
-            if self.thumbnail_image == "__CUSTOM_PATH__":
-                thumb_box.prop(self, "thumbnail_image_path", text="")
-
-        layout.separator()
-
-        # Standard options
-        layout.prop(self, "use_selection")
-        layout.prop(self, "export_hidden")
-        layout.prop(self, "use_mesh_modifiers")
-        layout.prop(self, "use_components")
-        layout.prop(self, "global_scale")
-        layout.prop(self, "coordinate_precision")
+        # --- Archive ---
+        header, body = layout.panel("EXPORT_3MF_archive", default_closed=True)
+        header.label(text="Archive", icon="PACKAGE")
+        if body:
+            body.prop(self, "compression_level")
+            body.separator()
+            body.label(text="Thumbnail", icon="IMAGE_DATA")
+            body.use_property_split = False
+            body.row().prop(self, "thumbnail_mode", expand=True)
+            if self.thumbnail_mode == "AUTO":
+                body.use_property_split = True
+                body.prop(self, "thumbnail_resolution")
+            elif self.thumbnail_mode == "CUSTOM":
+                body.prop(self, "thumbnail_image", text="")
+                if self.thumbnail_image == "__CUSTOM_PATH__":
+                    body.prop(self, "thumbnail_image_path", text="")
 
     def safe_report(self, level: Set[str], message: str) -> None:
         """
@@ -288,6 +346,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             global_scale=self.global_scale,
             use_mesh_modifiers=self.use_mesh_modifiers,
             coordinate_precision=self.coordinate_precision,
+            compression_level=self.compression_level,
             use_orca_format=self.use_orca_format,
             use_components=self.use_components,
             mmu_slicer_format=self.mmu_slicer_format,
@@ -319,7 +378,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         ctx._progress_begin(context, "Exporting 3MF...")
 
         try:
-            archive = create_archive(self.filepath, ctx.safe_report)
+            archive = create_archive(self.filepath, ctx.safe_report, ctx.options.compression_level)
             if archive is None:
                 return {"CANCELLED"}
 
@@ -436,7 +495,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
 
     def create_archive(self, filepath: str):
         """Create a 3MF archive. Backward-compatible wrapper."""
-        return create_archive(filepath, self.safe_report)
+        return create_archive(filepath, self.safe_report, getattr(self, 'compression_level', 3))
 
     def unit_scale(self, context):
         """Calculate unit scale. Backward-compatible wrapper."""

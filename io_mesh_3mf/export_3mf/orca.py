@@ -57,6 +57,7 @@ from .components import collect_mesh_objects
 from .segmentation import texture_to_segmentation
 from .standard import BaseExporter
 from .thumbnail import write_thumbnail
+from ..import_3mf.archive import get_stashed_config
 
 
 class OrcaExporter(BaseExporter):
@@ -633,20 +634,27 @@ class OrcaExporter(BaseExporter):
         """Return bed center offset for the built-in project template.
 
         The built-in template (Bambu Lab A1) uses a bottom-left origin.
-        Custom templates get no offset — the caller handles positioning.
+        Custom templates and stashed configs get no offset — the caller
+        handles positioning.
 
         :return: ``(offset_x, offset_y)`` in millimeters.
         """
         if self.ctx.project_template_path:
+            return (0.0, 0.0)
+        if get_stashed_config("Metadata/project_settings.config") is not None:
             return (0.0, 0.0)
         return (self._BED_CENTER_X, self._BED_CENTER_Y)
 
     def generate_project_settings(self) -> dict:
         """Generate project_settings.config by loading template and updating filament colors.
 
-        If ``ctx.project_template_path`` is set, loads the custom JSON file
-        instead of the built-in ``orca_project_template.json``.  Falls back
-        to the built-in template on missing file or invalid JSON.
+        Priority order for the base template:
+        1. ``ctx.project_template_path`` — explicit custom template from API
+        2. Stashed config from a previous import (preserved in Blender text blocks)
+        3. Built-in ``orca_project_template.json``
+
+        Regardless of source, ``filament_colour`` is updated and all filament
+        arrays are resized to match the current export colors.
         """
         ctx = self.ctx
 
@@ -665,9 +673,23 @@ class OrcaExporter(BaseExporter):
                     f"Falling back to built-in template."
                 )
 
+        # Priority 2: stashed config from a previous import.
+        stashed_config = None
+        if template_path == builtin_path:
+            stashed_raw = get_stashed_config("Metadata/project_settings.config")
+            if stashed_raw is not None:
+                try:
+                    stashed_config = json.loads(stashed_raw.decode("utf-8"))
+                    debug("Using stashed project_settings.config from previous import")
+                except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                    warn(f"Stashed project_settings.config is invalid: {e}. Using built-in template.")
+
         try:
-            with open(template_path, "r", encoding="utf-8") as f:
-                settings = json.load(f)
+            if stashed_config is not None:
+                settings = stashed_config
+            else:
+                with open(template_path, "r", encoding="utf-8") as f:
+                    settings = json.load(f)
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
             if template_path != builtin_path:
                 warn(

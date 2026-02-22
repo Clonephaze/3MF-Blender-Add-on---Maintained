@@ -10,14 +10,22 @@
 # Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 """
-3MF Export Package.
+Panels package — non-paint sidebar panels for the 3MF tab.
 
-Provides the Export3MF operator and all supporting modules for writing
-3MF files from Blender. Sub-packages:
+Each module provides one or more ``bpy.types.Panel`` subclasses that appear
+in the 3D Viewport sidebar under the **3MF** tab.  These are independent of
+the MMU paint subsystem and show in different Blender modes:
 
-- ``materials/`` — Materials Extension export (basematerials, textures, PBR, passthrough)
+- ``metadata`` — Object-mode panel for viewing/editing 3MF metadata
+- (future) ``triangle_sets`` — Edit-mode panel for triangle set assignment/viewing
 """
 
-from .operator import Export3MF, EXPORT_MT_threemf_presets, EXPORT_OT_threemf_preset
+from . import metadata  # noqa: F401
 
-__all__ = ["Export3MF", "EXPORT_MT_threemf_presets", "EXPORT_OT_threemf_preset"]
+
+def register():
+    metadata.register()
+
+
+def unregister():
+    metadata.unregister()

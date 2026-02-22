@@ -668,7 +668,7 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
 
         # --- Step 12: Sync the paint panel ---
         settings.loaded_mesh_name = ""  # Force reload
-        from .panel import _sync_filaments_from_mesh
+        from .helpers import _sync_filaments_from_mesh
         _sync_filaments_from_mesh(context)
 
         # Set active node so texture paint can find the image
@@ -676,7 +676,7 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
 
         # --- Step 13: Switch to Texture Paint mode ---
         bpy.ops.object.mode_set(mode="TEXTURE_PAINT")
-        from .panel import _configure_paint_brush
+        from .helpers import _configure_paint_brush
         _configure_paint_brush(context)
 
         ts = context.tool_settings
@@ -685,7 +685,7 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
 
         # Set brush to first filament color
         if len(settings.filaments) > 0:
-            from .panel import _set_brush_color
+            from .helpers import _set_brush_color
             _set_brush_color(context, settings.filaments[0].color[:])
 
         self.report(
@@ -721,7 +721,7 @@ class MMU_OT_quantize_texture(bpy.types.Operator):
         mesh = obj.data
 
         # Get the paint image
-        from .panel import _get_paint_image
+        from .helpers import _get_paint_image
         image = _get_paint_image(obj)
         if image is None:
             self.report({"ERROR"}, "No paint texture found")

@@ -21,6 +21,7 @@ from . import (
     import_3mf,
     export_3mf,
     paint,
+    panels,
 )
 
 if _needs_reload:
@@ -30,18 +31,25 @@ if _needs_reload:
     import_3mf = importlib.reload(import_3mf)
     export_3mf = importlib.reload(export_3mf)
     paint = importlib.reload(paint)
+    panels = importlib.reload(panels)
     pass  # Reloaded
 
 from .import_3mf import Import3MF
-from .export_3mf import Export3MF
+from .export_3mf import Export3MF, EXPORT_MT_threemf_presets, EXPORT_OT_threemf_preset
 from .paint import (
     register as register_paint,
     unregister as unregister_paint,
+)
+from .panels import (
+    register as register_panels,
+    unregister as unregister_panels,
 )
 
 # IDE and Documentation support.
 __all__ = [
     "Export3MF",
+    "EXPORT_MT_threemf_presets",
+    "EXPORT_OT_threemf_preset",
     "Import3MF",
     "ThreeMF_FH_import",
     "ThreeMFPreferences",
@@ -216,6 +224,18 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         max=10,
     )
 
+    default_compression_level: bpy.props.IntProperty(
+        name="Compression Level",
+        description=(
+            "Default ZIP compression level for exported 3MF archives. "
+            "0 = no compression (fastest), 9 = maximum compression (smallest). "
+            "3 is a good balance between speed and file size"
+        ),
+        default=3,
+        min=0,
+        max=9,
+    )
+
     default_thumbnail_mode: bpy.props.EnumProperty(
         name="Thumbnail",
         description="Default thumbnail mode for 3MF export",
@@ -261,6 +281,7 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         col.prop(self, "default_apply_modifiers", icon="MODIFIER")
         col.prop(self, "default_multi_material_export", icon="COLORSET_01_VEC")
         col.prop(self, "default_subdivision_depth")
+        col.prop(self, "default_compression_level")
         col.separator()
         col.label(text="Thumbnail:", icon="IMAGE_DATA")
         col.prop(self, "default_thumbnail_mode")
@@ -296,7 +317,7 @@ def menu_export(self, _) -> None:
     self.layout.operator(Export3MF.bl_idname, text="3D Manufacturing Format (.3mf)")
 
 
-classes = (ThreeMFPreferences, Import3MF, Export3MF, ThreeMF_FH_import)
+classes = (ThreeMFPreferences, EXPORT_MT_threemf_presets, EXPORT_OT_threemf_preset, Import3MF, Export3MF, ThreeMF_FH_import)
 
 
 def register() -> None:
@@ -309,6 +330,7 @@ def register() -> None:
     bpy.types.TOPBAR_MT_file_export.append(menu_export)
 
     register_paint()
+    register_panels()
 
 
 def _remove_menu_entries() -> None:
@@ -333,6 +355,7 @@ def _remove_menu_entries() -> None:
 
 
 def unregister() -> None:
+    unregister_panels()
     unregister_paint()
 
     _remove_menu_entries()

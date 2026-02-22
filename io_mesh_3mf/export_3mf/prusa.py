@@ -37,6 +37,7 @@ from .materials import collect_face_colors, write_prusa_filament_colors
 from .components import collect_mesh_objects
 from .standard import BaseExporter, StandardExporter
 from .thumbnail import write_thumbnail
+from ..import_3mf.archive import get_stashed_config
 
 
 class PrusaExporter(BaseExporter):
@@ -159,6 +160,14 @@ class PrusaExporter(BaseExporter):
 
         # Write filament colors to metadata for round-trip import
         write_prusa_filament_colors(archive, ctx.vertex_colors)
+
+        # Write back stashed PrusaSlicer config files from previous import.
+        for config_path in ("Metadata/Slic3r_PE.config", "Metadata/Slic3r_PE_model.config"):
+            stashed = get_stashed_config(config_path)
+            if stashed is not None:
+                with archive.open(config_path, "w") as f:
+                    f.write(stashed)
+                debug(f"Wrote stashed {config_path} to archive")
 
         document = xml.etree.ElementTree.ElementTree(root)
         with archive.open(MODEL_LOCATION, "w", force_zip64=True) as f:
