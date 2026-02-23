@@ -24,7 +24,7 @@ Features and improvements organized by priority. Complexity ratings help with pl
 ### Cura
 | Status | Feature | Complexity | Description |
 |--------|---------|------------|-------------|
-| 💭 | MMU Research Needed | 🔴 | Import/Export of cura MMU Data Needed
+| 💭 | MMU Research Needed | 🔴 | Import/Export of cura MMU Data Needed (I'll be honest, I don't want to do this. PRs would be very welcome) |
 
 ---
 
