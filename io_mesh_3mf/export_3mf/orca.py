@@ -58,6 +58,7 @@ from .segmentation import texture_to_segmentation
 from .standard import BaseExporter
 from .thumbnail import write_thumbnail
 from ..import_3mf.archive import get_stashed_config
+from ..slicer_profiles import get_profile_config
 
 
 class OrcaExporter(BaseExporter):
@@ -643,6 +644,14 @@ class OrcaExporter(BaseExporter):
             return (0.0, 0.0)
         if get_stashed_config("Metadata/project_settings.config") is not None:
             return (0.0, 0.0)
+        if (
+            self.ctx.options.slicer_profile != "NONE"
+            and get_profile_config(
+                self.ctx.options.slicer_profile,
+                "Metadata/project_settings.config",
+            ) is not None
+        ):
+            return (0.0, 0.0)
         return (self._BED_CENTER_X, self._BED_CENTER_Y)
 
     def generate_project_settings(self) -> dict:
@@ -683,6 +692,29 @@ class OrcaExporter(BaseExporter):
                     debug("Using stashed project_settings.config from previous import")
                 except (json.JSONDecodeError, UnicodeDecodeError) as e:
                     warn(f"Stashed project_settings.config is invalid: {e}. Using built-in template.")
+
+        # Priority 3: user-selected slicer profile from addon settings.
+        if stashed_config is None and template_path == builtin_path:
+            profile_name = ctx.options.slicer_profile
+            if profile_name != "NONE":
+                profile_raw = get_profile_config(
+                    profile_name,
+                    "Metadata/project_settings.config",
+                )
+                if profile_raw is not None:
+                    try:
+                        stashed_config = json.loads(
+                            profile_raw.decode("utf-8"),
+                        )
+                        debug(
+                            f"Using slicer profile '{profile_name}' "
+                            f"for project settings"
+                        )
+                    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                        warn(
+                            f"Profile config is invalid: {e}. "
+                            f"Using built-in template."
+                        )
 
         try:
             if stashed_config is not None:

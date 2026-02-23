@@ -83,6 +83,7 @@ class EXPORT_OT_threemf_preset(AddPresetBase, bpy.types.Operator):
         "op.use_orca_format",
         "op.use_components",
         "op.mmu_slicer_format",
+        "op.slicer_profile",
         "op.subdivision_depth",
         "op.thumbnail_mode",
         "op.thumbnail_resolution",
@@ -101,6 +102,38 @@ def _thumbnail_image_items(self, context):
     items.append(
         ("__CUSTOM_PATH__", "Custom File Path", "Enter a file path manually", "FILEBROWSER", len(items))
     )
+    return items
+
+
+# Cache for dynamic enum to prevent Blender GC issues.
+_slicer_profile_cache: list = []
+
+
+def _slicer_profile_items(self, context):
+    """Dynamic enum items listing saved slicer profiles."""
+    global _slicer_profile_cache
+    items = [
+        (
+            "NONE",
+            "Default (Bambu A1)",
+            "Uses built-in Bambu Lab A1 template. "
+            "Add more profiles in Preferences > Add-ons > 3MF > Advanced",
+        ),
+    ]
+    try:
+        from ..slicer_profiles import list_profiles
+
+        for profile in list_profiles():
+            name = profile.name[:64]
+            detail = profile.machine or profile.vendor
+            items.append((
+                name,
+                name,
+                f"Slicer profile: {detail} (from {profile.source_file})",
+            ))
+    except Exception:
+        pass
+    _slicer_profile_cache = items
     return items
 
 
@@ -198,6 +231,15 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         default="ORCA",
     )
 
+    slicer_profile: bpy.props.EnumProperty(
+        name="Slicer Profile",
+        description=(
+            "Saved slicer settings to embed in the exported 3MF. "
+            "Profiles provide printer and filament configuration for the target slicer"
+        ),
+        items=_slicer_profile_items,
+    )
+
     subdivision_depth: bpy.props.IntProperty(
         name="Subdivision Depth",
         description=(
@@ -291,6 +333,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             body.prop(self, "use_orca_format")
             if self.use_orca_format == "PAINT":
                 body.prop(self, "mmu_slicer_format", text="Slicer")
+                body.prop(self, "slicer_profile", text="Profile")
                 body.prop(self, "subdivision_depth")
             elif self.use_orca_format == "STANDARD":
                 tip = body.column(align=True)
@@ -351,6 +394,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             use_components=self.use_components,
             mmu_slicer_format=self.mmu_slicer_format,
             subdivision_depth=self.subdivision_depth,
+            slicer_profile=self.slicer_profile,
             thumbnail_mode=self.thumbnail_mode,
             thumbnail_resolution=self.thumbnail_resolution,
             thumbnail_image=(
