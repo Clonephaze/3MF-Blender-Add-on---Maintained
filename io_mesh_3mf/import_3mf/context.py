@@ -53,6 +53,8 @@ class ImportOptions:
     import_location: str = "KEEP"  # "ORIGIN" | "CURSOR" | "KEEP" | "GRID"
     origin_to_geometry: str = "KEEP"  # "KEEP" | "CENTER" | "BOTTOM"
     grid_spacing: float = 0.1
+    auto_smooth: bool = False
+    auto_smooth_angle: float = 0.5236  # 30 degrees in radians
     paint_uv_method: str = "SMART"  # "SMART" | "LIGHTMAP"
     paint_texture_size: int = 0  # 0 = auto
 

@@ -342,7 +342,8 @@ def apply_triangle_sets(
     if not set_names:
         return
 
-    mesh["3mf_triangle_set_names"] = set_names
+    import json
+    mesh["3mf_triangle_set_names"] = json.dumps(set_names)
     # Store original face count to detect topology changes before export
     mesh["3mf_original_face_count"] = len(mesh.polygons)
 
@@ -361,7 +362,15 @@ def apply_triangle_sets(
                 set_values[tri_idx] = set_idx
 
     mesh.attributes[attr_name].data.foreach_set("value", set_values)
-    debug(f"Applied {len(resource_object.triangle_sets)} triangle sets as face attributes")
+
+    # Mirror into Blender's sculpt face sets so users can view/edit in
+    # Sculpt mode with the built-in face-set tools.
+    fs_name = ".sculpt_face_set"
+    if fs_name not in mesh.attributes:
+        mesh.attributes.new(name=fs_name, type="INT", domain="FACE")
+    mesh.attributes[fs_name].data.foreach_set("value", set_values)
+
+    debug(f"Applied {len(resource_object.triangle_sets)} triangle sets as face attributes + sculpt face sets")
 
 
 # ---------------------------------------------------------------------------

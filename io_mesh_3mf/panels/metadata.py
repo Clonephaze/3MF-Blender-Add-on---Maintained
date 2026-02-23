@@ -612,7 +612,15 @@ class VIEW3D_PT_3mf_metadata(bpy.types.Panel):
     # ---------------------------------------------------------------
 
     def _draw_triangle_sets(self, layout, mesh):
-        set_names = list(mesh.get("3mf_triangle_set_names", []))
+        import json
+        raw_names = mesh.get("3mf_triangle_set_names", "")
+        if isinstance(raw_names, str) and raw_names:
+            try:
+                set_names = json.loads(raw_names)
+            except (json.JSONDecodeError, ValueError):
+                set_names = []
+        else:
+            set_names = list(raw_names) if raw_names else []
         if not set_names:
             return
 

@@ -27,7 +27,9 @@ from ..common.logging import debug, warn
 
 
 def write_triangle_sets(
-    mesh_element: xml.etree.ElementTree.Element, mesh: bpy.types.Mesh
+    mesh_element: xml.etree.ElementTree.Element,
+    mesh: bpy.types.Mesh,
+    original_mesh: bpy.types.Mesh = None,
 ) -> None:
     """
     Writes triangle sets from Blender mesh attributes into the mesh element.
@@ -35,27 +37,64 @@ def write_triangle_sets(
     Triangle sets group triangles together for selection workflows and property
     assignment in 3MF-compatible applications.
 
+    The source data is read in priority order:
+
+    1. ``3mf_triangle_set`` custom attribute — written on import, mirrors
+       the original 3MF data verbatim.
+    2. ``.sculpt_face_set`` — Blender's native sculpt face sets.  Used as
+       a fallback when no ``3mf_triangle_set`` attribute exists, so users
+       can create triangle sets purely through Sculpt-mode tools.
+
+    Names are looked up from the ``3mf_triangle_set_names`` custom property.
+    Because ``to_mesh()`` copies do not carry custom properties, an
+    *original_mesh* reference is accepted so names can be read from the
+    real mesh datablock.
+
     :param mesh_element: The <mesh> element of the 3MF document.
-    :param mesh: The Blender mesh containing triangle set attributes to export.
+    :param mesh: The (possibly evaluated) Blender mesh with face attributes.
+    :param original_mesh: The original mesh datablock for custom-property
+        lookups.  Falls back to *mesh* when ``None``.
     """
+    if original_mesh is None:
+        original_mesh = mesh
+    # Determine source attribute.
     attr_name = "3mf_triangle_set"
+    from_face_sets = False
+
     if attr_name not in mesh.attributes:
+        # Fall back to sculpt face sets.
+        if ".sculpt_face_set" in mesh.attributes:
+            attr_name = ".sculpt_face_set"
+            from_face_sets = True
+        else:
+            return
+
+    import json
+    raw_names = original_mesh.get("3mf_triangle_set_names", "")
+    if isinstance(raw_names, str) and raw_names:
+        try:
+            set_names = json.loads(raw_names)
+        except (json.JSONDecodeError, ValueError):
+            set_names = []
+    else:
+        set_names = list(raw_names) if raw_names else []
+
+    # When sourcing from the dedicated attribute, require names.
+    if not from_face_sets and not set_names:
         return
 
-    set_names = mesh.get("3mf_triangle_set_names", [])
-    if not set_names:
-        return
-
-    # CRITICAL: Check if topology has changed since import
-    # If faces were dissolved/merged, triangle indices are meaningless
-    original_face_count = mesh.get("3mf_original_face_count")
-    current_face_count = len(mesh.polygons)
-    if original_face_count is not None and original_face_count != current_face_count:
-        warn(
-            f"Mesh '{mesh.name}' topology changed ({original_face_count} → {current_face_count} faces). "
-            f"Triangle sets are invalid and will not be exported. Original triangle indices are lost."
-        )
-        return
+    # CRITICAL: Check if topology has changed since import.
+    # Only relevant for imported 3mf_triangle_set data — sculpt face sets
+    # are maintained by Blender and always match current topology.
+    if not from_face_sets:
+        original_face_count = original_mesh.get("3mf_original_face_count")
+        current_face_count = len(mesh.polygons)
+        if original_face_count is not None and original_face_count != current_face_count:
+            warn(
+                f"Mesh '{mesh.name}' topology changed ({original_face_count} → {current_face_count} faces). "
+                f"Triangle sets are invalid and will not be exported. Original triangle indices are lost."
+            )
+            return
 
     # Build mapping of set_index -> list of triangle indices
     num_faces = len(mesh.polygons)

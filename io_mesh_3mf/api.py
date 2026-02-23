@@ -385,6 +385,8 @@ def import_3mf(
     import_location: str = "KEEP",
     origin_to_geometry: str = "KEEP",
     grid_spacing: float = 0.1,
+    auto_smooth: bool = False,
+    auto_smooth_angle: float = 0.5236,
     paint_uv_method: str = "SMART",
     paint_texture_size: int = 0,
     target_collection: Optional[str] = None,
@@ -405,6 +407,9 @@ def import_3mf(
     :param import_location: ``"ORIGIN"`` | ``"CURSOR"`` | ``"KEEP"`` | ``"GRID"``.
     :param origin_to_geometry: ``"KEEP"`` | ``"CENTER"`` | ``"BOTTOM"``.
     :param grid_spacing: Spacing between objects in grid layout mode.
+    :param auto_smooth: Apply Smooth by Angle modifier to imported objects.
+    :param auto_smooth_angle: Maximum angle (radians) for smooth shading
+        (default 0.5236 = 30 degrees).
     :param paint_uv_method: ``"SMART"`` (default) or ``"LIGHTMAP"``.
         Smart UV groups adjacent faces; Lightmap gives each face unique space.
     :param paint_texture_size: Override texture resolution (0 = auto).
@@ -459,6 +464,8 @@ def import_3mf(
         import_location=import_location,
         origin_to_geometry=origin_to_geometry,
         grid_spacing=grid_spacing,
+        auto_smooth=auto_smooth,
+        auto_smooth_angle=auto_smooth_angle,
         paint_uv_method=paint_uv_method,
         paint_texture_size=paint_texture_size,
     )

@@ -587,12 +587,16 @@ class StandardExporter(BaseExporter):
 
             # Write triangle sets if present (auto-export utility metadata)
             # Skipped when PAINT mode is active since segmentation data replaces it
-            if ctx.options.use_orca_format != "PAINT" and "3mf_triangle_set" in mesh.attributes:
+            has_triangle_sets = (
+                "3mf_triangle_set" in mesh.attributes
+                or ".sculpt_face_set" in mesh.attributes
+            )
+            if ctx.options.use_orca_format != "PAINT" and has_triangle_sets:
                 # Activate extension on first use
                 if not ctx.extension_manager.is_active(TRIANGLE_SETS_EXTENSION.namespace):
                     ctx.extension_manager.activate(TRIANGLE_SETS_EXTENSION.namespace)
                     debug("Activated Triangle Sets extension")
-                write_triangle_sets(mesh_element, mesh)
+                write_triangle_sets(mesh_element, mesh, original_object.data)
 
             # Write metadata
             if "3mf:partnumber" in metadata:

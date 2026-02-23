@@ -136,6 +136,19 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         ],
         default="KEEP",
     )
+    auto_smooth: bpy.props.BoolProperty(
+        name="Smooth by Angle",
+        description="Apply Smooth by Angle modifier to imported objects",
+        default=False,
+    )
+    auto_smooth_angle: bpy.props.FloatProperty(
+        name="Angle",
+        description="Maximum angle between face normals that will be considered smooth",
+        default=0.5236,
+        min=0.0,
+        max=3.14159,
+        subtype="ANGLE",
+    )
 
     # ----- Advanced MMU Paint settings (collapsed by default) ---------------
 
@@ -202,6 +215,13 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             placement_box.prop(self, "grid_spacing")
         placement_box.prop(self, "origin_to_geometry")
 
+        layout.separator()
+        smooth_box = layout.box()
+        smooth_box.label(text="Normals:", icon="MOD_SMOOTH")
+        smooth_box.prop(self, "auto_smooth")
+        if self.auto_smooth:
+            smooth_box.prop(self, "auto_smooth_angle")
+
         # --- Advanced settings (collapsible, only relevant for MMU Paint) ---
         if self.import_materials == "PAINT":
             layout.separator()
@@ -227,6 +247,10 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             self.origin_to_geometry = prefs.preferences.default_origin_to_geometry
             if hasattr(prefs.preferences, "default_grid_spacing"):
                 self.grid_spacing = prefs.preferences.default_grid_spacing
+            if hasattr(prefs.preferences, "default_auto_smooth"):
+                self.auto_smooth = prefs.preferences.default_auto_smooth
+            if hasattr(prefs.preferences, "default_auto_smooth_angle"):
+                self.auto_smooth_angle = prefs.preferences.default_auto_smooth_angle
 
         # If files are already provided (drag-drop), show popup instead of file browser
         if getattr(self, "directory", "") and getattr(self, "files", None):
@@ -297,6 +321,8 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             import_location=self.import_location,
             origin_to_geometry=self.origin_to_geometry,
             grid_spacing=self.grid_spacing,
+            auto_smooth=self.auto_smooth,
+            auto_smooth_angle=self.auto_smooth_angle,
             paint_uv_method=self.paint_uv_method,
             paint_texture_size=int(self.paint_texture_size),
         )

@@ -1,24 +1,20 @@
-2.2.0 — Metadata Panel, Slicer Profiles, Export Presets
+2.2.0 — Metadata Panel, Slicer Profiles, Triangle Sets & More
 ====
 
 Features
 ----
-* **3MF Metadata Panel** — New `VIEW3D > 3MF > Metadata` sidebar panel (Object mode) to view and edit 3MF metadata. Editable standard fields (Title, Designer, Description, Copyright, LicenseTerms), read-only fields (Application, CreationDate, ModificationDate), custom entries, per-object metadata, and stashed config indicator.
-* **Slicer profiles** — Load slicer settings from any 3MF file and save as named profiles. Profiles are stored as JSON files in Blender's config directory and persist across sessions. Multiple profiles supported with rename/delete management. Printer model name automatically extracted from Orca/Bambu JSON or PrusaSlicer INI configs.
-* **Slicer profile picker** — Export dialog shows a profile dropdown in Paint Segmentation mode. Select a saved profile to embed its printer/filament configuration in the exported 3MF. Falls back through stashed config → selected profile → built-in Bambu Lab A1 template.
-* **Export presets** — Save and load named export configurations from the export dialog preset dropdown. Persist across sessions via Blender's built-in preset system.
-* **Adjustable compression level** — Compression slider (0–9) in the export dialog, addon preferences, and public API. Default 3 for good speed/size balance.
-* **Slicer config preservation** — Slicer configs (`project_settings.config`, `Slic3r_PE.config`, etc.) are stashed on import and round-tripped on re-export, preserving printer profiles and filament settings through Blender workflows.
-* **Tabbed addon preferences** — Preferences reorganized into three tabs: Export (material mode, modifiers, compression, thumbnails, precision, scale), Import (materials, placement, origin), and Advanced (slicer profile management with collapsible UI).
+* **Smooth by Angle on import** — New import option to apply Blender's *Smooth by Angle* modifier with an adjustable angle threshold (default 30°). Configurable in the import dialog and addon preferences.
+* **Triangle Sets ↔ Sculpt Face Sets** — 3MF Triangle Sets now map bidirectionally to Blender's native sculpt face sets. New `VIEW3D > 3MF > Triangle Sets` sidebar panel (Sculpt mode) allows assigning human-readable names to face set IDs, which round-trip through 3MF export/import. Imported sets populate `.sculpt_face_set` for immediate Sculpt mode visibility.
+* **3MF Metadata Panel** — New `VIEW3D > 3MF > Metadata` sidebar panel to view and edit 3MF metadata (Title, Designer, Description, Copyright, LicenseTerms, etc.). Shows per-object metadata, triangle set names and face counts, and stashed slicer config indicators.
+* **Slicer profile management** — Load slicer settings from any 3MF file and save as named profiles. Profiles persist across sessions/updates. Export dialog includes a profile picker filtered by slicer format (Orca/Bambu vs PrusaSlicer/SuperSlicer) to embed printer/filament configurations in the exported 3MF, with automatic fallback through stashed config → selected profile → built-in template. Slicer configs are preserved and round-tripped on re-export.
+* **Export presets & compression** — Save and load named export configurations via the preset dropdown. Adjustable compression level (0–9) in the export dialog, preferences, and public API (default 3). Preferences reorganized into three tabs: Export, Import, and Advanced (slicer profile management).
 
 Technical
 ----
-* New `slicer_profiles/` package with `storage.py` (file-based CRUD, config extraction, machine name parsing) and `operators.py` (load/delete/rename Blender operators).
-* Profiles stored as JSON in `<blender_config>/3mf_slicer_profiles/` with Base85-encoded slicer config files, vendor, and machine name.
-* Slicer configs stored in Blender text blocks under `.3mf_config/` prefix (Base85 encoded). Stash invalidated if configs differ across multiple imported files.
-* `ExportOptions` gains `slicer_profile` field; Orca and Prusa exporters check profile as Priority 3 fallback (after stashed config, before built-in template).
-* `paint/panel.py` (1499 lines) split into focused submodules: `helpers.py`, `properties.py`, `color_detection.py`, `operators.py`, `mmu_panel.py`.
-* New `panels/` package for non-paint sidebar panels; metadata panel is the first module.
+* New `slicer_profiles/` package with file-based CRUD, config extraction, and machine name parsing.
+* Slicer configs stored in Blender text blocks (Base85 encoded) and stashed on import for round-trip preservation.
+* `ExportOptions` gains `slicer_profile` field; Orca and Prusa exporters check profile as Priority 3 fallback.
+* `paint/panel.py` split into focused submodules; new `panels/` package for non-paint sidebar panels.
 
 ---
 

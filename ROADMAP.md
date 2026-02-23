@@ -18,42 +18,18 @@ Features and improvements organized by priority. Complexity ratings help with pl
 
 ---
 
-## 📦 3MF Extensions
-
-### Triangle Sets Extension
-> `http://schemas.microsoft.com/3dmanufacturing/trianglesets/2021/07`
-
-| Status | Feature | Complexity | Description |
-|--------|---------|------------|-------------|
-| 💭 | Triangle Sets UI Panel | 🟡 | Create/edit sets in Blender (face selection → named groups) |
-
----
 
 ## 🖨️ Slicer Compatibility
+
+### General
+| Status | Feature | Complexity | Description |
+|--------|---------|------------|-------------|
+| 💭 | Seam/Support Painting | 🟡 | Research if/how slicers support painting seams/supports for better print results
 
 ### Cura
 | Status | Feature | Complexity | Description |
 |--------|---------|------------|-------------|
 | 💭 | MMU Research Needed | 🔴 | Import/Export of cura MMU Data Needed
-
----
-
-## 🎨 Blender Integration
-
-### Geometry
-| Status | Feature | Complexity | Description |
-|--------|---------|------------|-------------|
-| 💭 | Sharp Edges | 🟡 | Preserve via edge marks 
-
----
-
-## ⚡ Performance
-
-| Status | Feature | Complexity | Description |
-|--------|---------|------------|-------------|
-| 💭 | Progress Indicators | 🟢 | Progress bar for long operations |
-| 📋 | Large Files | 🟡 | Streaming XML parsing |
-| 📋 | Optimize Output | 🟡 | Minimize file size |
 
 ---
 
@@ -69,10 +45,6 @@ Features and improvements organized by priority. Complexity ratings help with pl
 ### Research Needed
 *Requires investigation*
 
-- [ ] Triangle Sets UI for Custom Assignment
-- [ ] Sharp Edge Preservation Method/Options
-- [ ] Project Config Preservation/Editing
-- [ ] Better Progress Indicators (Blender import/export helpers block main thread)
 - [ ] Seam/support painting formats (No idea if we can add this in any way slicers support it)
 ---
 
@@ -85,4 +57,4 @@ Help wanted:
 
 ---
 
-*Current version: 2.2.0*
+*Current version: 2.2.1*

@@ -108,22 +108,38 @@ def _thumbnail_image_items(self, context):
 # Cache for dynamic enum to prevent Blender GC issues.
 _slicer_profile_cache: list = []
 
+# Vendor strings grouped by slicer format compatibility.
+_ORCA_VENDORS = {"Orca Slicer", "BambuStudio"}
+_PRUSA_VENDORS = {"PrusaSlicer", "SuperSlicer"}
+
 
 def _slicer_profile_items(self, context):
-    """Dynamic enum items listing saved slicer profiles."""
+    """Dynamic enum items listing saved slicer profiles filtered by slicer format."""
     global _slicer_profile_cache
-    items = [
-        (
-            "NONE",
-            "Default (Bambu A1)",
+
+    slicer_fmt = getattr(self, "mmu_slicer_format", "ORCA")
+    if slicer_fmt == "PRUSA":
+        allowed = _PRUSA_VENDORS
+        default_label = "None"
+        default_tip = (
+            "PrusaSlicer can interpret color zones without an embedded profile. "
+            "Optionally add one in Preferences > Add-ons > 3MF > Advanced"
+        )
+    else:
+        allowed = _ORCA_VENDORS
+        default_label = "Default (Bambu A1)"
+        default_tip = (
             "Uses built-in Bambu Lab A1 template. "
-            "Add more profiles in Preferences > Add-ons > 3MF > Advanced",
-        ),
-    ]
+            "Add more profiles in Preferences > Add-ons > 3MF > Advanced"
+        )
+
+    items = [("NONE", default_label, default_tip)]
     try:
         from ..slicer_profiles import list_profiles
 
         for profile in list_profiles():
+            if profile.vendor not in allowed and profile.vendor != "Unknown":
+                continue
             name = profile.name[:64]
             detail = profile.machine or profile.vendor
             items.append((

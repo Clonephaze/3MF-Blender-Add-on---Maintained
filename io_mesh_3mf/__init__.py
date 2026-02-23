@@ -221,6 +221,21 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         default="KEEP",
     )
 
+    default_auto_smooth: bpy.props.BoolProperty(
+        name="Smooth by Angle",
+        description="Apply Smooth by Angle modifier to imported objects by default",
+        default=False,
+    )
+
+    default_auto_smooth_angle: bpy.props.FloatProperty(
+        name="Angle",
+        description="Default maximum angle between face normals that will be considered smooth",
+        default=0.5236,
+        min=0.0,
+        max=3.14159,
+        subtype="ANGLE",
+    )
+
     default_multi_material_export: bpy.props.EnumProperty(
         name="Material Export Mode",
         description="How to export material and color data to 3MF",
@@ -327,6 +342,11 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         if self.default_import_location == "GRID":
             col.prop(self, "default_grid_spacing")
         col.prop(self, "default_origin_to_geometry")
+        col.separator()
+        col.label(text="Normals:", icon="MOD_SMOOTH")
+        col.prop(self, "default_auto_smooth")
+        if self.default_auto_smooth:
+            col.prop(self, "default_auto_smooth_angle")
 
     def _draw_advanced(self, layout):
         from .slicer_profiles import list_profiles
@@ -345,8 +365,14 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
                 for p in profiles:
                     prow = box.row(align=True)
                     detail = p.machine or p.vendor
+                    if p.vendor in ("PrusaSlicer", "SuperSlicer"):
+                        tag = "Prusa"
+                    elif p.vendor in ("Orca Slicer", "BambuStudio"):
+                        tag = "Orca/Bambu"
+                    else:
+                        tag = p.vendor
                     prow.label(
-                        text=f"{p.name}  \u2014  {detail}",
+                        text=f"[{tag}]  {p.name}  \u2014  {detail}",
                         icon="FILE_3D",
                     )
                     op = prow.operator(

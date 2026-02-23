@@ -176,6 +176,10 @@ def build_object(
             and resource_object.metadata["3mf:object_type"].value in {"solidsupport", "support"}
         ):
             blender_object.hide_render = True
+
+        # Apply Smooth by Angle modifier if requested
+        if ctx.options.auto_smooth:
+            _apply_auto_smooth(blender_object, ctx.options.auto_smooth_angle)
     else:
         blender_object = parent
 
@@ -277,3 +281,24 @@ def _build_mesh(
     apply_uv_coordinates(mesh, resource_object)
 
     return mesh
+
+
+def _apply_auto_smooth(
+    blender_object: bpy.types.Object,
+    angle: float,
+) -> None:
+    """Apply Blender's Smooth by Angle modifier to the object.
+
+    Uses ``bpy.ops.object.shade_auto_smooth`` which adds the bundled
+    Geometry Nodes "Smooth by Angle" modifier from the Essentials library.
+
+    :param blender_object: The Blender object to smooth.
+    :param angle: Maximum angle (radians) between face normals considered smooth.
+    """
+    # Ensure the object is selected and active (should already be the case)
+    bpy.context.view_layer.objects.active = blender_object
+    blender_object.select_set(True)
+    try:
+        bpy.ops.object.shade_auto_smooth(angle=angle)
+    except Exception:
+        warn(f"Failed to apply Smooth by Angle to {blender_object.name}")
