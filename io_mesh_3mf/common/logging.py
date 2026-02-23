@@ -1,5 +1,4 @@
 # Blender add-on to import and export 3MF files.
-# Copyright (C) 2020 Ghostkeeper
 # Copyright (C) 2025 Jack (modernization for Blender 4.2+)
 # This add-on is free software; you can redistribute it and/or modify it under the terms of the GNU General Public
 # License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later
@@ -28,7 +27,7 @@ Usage::
 __all__ = ["DEBUG_MODE", "debug", "warn", "error", "safe_report"]
 
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 """Set to True to enable verbose console output for development/debugging."""
 
 

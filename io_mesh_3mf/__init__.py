@@ -22,6 +22,7 @@ from . import (
     export_3mf,
     paint,
     panels,
+    slicer_profiles,
 )
 
 if _needs_reload:
@@ -32,6 +33,7 @@ if _needs_reload:
     export_3mf = importlib.reload(export_3mf)
     paint = importlib.reload(paint)
     panels = importlib.reload(panels)
+    slicer_profiles = importlib.reload(slicer_profiles)
     pass  # Reloaded
 
 from .import_3mf import Import3MF
@@ -44,6 +46,11 @@ from .panels import (
     register as register_panels,
     unregister as unregister_panels,
 )
+from .slicer_profiles import (
+    THREEMF_OT_load_slicer_profile,
+    THREEMF_OT_delete_slicer_profile,
+    THREEMF_OT_rename_slicer_profile,
+)
 
 # IDE and Documentation support.
 __all__ = [
@@ -53,6 +60,9 @@ __all__ = [
     "Import3MF",
     "ThreeMF_FH_import",
     "ThreeMFPreferences",
+    "THREEMF_OT_load_slicer_profile",
+    "THREEMF_OT_delete_slicer_profile",
+    "THREEMF_OT_rename_slicer_profile",
     "register",
     "unregister",
 ]
@@ -95,7 +105,23 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
 
     bl_idname = __package__
 
-    # Precision settings
+    # ---- Preferences tab selector ----
+    pref_tab: bpy.props.EnumProperty(
+        name="Category",
+        items=[
+            ("EXPORT", "Export", "Default export settings"),
+            ("IMPORT", "Import", "Default import settings"),
+            ("ADVANCED", "Advanced", "Advanced settings and slicer profiles"),
+        ],
+        default="EXPORT",
+    )
+
+    show_slicer_profiles: bpy.props.BoolProperty(
+        name="Slicer Profiles",
+        default=True,
+    )
+
+    # ---- Precision settings ----
     default_coordinate_precision: bpy.props.IntProperty(
         name="Coordinate Precision",
         description=(
@@ -259,28 +285,31 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
     def draw(self, context):
         layout = self.layout
 
-        # Precision section
-        precision_box = layout.box()
-        precision_box.label(text="Precision", icon="PREFERENCES")
-        row = precision_box.row()
-        row.prop(self, "default_coordinate_precision")
-        precision_box.label(
-            text="Tip: 9 decimals preserves full 32-bit float precision", icon="INFO"
-        )
+        # Tab selector
+        row = layout.row()
+        row.prop(self, "pref_tab", expand=True)
+        layout.separator()
 
-        # Scale section
-        scale_box = layout.box()
-        scale_box.label(text="Scale (Import & Export)", icon="ORIENTATION_GLOBAL")
-        scale_box.prop(self, "default_global_scale")
+        if self.pref_tab == "EXPORT":
+            self._draw_export(layout)
+        elif self.pref_tab == "IMPORT":
+            self._draw_import(layout)
+        elif self.pref_tab == "ADVANCED":
+            self._draw_advanced(layout)
 
-        # Export behavior section
-        export_box = layout.box()
-        export_box.label(text="Export Behavior", icon="EXPORT")
-        col = export_box.column(align=True)
+    def _draw_export(self, layout):
+        col = layout.column(align=True)
+        col.label(text="Material Export Mode:", icon="COLORSET_01_VEC")
+        col.prop(self, "default_multi_material_export", text="")
+        if self.default_multi_material_export == "PAINT":
+            col.prop(self, "default_subdivision_depth")
+        col.separator()
         col.prop(self, "default_export_hidden", icon="HIDE_OFF")
         col.prop(self, "default_apply_modifiers", icon="MODIFIER")
-        col.prop(self, "default_multi_material_export", icon="COLORSET_01_VEC")
-        col.prop(self, "default_subdivision_depth")
+        col.separator()
+        col.prop(self, "default_coordinate_precision")
+        col.prop(self, "default_global_scale")
+        col.separator()
         col.prop(self, "default_compression_level")
         col.separator()
         col.label(text="Thumbnail:", icon="IMAGE_DATA")
@@ -288,19 +317,51 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         if self.default_thumbnail_mode == "AUTO":
             col.prop(self, "default_thumbnail_resolution")
 
-        # Import behavior section
-        import_box = layout.box()
-        import_box.label(text="Import Behavior", icon="IMPORT")
-        col = import_box.column(align=True)
+    def _draw_import(self, layout):
+        col = layout.column(align=True)
         col.prop(self, "default_import_materials", icon="MATERIAL")
         col.prop(self, "default_reuse_materials", icon="LINKED")
         col.separator()
         col.label(text="Placement:", icon="OBJECT_ORIGIN")
         col.prop(self, "default_import_location")
-        # Show grid spacing only when grid layout is selected
         if self.default_import_location == "GRID":
             col.prop(self, "default_grid_spacing")
         col.prop(self, "default_origin_to_geometry")
+
+    def _draw_advanced(self, layout):
+        from .slicer_profiles import list_profiles
+
+        # ---- Slicer Profiles (collapsible) ----
+        box = layout.box()
+        row = box.row()
+        row.prop(
+            self, "show_slicer_profiles",
+            icon="TRIA_DOWN" if self.show_slicer_profiles else "TRIA_RIGHT",
+            emboss=False,
+        )
+        if self.show_slicer_profiles:
+            profiles = list_profiles()
+            if profiles:
+                for p in profiles:
+                    prow = box.row(align=True)
+                    detail = p.machine or p.vendor
+                    prow.label(
+                        text=f"{p.name}  \u2014  {detail}",
+                        icon="FILE_3D",
+                    )
+                    op = prow.operator(
+                        "threemf.rename_slicer_profile",
+                        text="", icon="GREASEPENCIL",
+                    )
+                    op.old_name = p.name
+                    op = prow.operator(
+                        "threemf.delete_slicer_profile",
+                        text="", icon="X",
+                    )
+                    op.profile_name = p.name
+            else:
+                box.label(text="No profiles saved", icon="INFO")
+            box.operator("threemf.load_slicer_profile", icon="FILEBROWSER")
 
 
 def menu_import(self, _) -> None:
@@ -321,6 +382,9 @@ classes = (
     ThreeMFPreferences,
     EXPORT_MT_threemf_presets,
     EXPORT_OT_threemf_preset,
+    THREEMF_OT_load_slicer_profile,
+    THREEMF_OT_delete_slicer_profile,
+    THREEMF_OT_rename_slicer_profile,
     Import3MF,
     Export3MF,
     ThreeMF_FH_import,

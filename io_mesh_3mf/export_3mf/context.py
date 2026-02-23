@@ -47,6 +47,7 @@ class ExportOptions:
     use_components: bool = True
     mmu_slicer_format: str = "ORCA"  # "ORCA" | "PRUSA"
     subdivision_depth: int = 7  # 4-10, controls paint segmentation detail
+    slicer_profile: str = "NONE"  # Profile name or "NONE" for built-in
     compression_level: int = 3  # 0 (store) – 9 (max deflate), default 3
     thumbnail_mode: str = "AUTO"  # "AUTO" | "CUSTOM" | "NONE"
     thumbnail_resolution: int = 256  # Width & height in pixels
