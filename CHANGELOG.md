@@ -1,4 +1,4 @@
-2.2.0 — Metadata Panel, Slicer Profiles, Export Presets & Compression
+2.2.0 — Metadata Panel, Slicer Profiles, Export Presets
 ====
 
 Features
