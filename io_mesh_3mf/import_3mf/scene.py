@@ -36,6 +36,7 @@ __all__ = [
     "create_mesh_from_data",
     "assign_materials_to_mesh",
     "render_paint_texture",
+    "render_seam_support_texture",
     "apply_triangle_sets",
     "apply_uv_coordinates",
     "set_object_origin",
@@ -170,6 +171,117 @@ def render_paint_texture(
 
         ctx._paint_object_names.append(mesh.name)
         debug("Successfully rendered MMU paint data to UV texture")
+        return True
+
+    finally:
+        bpy.data.objects.remove(temp_obj, do_unlink=True)
+
+
+# ---------------------------------------------------------------------------
+# render_seam_support_texture
+# ---------------------------------------------------------------------------
+
+def render_seam_support_texture(
+    ctx: "ImportContext",
+    mesh: bpy.types.Mesh,
+    seg_strings: Dict[int, str],
+    layer_type: str,
+) -> bool:
+    """Render seam or support segmentation strings to a dedicated UV texture.
+
+    Creates a separate UV layer and image for the given layer type.  The
+    segmentation states map to: 0 = auto (background), 1 = enforced,
+    2 = blocked.
+
+    The image is added as an unlinked ``ShaderNodeTexImage`` node in the
+    mesh's first material so it can be selected for texture painting.
+
+    :param ctx: Import context.
+    :param mesh: The Blender mesh to apply the texture to.
+    :param seg_strings: Dict mapping face_index → segmentation hex string.
+    :param layer_type: ``"SEAM"`` or ``"SUPPORT"``.
+    :return: ``True`` if the texture was successfully rendered.
+    """
+    if not seg_strings:
+        return False
+    if ctx.options.import_materials != "PAINT":
+        return False
+
+    from .segmentation import render_segmentation_to_texture
+    from ..paint.helpers import (
+        _layer_colors, _layer_uv_name, _layer_flag_key, _layer_colors_key,
+    )
+    from ..common.colors import rgb_to_hex as _hex_from_rgb
+
+    bg, enforce, block = _layer_colors(layer_type)
+    uv_name = _layer_uv_name(layer_type)
+    flag_key = _layer_flag_key(layer_type)
+    colors_key = _layer_colors_key(layer_type)
+
+    # Color map: segmentation state 1 → enforce, state 2 → block.
+    # render_segmentation_to_texture uses ci = int(state) - 1 to index
+    # color_table, so color_table[0] → state 1, color_table[1] → state 2.
+    extruder_colors: Dict[int, list] = {
+        0: [enforce[0], enforce[1], enforce[2], 1.0],
+        1: [block[0], block[1], block[2], 1.0],
+    }
+    default_color = [bg[0], bg[1], bg[2], 1.0]
+
+    temp_obj = bpy.data.objects.new(f"_temp_{layer_type.lower()}", mesh)
+    bpy.context.collection.objects.link(temp_obj)
+
+    try:
+        # Texture size — same logic as color paint
+        override_size = ctx.options.paint_texture_size
+        tri_count = len(mesh.polygons)
+        if override_size > 0:
+            texture_size = override_size
+        elif tri_count < 5000:
+            texture_size = 2048
+        elif tri_count < 20000:
+            texture_size = 4096
+        else:
+            texture_size = 8192
+
+        image_name = f"{mesh.name}_{uv_name}"
+        debug(
+            f"Rendering {layer_type} segmentation to {texture_size}x{texture_size} "
+            f"UV texture for {tri_count} triangles"
+        )
+
+        image = render_segmentation_to_texture(
+            temp_obj,
+            seg_strings,
+            extruder_colors,
+            texture_size=texture_size,
+            default_extruder=1,
+            uv_method=ctx.options.paint_uv_method,
+            uv_layer_name=uv_name,
+            default_color_override=default_color,
+            image_name_override=image_name,
+            set_active_render=False,
+        )
+
+        # Add the image as an unlinked TEX_IMAGE node in the paint material
+        # so _get_layer_image() can find it and texture painting can use it.
+        if mesh.materials:
+            mat = mesh.materials[0]
+            if mat and mat.use_nodes:
+                tex_node = mat.node_tree.nodes.new("ShaderNodeTexImage")
+                tex_node.image = image
+                tex_node.label = uv_name
+                tex_node.name = uv_name
+                tex_node.location = (-300, -300 if layer_type == "SEAM" else -500)
+
+        # Store custom properties for round-trip export
+        mesh[flag_key] = True
+        color_dict = {
+            1: _hex_from_rgb(*enforce),
+            2: _hex_from_rgb(*block),
+        }
+        mesh[colors_key] = str(color_dict)
+
+        debug(f"Successfully rendered {layer_type} paint data to UV texture")
         return True
 
     finally:

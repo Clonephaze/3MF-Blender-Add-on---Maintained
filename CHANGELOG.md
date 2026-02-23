@@ -3,11 +3,12 @@
 
 Features
 ----
-* **Smooth by Angle on import** — New import option to apply Blender's *Smooth by Angle* modifier with an adjustable angle threshold (default 30°). Configurable in the import dialog and addon preferences.
 * **Triangle Sets ↔ Sculpt Face Sets** — 3MF Triangle Sets now map bidirectionally to Blender's native sculpt face sets. New `VIEW3D > 3MF > Triangle Sets` sidebar panel (Sculpt mode) allows assigning human-readable names to face set IDs, which round-trip through 3MF export/import. Imported sets populate `.sculpt_face_set` for immediate Sculpt mode visibility.
 * **3MF Metadata Panel** — New `VIEW3D > 3MF > Metadata` sidebar panel to view and edit 3MF metadata (Title, Designer, Description, Copyright, LicenseTerms, etc.). Shows per-object metadata, triangle set names and face counts, and stashed slicer config indicators.
 * **Slicer profile management** — Load slicer settings from any 3MF file and save as named profiles. Profiles persist across sessions/updates. Export dialog includes a profile picker filtered by slicer format (Orca/Bambu vs PrusaSlicer/SuperSlicer) to embed printer/filament configurations in the exported 3MF, with automatic fallback through stashed config → selected profile → built-in template. Slicer configs are preserved and round-tripped on re-export.
 * **Export presets & compression** — Save and load named export configurations via the preset dropdown. Adjustable compression level (0–9) in the export dialog, preferences, and public API (default 3). Preferences reorganized into three tabs: Export, Import, and Advanced (slicer profile management).
+* **Smooth by Angle on import** — New import option to apply Blender's *Smooth by Angle* modifier with an adjustable angle threshold (default 30°). Configurable in the import dialog and addon preferences.
+* **Seam & Support paint layers** — Full round-trip import/export of `paint_seam` and `paint_supports` 3MF attributes (Orca Slicer / BambuStudio). Uses the same hex segmentation codec as color paint with a 2-state palette: enforce (state 1) and block (state 2). Each layer gets a dedicated UV texture and image. The MMU Paint panel gains a layer switcher (Color / Seam / Support) with Initialize buttons for new layers and Enforce/Block brush mode toggles.
 
 Technical
 ----

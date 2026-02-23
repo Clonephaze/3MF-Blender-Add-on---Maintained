@@ -316,6 +316,8 @@ class OrcaExporter(BaseExporter):
 
         # Generate segmentation strings from UV texture if in PAINT mode
         segmentation_strings = {}
+        seam_strings = {}
+        support_strings = {}
         if ctx.options.use_orca_format == "PAINT" and mesh.uv_layers.active:
             # Read from original object's data, not the temporary evaluated mesh
             original_object = blender_object
@@ -391,6 +393,14 @@ class OrcaExporter(BaseExporter):
                         traceback.print_exc()
                         segmentation_strings = {}
 
+            # Seam / support paint (independent of color paint)
+            seam_strings = self._extract_auxiliary_segmentation(
+                original_object, blender_object, mesh, "SEAM"
+            )
+            support_strings = self._extract_auxiliary_segmentation(
+                original_object, blender_object, mesh, "SUPPORT"
+            )
+
         # Triangles with paint_color
         triangles_elem = xml.etree.ElementTree.SubElement(mesh_elem, "triangles")
         for tri_idx, triangle in enumerate(mesh.loop_triangles):
@@ -405,6 +415,11 @@ class OrcaExporter(BaseExporter):
                 seg_string = segmentation_strings[tri_idx]
                 if seg_string:
                     tri_attribs["paint_color"] = seg_string
+                    # Seam / support are independent of color
+                    if seam_strings and tri_idx in seam_strings and seam_strings[tri_idx]:
+                        tri_attribs["paint_seam"] = seam_strings[tri_idx]
+                    if support_strings and tri_idx in support_strings and support_strings[tri_idx]:
+                        tri_attribs["paint_supports"] = support_strings[tri_idx]
                     xml.etree.ElementTree.SubElement(
                         triangles_elem, "triangle", attrib=tri_attribs
                     )
@@ -418,6 +433,12 @@ class OrcaExporter(BaseExporter):
                     paint_code = ORCA_FILAMENT_CODES[filament_index]
                     if paint_code:
                         tri_attribs["paint_color"] = paint_code
+
+            # Seam / support for non-segmentation triangles
+            if seam_strings and tri_idx in seam_strings and seam_strings[tri_idx]:
+                tri_attribs["paint_seam"] = seam_strings[tri_idx]
+            if support_strings and tri_idx in support_strings and support_strings[tri_idx]:
+                tri_attribs["paint_supports"] = support_strings[tri_idx]
 
             xml.etree.ElementTree.SubElement(
                 triangles_elem, "triangle", attrib=tri_attribs

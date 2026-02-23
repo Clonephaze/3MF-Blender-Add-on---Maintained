@@ -54,6 +54,9 @@ from .operators import (
     MMU_OT_fix_falloff,
     MMU_OT_switch_to_paint,
     MMU_OT_import_paint_popup,
+    MMU_OT_init_auxiliary_paint,
+    MMU_OT_switch_paint_layer,
+    MMU_OT_switch_aux_brush,
 )
 from .mmu_panel import (
     MMU_UL_init_filaments,
@@ -80,6 +83,9 @@ _paint_classes = (
     MMU_OT_fix_falloff,
     MMU_OT_switch_to_paint,
     MMU_OT_import_paint_popup,
+    MMU_OT_init_auxiliary_paint,
+    MMU_OT_switch_paint_layer,
+    MMU_OT_switch_aux_brush,
     MMU_UL_init_filaments,
     MMU_UL_filaments,
     VIEW3D_PT_mmu_paint,

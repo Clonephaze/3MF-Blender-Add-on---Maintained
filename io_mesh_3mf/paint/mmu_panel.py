@@ -168,29 +168,107 @@ class VIEW3D_PT_mmu_paint(bpy.types.Panel):
             #  STATE B: Active palette
             # ============================
 
-            # --- Filament list ---
-            box = layout.box()
-            box.label(text="Filament Palette", icon="COLOR")
+            active_layer = settings.active_paint_layer
 
-            row = box.row()
-            row.template_list(
-                "MMU_UL_filaments",
-                "",
-                settings,
-                "filaments",
-                settings,
-                "active_filament_index",
-                rows=3,
-                maxrows=6,
+            # --- Paint layer selector ---
+            layer_box = layout.box()
+            layer_box.label(text="Paint Layer", icon="OUTLINER_DATA_GP_LAYER")
+            layer_row = layer_box.row(align=True)
+
+            # Color layer button
+            op = layer_row.operator(
+                "mmu.switch_paint_layer", text="Color",
+                icon="BRUSHES_ALL",
+                depress=(active_layer == "COLOR"),
             )
+            op.layer_type = "COLOR"
 
-            # Add/Remove buttons
-            col = row.column(align=True)
-            col.operator("mmu.add_filament", icon="ADD", text="")
-            col.operator("mmu.remove_filament", icon="REMOVE", text="")
+            # Seam layer button
+            has_seam = mesh.get("3mf_has_seam_paint", False)
+            if has_seam:
+                op = layer_row.operator(
+                    "mmu.switch_paint_layer", text="Seam",
+                    icon="MOD_EDGESPLIT",
+                    depress=(active_layer == "SEAM"),
+                )
+                op.layer_type = "SEAM"
+            else:
+                op = layer_row.operator(
+                    "mmu.init_auxiliary_paint", text="Init Seam",
+                    icon="MOD_EDGESPLIT",
+                )
+                op.layer_type = "SEAM"
 
-            # Reassign color button below list
-            box.operator("mmu.reassign_filament_color", icon="COLORSET_01_VEC")
+            # Support layer button
+            has_support = mesh.get("3mf_has_support_paint", False)
+            if has_support:
+                op = layer_row.operator(
+                    "mmu.switch_paint_layer", text="Support",
+                    icon="MOD_LATTICE",
+                    depress=(active_layer == "SUPPORT"),
+                )
+                op.layer_type = "SUPPORT"
+            else:
+                op = layer_row.operator(
+                    "mmu.init_auxiliary_paint", text="Init Support",
+                    icon="MOD_LATTICE",
+                )
+                op.layer_type = "SUPPORT"
+
+            if active_layer == "COLOR":
+                # --- Filament list (color layer only) ---
+                box = layout.box()
+                box.label(text="Filament Palette", icon="COLOR")
+
+                row = box.row()
+                row.template_list(
+                    "MMU_UL_filaments",
+                    "",
+                    settings,
+                    "filaments",
+                    settings,
+                    "active_filament_index",
+                    rows=3,
+                    maxrows=6,
+                )
+
+                # Add/Remove buttons
+                col = row.column(align=True)
+                col.operator("mmu.add_filament", icon="ADD", text="")
+                col.operator("mmu.remove_filament", icon="REMOVE", text="")
+
+                # Reassign color button below list
+                box.operator("mmu.reassign_filament_color", icon="COLORSET_01_VEC")
+
+            else:
+                # --- Seam / Support layer palette ---
+                from .helpers import _layer_colors
+                bg, enforce, block = _layer_colors(active_layer)
+                label = active_layer.title()
+
+                box = layout.box()
+                box.label(text=f"{label} Paint", icon="BRUSH_DATA")
+
+                # Enforce / Block color swatches
+                row = box.row(align=True)
+                enforce_btn = row.operator(
+                    "mmu.switch_aux_brush", text="Enforce",
+                    depress=True,
+                )
+                enforce_btn.layer_type = active_layer
+                enforce_btn.mode = "ENFORCE"
+
+                block_btn = row.operator(
+                    "mmu.switch_aux_brush", text="Block",
+                    depress=False,
+                )
+                block_btn.layer_type = active_layer
+                block_btn.mode = "BLOCK"
+
+                info = box.column(align=True)
+                info.scale_y = 0.7
+                info.label(text="Enforce: painted areas are forced")
+                info.label(text="Block: painted areas are prevented")
 
             # --- Brush falloff warning ---
             brush = context.tool_settings.image_paint.brush

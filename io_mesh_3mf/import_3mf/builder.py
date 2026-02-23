@@ -33,6 +33,7 @@ from ..common.types import ResourceObject
 from .scene import (
     create_mesh_from_data,
     render_paint_texture,
+    render_seam_support_texture,
     assign_materials_to_mesh,
     apply_triangle_sets,
     apply_uv_coordinates,
@@ -276,6 +277,10 @@ def _build_mesh(
 
     if not paint_rendered:
         assign_materials_to_mesh(ctx, mesh, resource_object)
+
+    # Seam / support paint textures (independent of color paint)
+    render_seam_support_texture(ctx, mesh, resource_object.seam_strings or {}, "SEAM")
+    render_seam_support_texture(ctx, mesh, resource_object.support_strings or {}, "SUPPORT")
 
     apply_triangle_sets(mesh, resource_object)
     apply_uv_coordinates(mesh, resource_object)

@@ -108,5 +108,17 @@ class MMUPaintSettings(bpy.types.PropertyGroup):
         default=12,
     )
 
+    # Active paint layer for layer switching
+    active_paint_layer: bpy.props.EnumProperty(
+        name="Paint Layer",
+        description="Which paint data layer is currently active",
+        items=[
+            ("COLOR", "Color", "MMU filament color painting"),
+            ("SEAM", "Seam", "Seam enforce/block painting"),
+            ("SUPPORT", "Support", "Support enforce/block painting"),
+        ],
+        default="COLOR",
+    )
+
     # Internal: tracks which mesh the filament list was loaded from
     loaded_mesh_name: bpy.props.StringProperty(default="")

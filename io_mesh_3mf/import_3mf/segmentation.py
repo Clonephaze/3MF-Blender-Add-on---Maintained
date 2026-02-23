@@ -308,6 +308,10 @@ def render_segmentation_to_texture(
     default_extruder: int = 1,
     uv_method: str = "SMART",
     bpy_module=None,
+    uv_layer_name: str = "MMU_Paint",
+    default_color_override: "List[float] | None" = None,
+    image_name_override: "str | None" = None,
+    set_active_render: bool = True,
 ) -> "bpy.types.Image":
     """
     Render segmentation strings to a UV texture.
@@ -332,18 +336,25 @@ def render_segmentation_to_texture(
     :param default_extruder: Default extruder for state 0
     :param uv_method: ``"SMART"`` or ``"LIGHTMAP"``
     :param bpy_module: Blender Python module (for testing injection)
+    :param uv_layer_name: Name of the UV layer to create/use.
+    :param default_color_override: If provided, used as the base fill color
+        instead of deriving from *default_extruder*.
+    :param image_name_override: If provided, used as the Blender image name
+        instead of the auto-generated ``{obj.name}_segmentation``.
+    :param set_active_render: Whether to mark this UV layer as active render.
     :return: Blender Image object
     """
     _bpy = bpy_module if bpy_module is not None else bpy
 
     mesh = obj.data
 
-    # Create dedicated MMU_Paint UV layer.  Existing UVs stay untouched.
-    mmu_layer = mesh.uv_layers.get("MMU_Paint")
-    if mmu_layer is None:
-        mmu_layer = mesh.uv_layers.new(name="MMU_Paint")
-    mesh.uv_layers.active = mmu_layer
-    mmu_layer.active_render = True
+    # Create dedicated UV layer.  Existing UVs stay untouched.
+    uv_layer = mesh.uv_layers.get(uv_layer_name)
+    if uv_layer is None:
+        uv_layer = mesh.uv_layers.new(name=uv_layer_name)
+    mesh.uv_layers.active = uv_layer
+    if set_active_render:
+        uv_layer.active_render = True
 
     _bpy.context.view_layer.objects.active = obj
     _bpy.ops.object.mode_set(mode="EDIT")
@@ -383,8 +394,8 @@ def render_segmentation_to_texture(
     uv_layer_data.foreach_get("uv", uv_flat)
     all_uvs = uv_flat.reshape(-1, 2)
 
-    image_name = f"{obj.name}_segmentation"
-    image = _bpy.data.images.new(image_name, width=texture_size, height=texture_size, alpha=True)
+    img_name = image_name_override or f"{obj.name}_segmentation"
+    image = _bpy.data.images.new(img_name, width=texture_size, height=texture_size, alpha=True)
 
     # Pre-build color lookup table for fast indexed access.
     max_color_idx = max(extruder_colors.keys()) if extruder_colors else 0
@@ -392,8 +403,11 @@ def render_segmentation_to_texture(
     for idx, col in extruder_colors.items():
         color_table[idx] = col
 
-    default_color_index = default_extruder - 1
-    default_color = color_table[min(default_color_index, len(color_table) - 1)]
+    if default_color_override is not None:
+        default_color = np.array(default_color_override, dtype=np.float32)
+    else:
+        default_color_index = default_extruder - 1
+        default_color = color_table[min(max(default_color_index, 0), len(color_table) - 1)]
 
     # Numpy pixel buffer: (H, W, 4) — pre-fill with the default/base color so
     # the entire texture starts as the base filament.  Any UV regions not
