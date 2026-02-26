@@ -29,7 +29,7 @@ import re
 import uuid
 import xml.etree.ElementTree
 import zipfile
-from typing import List, Set
+from typing import List, Optional, Set
 
 import bpy
 import mathutils
@@ -205,9 +205,26 @@ class OrcaExporter(BaseExporter):
 
             ctx.num_written += 1
 
+        # Detect grouped mode: if any input object is an Empty with
+        # children, the caller wants all meshes grouped as a single
+        # assembly in the slicer (e.g. TrailPrint3D).
+        group_info = None
+        for obj in blender_objects:
+            if obj.type == "EMPTY" and obj.children:
+                group_info = {
+                    "wrapper_id": len(object_data) * 2 + 1,
+                    "uuid": str(uuid.uuid4()),
+                    "name": str(obj.name),
+                }
+                break
+
         # Apply bed center offset to transformations (built-in template only)
         bed_offset_x, bed_offset_y = self._get_bed_center_offset()
-        if bed_offset_x != 0.0 or bed_offset_y != 0.0:
+        if group_info is not None:
+            # Grouped mode: bed offset applied to the single group build
+            # item; individual component transforms stay relative.
+            group_info["bed_offset"] = (bed_offset_x, bed_offset_y)
+        elif bed_offset_x != 0.0 or bed_offset_y != 0.0:
             for od in object_data:
                 od["transformation"][0][3] += bed_offset_x
                 od["transformation"][1][3] += bed_offset_y
@@ -218,7 +235,7 @@ class OrcaExporter(BaseExporter):
 
         # Write main 3dmodel.model with wrapper objects and build items
         ctx._progress_update(90, "Writing main model...")
-        self.write_main_model(archive, object_data, build_uuid)
+        self.write_main_model(archive, object_data, build_uuid, group_info)
 
         # Write 3D/_rels/3dmodel.model.rels
         ctx._progress_update(93, "Writing relationships...")
@@ -226,7 +243,7 @@ class OrcaExporter(BaseExporter):
 
         # Write Orca metadata files
         ctx._progress_update(96, "Writing configuration...")
-        self.write_orca_metadata(archive, mesh_objects, object_data)
+        self.write_orca_metadata(archive, mesh_objects, object_data, group_info)
 
         # Write thumbnail
         ctx._progress_update(99, "Writing thumbnail...")
@@ -463,9 +480,19 @@ class OrcaExporter(BaseExporter):
         debug(f"Wrote object model: {archive_path}")
 
     def write_main_model(
-        self, archive: zipfile.ZipFile, object_data: List[dict], build_uuid: str
+        self,
+        archive: zipfile.ZipFile,
+        object_data: List[dict],
+        build_uuid: str,
+        group_info: Optional[dict] = None,
     ) -> None:
-        """Write the main 3dmodel.model file with wrapper objects."""
+        """Write the main 3dmodel.model file with wrapper objects.
+
+        When *group_info* is provided the meshes are written as components
+        of a **single** wrapper object with one ``<item>`` in ``<build>``.
+        Orca Slicer treats that structure as a grouped assembly that moves
+        as one unit on the plate.
+        """
         root = xml.etree.ElementTree.Element(
             "model",
             attrib={
@@ -528,48 +555,94 @@ class OrcaExporter(BaseExporter):
         # Resources - wrapper objects with component references
         resources = xml.etree.ElementTree.SubElement(root, "resources")
 
-        for obj in object_data:
+        if group_info is not None:
+            # Grouped mode: single wrapper containing all meshes as components.
             wrapper = xml.etree.ElementTree.SubElement(
                 resources,
                 "object",
                 attrib={
-                    "id": str(obj["wrapper_id"]),
-                    "p:UUID": obj["wrapper_uuid"],
+                    "id": str(group_info["wrapper_id"]),
+                    "p:UUID": group_info["uuid"],
                     "type": "model",
                 },
             )
-
             components = xml.etree.ElementTree.SubElement(wrapper, "components")
-            xml.etree.ElementTree.SubElement(
-                components,
-                "component",
-                attrib={
-                    "p:path": obj["object_path"],
-                    "objectid": str(obj["mesh_id"]),
-                    "p:UUID": obj["component_uuid"],
-                    "transform": "1 0 0 0 1 0 0 0 1 0 0 0",
-                },
-            )
+            for obj in object_data:
+                comp_transform = format_transformation(obj["transformation"])
+                xml.etree.ElementTree.SubElement(
+                    components,
+                    "component",
+                    attrib={
+                        "p:path": obj["object_path"],
+                        "objectid": str(obj["mesh_id"]),
+                        "p:UUID": obj["component_uuid"],
+                        "transform": comp_transform,
+                    },
+                )
+        else:
+            # Non-grouped: per-object wrappers
+            for obj in object_data:
+                wrapper = xml.etree.ElementTree.SubElement(
+                    resources,
+                    "object",
+                    attrib={
+                        "id": str(obj["wrapper_id"]),
+                        "p:UUID": obj["wrapper_uuid"],
+                        "type": "model",
+                    },
+                )
+
+                components = xml.etree.ElementTree.SubElement(wrapper, "components")
+                xml.etree.ElementTree.SubElement(
+                    components,
+                    "component",
+                    attrib={
+                        "p:path": obj["object_path"],
+                        "objectid": str(obj["mesh_id"]),
+                        "p:UUID": obj["component_uuid"],
+                        "transform": "1 0 0 0 1 0 0 0 1 0 0 0",
+                    },
+                )
 
         # Build element
         build = xml.etree.ElementTree.SubElement(
             root, "build", attrib={"p:UUID": build_uuid}
         )
 
-        for idx, obj in enumerate(object_data):
-            item_uuid = f"0000000{idx + 2}-b1ec-4553-aec9-835e5b724bb4"
-            transform_str = format_transformation(obj["transformation"])
-
+        if group_info is not None:
+            # Single build item for the grouped assembly
+            bed_x, bed_y = group_info.get("bed_offset", (0.0, 0.0))
+            group_transform = (
+                f"1.000000000 0.000000000 0.000000000 "
+                f"0.000000000 1.000000000 0.000000000 "
+                f"0.000000000 0.000000000 1.000000000 "
+                f"{bed_x:.9f} {bed_y:.9f} 0.000000000"
+            )
             xml.etree.ElementTree.SubElement(
                 build,
                 "item",
                 attrib={
-                    "objectid": str(obj["wrapper_id"]),
-                    "p:UUID": item_uuid,
-                    "transform": transform_str,
+                    "objectid": str(group_info["wrapper_id"]),
+                    "p:UUID": "00000002-b1ec-4553-aec9-835e5b724bb4",
+                    "transform": group_transform,
                     "printable": "1",
                 },
             )
+        else:
+            for idx, obj in enumerate(object_data):
+                item_uuid = f"0000000{idx + 2}-b1ec-4553-aec9-835e5b724bb4"
+                transform_str = format_transformation(obj["transformation"])
+
+                xml.etree.ElementTree.SubElement(
+                    build,
+                    "item",
+                    attrib={
+                        "objectid": str(obj["wrapper_id"]),
+                        "p:UUID": item_uuid,
+                        "transform": transform_str,
+                        "printable": "1",
+                    },
+                )
 
         # Write to archive
         document = xml.etree.ElementTree.ElementTree(root)
@@ -616,12 +689,14 @@ class OrcaExporter(BaseExporter):
         archive: zipfile.ZipFile,
         blender_objects: List[bpy.types.Object],
         object_data: List[dict],
+        group_info: Optional[dict] = None,
     ) -> None:
         """Write Orca Slicer compatible metadata files to the archive.
 
         :param archive: The ZIP archive to write into.
         :param blender_objects: The Blender objects being exported.
         :param object_data: Per-object export data dicts from ``execute()``.
+        :param group_info: Optional group metadata for grouped assembly export.
         """
         ctx = self.ctx
         debug("Writing Orca metadata files...")
@@ -635,7 +710,7 @@ class OrcaExporter(BaseExporter):
 
             # Write model_settings.config with object metadata
             model_settings_xml = self.generate_model_settings(
-                blender_objects, object_data
+                blender_objects, object_data, group_info
             )
             with archive.open("Metadata/model_settings.config", "w") as f:
                 f.write(model_settings_xml.encode("utf-8"))
@@ -673,6 +748,46 @@ class OrcaExporter(BaseExporter):
         ):
             return (0.0, 0.0)
         return (self._BED_CENTER_X, self._BED_CENTER_Y)
+
+    def _get_dominant_color(self, blender_object: bpy.types.Object) -> Optional[str]:
+        """Return the hex colour string of the most-common face material on *blender_object*.
+
+        Used to determine the per-object ``extruder`` value in
+        ``model_settings.config`` so Orca assigns the right filament even
+        when objects have only a single material (no ``paint_color``
+        per-triangle overrides needed).
+
+        Returns ``None`` when no material can be determined.
+        """
+        ctx = self.ctx
+
+        if ctx.options.use_mesh_modifiers:
+            depsgraph = bpy.context.evaluated_depsgraph_get()
+            eval_obj = blender_object.evaluated_get(depsgraph)
+        else:
+            eval_obj = blender_object
+
+        try:
+            mesh = eval_obj.to_mesh()
+        except RuntimeError:
+            return None
+        if mesh is None:
+            return None
+
+        mesh.calc_loop_triangles()
+
+        # Count colours by triangle
+        color_counts: dict[str, int] = {}
+        for tri in mesh.loop_triangles:
+            color = get_triangle_color(mesh, tri, blender_object, eval_obj)
+            if color:
+                color_counts[color] = color_counts.get(color, 0) + 1
+
+        eval_obj.to_mesh_clear()
+
+        if not color_counts:
+            return None
+        return max(color_counts, key=color_counts.get)
 
     def generate_project_settings(self) -> dict:
         """Generate project_settings.config by loading template and updating filament colors.
@@ -811,12 +926,14 @@ class OrcaExporter(BaseExporter):
         self,
         blender_objects: List[bpy.types.Object],
         object_data: List[dict],
+        group_info: Optional[dict] = None,
     ) -> str:
         """Generate the model_settings.config XML for Orca Slicer.
 
         :param blender_objects: The Blender objects being exported.
         :param object_data: Per-object export data dicts from ``execute()``,
             containing ``wrapper_id``, ``mesh_id``, ``transformation``, and ``name``.
+        :param group_info: Optional group metadata for grouped assembly export.
         """
         ctx = self.ctx
         root = xml.etree.ElementTree.Element("config")
@@ -826,52 +943,104 @@ class OrcaExporter(BaseExporter):
         for od in object_data:
             obj_data_by_name[od["name"]] = od
 
-        for blender_object in blender_objects:
-            if blender_object.type != "MESH":
-                continue
-
-            obj_name = str(blender_object.name)
-            od = obj_data_by_name.get(obj_name)
-            if od is None:
-                continue
-
-            wrapper_id = od["wrapper_id"]
-            mesh_id = od["mesh_id"]
-
+        if group_info is not None:
+            # ----- Grouped mode: single <object> with multiple <part> -----
             object_elem = xml.etree.ElementTree.SubElement(
-                root, "object", id=str(wrapper_id)
+                root, "object", id=str(group_info["wrapper_id"])
             )
             xml.etree.ElementTree.SubElement(
-                object_elem, "metadata", key="name", value=obj_name
+                object_elem, "metadata", key="name", value=group_info["name"]
             )
             xml.etree.ElementTree.SubElement(
                 object_elem, "metadata", key="extruder", value="1"
             )
 
-            # Per-object setting overrides (passthrough, no validation)
-            if obj_name in ctx.object_settings:
-                for setting_key, setting_value in ctx.object_settings[obj_name].items():
-                    xml.etree.ElementTree.SubElement(
-                        object_elem,
-                        "metadata",
-                        key=str(setting_key),
-                        value=str(setting_value),
-                    )
-                debug(
-                    f"Wrote {len(ctx.object_settings[obj_name])} per-object overrides "
-                    f"for '{obj_name}'"
+            for blender_object in blender_objects:
+                if blender_object.type != "MESH":
+                    continue
+
+                obj_name = str(blender_object.name)
+                od = obj_data_by_name.get(obj_name)
+                if od is None:
+                    continue
+
+                # Determine per-part extruder from dominant face colour
+                extruder_value = "1"
+                if ctx.vertex_colors:
+                    dominant_color = self._get_dominant_color(blender_object)
+                    if dominant_color and dominant_color in ctx.vertex_colors:
+                        extruder_value = str(ctx.vertex_colors[dominant_color])
+
+                part_elem = xml.etree.ElementTree.SubElement(
+                    object_elem, "part", id=str(od["mesh_id"]), subtype="normal_part"
+                )
+                xml.etree.ElementTree.SubElement(
+                    part_elem, "metadata", key="name", value=obj_name
+                )
+                xml.etree.ElementTree.SubElement(
+                    part_elem, "metadata", key="matrix",
+                    value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1",
+                )
+                xml.etree.ElementTree.SubElement(
+                    part_elem, "metadata", key="extruder", value=extruder_value
                 )
 
-            part_elem = xml.etree.ElementTree.SubElement(
-                object_elem, "part", id=str(mesh_id), subtype="normal_part"
-            )
-            xml.etree.ElementTree.SubElement(
-                part_elem, "metadata", key="name", value=obj_name
-            )
-            matrix_value = "1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"
-            xml.etree.ElementTree.SubElement(
-                part_elem, "metadata", key="matrix", value=matrix_value
-            )
+        else:
+            # ----- Non-grouped: per-object <object> entries -----
+            for blender_object in blender_objects:
+                if blender_object.type != "MESH":
+                    continue
+
+                obj_name = str(blender_object.name)
+                od = obj_data_by_name.get(obj_name)
+                if od is None:
+                    continue
+
+                wrapper_id = od["wrapper_id"]
+                mesh_id = od["mesh_id"]
+
+                # Determine the dominant extruder for this object from its
+                # most-common face material colour mapped through vertex_colors.
+                extruder_value = "1"
+                if ctx.vertex_colors:
+                    dominant_color = self._get_dominant_color(blender_object)
+                    if dominant_color and dominant_color in ctx.vertex_colors:
+                        extruder_value = str(ctx.vertex_colors[dominant_color])
+
+                object_elem = xml.etree.ElementTree.SubElement(
+                    root, "object", id=str(wrapper_id)
+                )
+                xml.etree.ElementTree.SubElement(
+                    object_elem, "metadata", key="name", value=obj_name
+                )
+                xml.etree.ElementTree.SubElement(
+                    object_elem, "metadata", key="extruder", value=extruder_value
+                )
+
+                # Per-object setting overrides (passthrough, no validation)
+                if obj_name in ctx.object_settings:
+                    for setting_key, setting_value in ctx.object_settings[obj_name].items():
+                        xml.etree.ElementTree.SubElement(
+                            object_elem,
+                            "metadata",
+                            key=str(setting_key),
+                            value=str(setting_value),
+                        )
+                    debug(
+                        f"Wrote {len(ctx.object_settings[obj_name])} per-object overrides "
+                        f"for '{obj_name}'"
+                    )
+
+                part_elem = xml.etree.ElementTree.SubElement(
+                    object_elem, "part", id=str(mesh_id), subtype="normal_part"
+                )
+                xml.etree.ElementTree.SubElement(
+                    part_elem, "metadata", key="name", value=obj_name
+                )
+                matrix_value = "1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"
+                xml.etree.ElementTree.SubElement(
+                    part_elem, "metadata", key="matrix", value=matrix_value
+                )
 
         # Add plate metadata with model_instance entries
         plate_elem = xml.etree.ElementTree.SubElement(root, "plate")
@@ -888,38 +1057,73 @@ class OrcaExporter(BaseExporter):
             plate_elem, "metadata", key="filament_map_mode", value="Auto For Flush"
         )
 
-        for od in object_data:
+        if group_info is not None:
+            # Single model_instance for the grouped assembly
             instance_elem = xml.etree.ElementTree.SubElement(
                 plate_elem, "model_instance"
             )
             xml.etree.ElementTree.SubElement(
-                instance_elem,
-                "metadata",
-                key="object_id",
-                value=str(od["wrapper_id"]),
+                instance_elem, "metadata", key="object_id",
+                value=str(group_info["wrapper_id"]),
             )
             xml.etree.ElementTree.SubElement(
                 instance_elem, "metadata", key="instance_id", value="0"
             )
             xml.etree.ElementTree.SubElement(
-                instance_elem,
-                "metadata",
-                key="identify_id",
-                value=str(od["wrapper_id"]),
+                instance_elem, "metadata", key="identify_id",
+                value=str(group_info["wrapper_id"]),
             )
+        else:
+            for od in object_data:
+                instance_elem = xml.etree.ElementTree.SubElement(
+                    plate_elem, "model_instance"
+                )
+                xml.etree.ElementTree.SubElement(
+                    instance_elem,
+                    "metadata",
+                    key="object_id",
+                    value=str(od["wrapper_id"]),
+                )
+                xml.etree.ElementTree.SubElement(
+                    instance_elem, "metadata", key="instance_id", value="0"
+                )
+                xml.etree.ElementTree.SubElement(
+                    instance_elem,
+                    "metadata",
+                    key="identify_id",
+                    value=str(od["wrapper_id"]),
+                )
 
         # Add assemble section with real world transforms
         assemble_elem = xml.etree.ElementTree.SubElement(root, "assemble")
-        for od in object_data:
-            transform_str = format_transformation(od["transformation"])
+
+        if group_info is not None:
+            bed_x, bed_y = group_info.get("bed_offset", (0.0, 0.0))
+            group_transform = (
+                f"1.000000000 0.000000000 0.000000000 "
+                f"0.000000000 1.000000000 0.000000000 "
+                f"0.000000000 0.000000000 1.000000000 "
+                f"{bed_x:.9f} {bed_y:.9f} 0.000000000"
+            )
             xml.etree.ElementTree.SubElement(
                 assemble_elem,
                 "assemble_item",
-                object_id=str(od["wrapper_id"]),
+                object_id=str(group_info["wrapper_id"]),
                 instance_id="0",
-                transform=transform_str,
+                transform=group_transform,
                 offset="0 0 0",
             )
+        else:
+            for od in object_data:
+                transform_str = format_transformation(od["transformation"])
+                xml.etree.ElementTree.SubElement(
+                    assemble_elem,
+                    "assemble_item",
+                    object_id=str(od["wrapper_id"]),
+                    instance_id="0",
+                    transform=transform_str,
+                    offset="0 0 0",
+                )
 
         tree = xml.etree.ElementTree.ElementTree(root)
 

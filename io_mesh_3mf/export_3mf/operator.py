@@ -479,20 +479,22 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
 
             global_scale = export_unit_scale(context, ctx.options.global_scale)
 
-            # Check if any mesh has multi-material face assignments.
+            # Check if any mesh has materials assigned.
             # Must check EVALUATED objects because Geometry Nodes "Set Material"
             # nodes only create material slots on the evaluated depsgraph copy.
-            has_multi_materials = False
+            # Detect ANY material (not just multi-material) because Orca/BambuStudio
+            # ignore core-spec <basematerials> and only read colorgroup/paint_color.
+            has_materials = False
             if mesh_objects and ctx.options.use_mesh_modifiers:
                 depsgraph = context.evaluated_depsgraph_get()
                 for obj in mesh_objects:
                     eval_obj = obj.evaluated_get(depsgraph)
-                    if len(eval_obj.material_slots) > 1:
-                        has_multi_materials = True
+                    if len(eval_obj.material_slots) >= 1:
+                        has_materials = True
                         break
             elif mesh_objects:
-                has_multi_materials = any(
-                    len(obj.material_slots) > 1 for obj in mesh_objects
+                has_materials = any(
+                    len(obj.material_slots) >= 1 for obj in mesh_objects
                 )
 
             # Dispatch to format-specific exporter
@@ -512,7 +514,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                 # Orca-specific API features requested — use OrcaExporter
                 # regardless of material mode so project/object settings are written
                 exporter = OrcaExporter(ctx)
-            elif has_multi_materials:
+            elif has_materials:
                 # Check if passthrough Materials Extension data exists from a
                 # prior 3MF import.  If so, use StandardExporter to preserve
                 # round-trip fidelity (colorgroups, textures, multiproperties,
@@ -529,15 +531,16 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                 )
                 if has_passthrough:
                     debug(
-                        "Multi-material faces with passthrough data detected, "
+                        "Materials with passthrough data detected, "
                         "using Standard exporter for round-trip fidelity"
                     )
                     exporter = StandardExporter(ctx)
                 else:
-                    # Face-level material assignments detected — use OrcaExporter
-                    # so slicers (Orca, BambuStudio) receive paint_color attributes
-                    # they understand, instead of spec basematerials they ignore.
-                    debug("Multi-material faces detected, using Orca exporter for slicer compatibility")
+                    # Material assignments detected — use OrcaExporter so slicers
+                    # receive colorgroup/paint_color attributes they understand.
+                    # Orca/BambuStudio ignore core-spec <basematerials>, so even
+                    # single-colour objects need the Orca path.
+                    debug("Materials detected, using Orca exporter for slicer compatibility")
                     exporter = OrcaExporter(ctx)
             else:
                 # Standard 3MF export — geometry, materials, and texture export

@@ -287,12 +287,17 @@ def write_triangles(
 
                 elif triangle_material_name in material_name_to_index:
                     material_index = material_name_to_index[triangle_material_name]
-                    if material_index != object_material_list_index:
-                        if basematerials_resource_id:
-                            triangle_element.attrib[pid_name] = str(
-                                basematerials_resource_id
-                            )
-                        triangle_element.attrib[p1_name] = str(material_index)
+                    # Always write per-triangle pid/p1 so slicers like
+                    # Orca see the color even for single-material objects.
+                    # Previously this was gated by
+                    #   ``material_index != object_material_list_index``
+                    # which meant single-colour objects got no per-triangle
+                    # attributes and Orca ignored the object-level pid.
+                    if basematerials_resource_id:
+                        triangle_element.attrib[pid_name] = str(
+                            basematerials_resource_id
+                        )
+                    triangle_element.attrib[p1_name] = str(material_index)
 
         # Seam / support for triangles not handled by the segmentation branch
         if seam_strings and tri_idx in seam_strings and seam_strings[tri_idx]:
