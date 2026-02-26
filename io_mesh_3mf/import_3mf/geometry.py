@@ -122,6 +122,8 @@ def read_triangles(
     List[Optional[Tuple]],
     List[Tuple[float, float, float]],
     Dict[int, str],
+    Dict[int, str],
+    Dict[int, str],
     int,
 ]:
     """Read triangles from an ``<object>`` element.
@@ -140,12 +142,14 @@ def read_triangles(
     :param paint_only: If ``True``, skip texture-group / multiproperties handling
         (used for external model objects that only carry ``paint_color``).
     :return: ``(triangles, materials, triangle_uvs, vertex_list,
-        segmentation_strings, default_extruder)``
+        segmentation_strings, seam_strings, support_strings, default_extruder)``
     """
     vertices: List[Tuple[int, int, int]] = []
     materials: List[Optional[ResourceMaterial]] = []
     triangle_uvs: List[Optional[Tuple]] = []
     segmentation_strings: Dict[int, str] = {}
+    seam_strings: Dict[int, str] = {}
+    support_strings: Dict[int, str] = {}
 
     vertex_list = list(vertex_coords) if vertex_coords else []
 
@@ -192,6 +196,10 @@ def read_triangles(
                 if not paint_code:
                     paint_code = attrib.get("slic3rpe:mmu_segmentation")
 
+                # --- Seam / support codes (independent layers) ---
+                seam_code = attrib.get("paint_seam")
+                support_code = attrib.get("paint_supports")
+
                 if paint_code:
                     handled = _handle_paint_code(
                         ctx,
@@ -209,6 +217,13 @@ def read_triangles(
                         default_material,
                     )
                     if handled:
+                        # Store seam/support at the face index just created
+                        if import_materials == "PAINT":
+                            face_idx = len(vertices) - 1
+                            if seam_code:
+                                seam_strings[face_idx] = seam_code
+                            if support_code:
+                                support_strings[face_idx] = support_code
                         continue
 
                 # --- Texture groups / multiproperties / standard materials ---
@@ -234,6 +249,16 @@ def read_triangles(
             materials.append(material)
             triangle_uvs.append(uvs)
 
+            # Store seam/support for triangles without paint_code
+            if import_materials == "PAINT":
+                face_idx = len(vertices) - 1
+                seam_code_late = attrib.get("paint_seam")
+                support_code_late = attrib.get("paint_supports")
+                if seam_code_late:
+                    seam_strings[face_idx] = seam_code_late
+                if support_code_late:
+                    support_strings[face_idx] = support_code_late
+
         except KeyError as e:
             warn(f"Vertex {e} is missing.")
             ctx.safe_report({"WARNING"}, f"Vertex {e} is missing")
@@ -249,6 +274,8 @@ def read_triangles(
         triangle_uvs,
         vertex_list,
         segmentation_strings,
+        seam_strings,
+        support_strings,
         default_extruder,
     )
 
@@ -649,6 +676,8 @@ def read_objects(
             triangle_uvs,
             verts,
             segmentation_strings,
+            seam_strings,
+            support_strings,
             default_extruder,
         ) = read_triangles(ctx, object_node, material, pid, verts, objectid)
 
@@ -710,6 +739,8 @@ def read_objects(
             triangle_sets=triangle_sets,
             triangle_uvs=triangle_uvs if has_uvs else None,
             segmentation_strings=segmentation_strings if segmentation_strings else None,
+            seam_strings=seam_strings if seam_strings else None,
+            support_strings=support_strings if support_strings else None,
             default_extruder=default_extruder,
         )
 
@@ -755,6 +786,8 @@ def read_external_model_objects(
             _triangle_uvs,
             verts,
             segmentation_strings,
+            seam_strings,
+            support_strings,
             default_extruder,
         ) = read_triangles(
             ctx, object_node, None, None, verts, objectid, paint_only=True
@@ -792,6 +825,8 @@ def read_external_model_objects(
             triangle_sets=triangle_sets,
             triangle_uvs=None,
             segmentation_strings=segmentation_strings if segmentation_strings else None,
+            seam_strings=seam_strings if seam_strings else None,
+            support_strings=support_strings if support_strings else None,
             default_extruder=default_extruder,
         )
         debug(

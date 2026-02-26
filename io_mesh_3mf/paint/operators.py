@@ -809,3 +809,249 @@ class MMU_OT_import_paint_popup(bpy.types.Operator):
         box = layout.box()
         box.label(text="After switching, open the sidebar (N key) and", icon="INFO")
         box.label(text="click the '3MF' tab to access the paint tools.")
+
+
+# ===================================================================
+#  Seam / Support paint layer operators
+# ===================================================================
+
+
+class MMU_OT_init_auxiliary_paint(bpy.types.Operator):
+    """Initialize seam or support painting on the active mesh"""
+
+    bl_idname = "mmu.init_auxiliary_paint"
+    bl_label = "Initialize Paint Layer"
+    bl_options = {"REGISTER", "UNDO"}
+
+    layer_type: bpy.props.EnumProperty(
+        name="Layer",
+        items=[
+            ("SEAM", "Seam", "Seam enforcement paint"),
+            ("SUPPORT", "Support", "Support enforcement paint"),
+        ],
+        default="SEAM",
+    )
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj is not None and obj.type == "MESH"
+
+    def execute(self, context):
+        from .helpers import (
+            _layer_colors, _layer_uv_name, _layer_flag_key, _layer_colors_key,
+            LAYER_BACKGROUND,
+        )
+
+        bpy.ops.ed.undo_push(message=f"Before {self.layer_type.title()} Paint Init")
+
+        obj = context.active_object
+        mesh = obj.data
+        settings = context.scene.mmu_paint
+        layer_type = self.layer_type
+
+        bg, enforce, block = _layer_colors(layer_type)
+        uv_name = _layer_uv_name(layer_type)
+        flag_key = _layer_flag_key(layer_type)
+        colors_key = _layer_colors_key(layer_type)
+
+        # Create UV layer
+        uv_layer = mesh.uv_layers.get(uv_name)
+        if uv_layer is None:
+            uv_layer = mesh.uv_layers.new(name=uv_name)
+
+        # Copy UVs from MMU_Paint if available, otherwise unwrap
+        mmu_uv = mesh.uv_layers.get("MMU_Paint")
+        if mmu_uv:
+            # Copy UV coordinates from the color paint layer
+            num_loops = len(mesh.loops)
+            uv_flat = [0.0] * (num_loops * 2)
+            mmu_uv.data.foreach_get("uv", uv_flat)
+            uv_layer.data.foreach_set("uv", uv_flat)
+        else:
+            # No existing UVs — do a fresh unwrap
+            mesh.uv_layers.active = uv_layer
+            context.view_layer.objects.active = obj
+            bpy.ops.object.mode_set(mode="EDIT")
+            bpy.ops.mesh.select_all(action="SELECT")
+            bpy.ops.uv.smart_project(
+                angle_limit=1.15192,
+                margin_method="SCALED",
+                rotate_method="AXIS_ALIGNED",
+                island_margin=0.002,
+                area_weight=0.6,
+                correct_aspect=True,
+                scale_to_bounds=False,
+            )
+            bpy.ops.object.mode_set(mode="OBJECT")
+
+        # Texture size matching color paint
+        tri_count = len(mesh.polygons)
+        if tri_count < 5000:
+            texture_size = 2048
+        elif tri_count < 20000:
+            texture_size = 4096
+        else:
+            texture_size = 8192
+
+        # Create image filled with background color
+        image_name = f"{mesh.name}_{uv_name}"
+        image = bpy.data.images.new(
+            image_name, width=texture_size, height=texture_size, alpha=True
+        )
+        fill = np.empty((texture_size, texture_size, 4), dtype=np.float32)
+        fill[:, :, 0] = bg[0]
+        fill[:, :, 1] = bg[1]
+        fill[:, :, 2] = bg[2]
+        fill[:, :, 3] = 1.0
+        image.pixels.foreach_set(fill.ravel())
+        image.pack()
+
+        # Add TEX_IMAGE node to the paint material
+        if mesh.materials and mesh.materials[0] and mesh.materials[0].use_nodes:
+            mat = mesh.materials[0]
+            tex_node = mat.node_tree.nodes.new("ShaderNodeTexImage")
+            tex_node.image = image
+            tex_node.label = uv_name
+            tex_node.name = uv_name
+            tex_node.location = (-300, -300 if layer_type == "SEAM" else -500)
+
+        # Store custom properties
+        mesh[flag_key] = True
+        color_dict = {
+            1: _hex_from_rgb(*enforce),
+            2: _hex_from_rgb(*block),
+        }
+        mesh[colors_key] = str(color_dict)
+
+        # Switch to the new layer
+        settings.active_paint_layer = layer_type
+        _switch_to_layer(context, layer_type)
+
+        label = layer_type.title()
+        self.report(
+            {"INFO"},
+            f"Initialized {label} paint layer at {texture_size}x{texture_size}",
+        )
+        return {"FINISHED"}
+
+
+class MMU_OT_switch_paint_layer(bpy.types.Operator):
+    """Switch the active paint layer (Color / Seam / Support)"""
+
+    bl_idname = "mmu.switch_paint_layer"
+    bl_label = "Switch Paint Layer"
+    bl_options = {"INTERNAL"}
+
+    layer_type: bpy.props.EnumProperty(
+        name="Layer",
+        items=[
+            ("COLOR", "Color", "MMU color paint"),
+            ("SEAM", "Seam", "Seam enforcement paint"),
+            ("SUPPORT", "Support", "Support enforcement paint"),
+        ],
+        default="COLOR",
+    )
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj is not None and obj.type == "MESH"
+
+    def execute(self, context):
+        settings = context.scene.mmu_paint
+        settings.active_paint_layer = self.layer_type
+        _switch_to_layer(context, self.layer_type)
+        return {"FINISHED"}
+
+
+def _switch_to_layer(context, layer_type):
+    """Internal helper to activate a paint layer's UV, image, and brush color."""
+    from .helpers import (
+        _layer_uv_name, _layer_colors, _get_layer_image,
+        COLOR_UV_LAYER,
+    )
+
+    obj = context.active_object
+    if not obj or not obj.data:
+        return
+
+    mesh = obj.data
+    uv_name = _layer_uv_name(layer_type)
+
+    # Activate the UV layer
+    uv_layer = mesh.uv_layers.get(uv_name)
+    if uv_layer:
+        mesh.uv_layers.active = uv_layer
+
+    # Find and activate the image for painting
+    image = _get_layer_image(obj, layer_type)
+    if not image and layer_type == "COLOR":
+        # Fallback: scan for the segmentation image
+        image = _get_paint_image(context)
+
+    if image:
+        # Set active TEX_IMAGE node in the material
+        if mesh.materials and mesh.materials[0] and mesh.materials[0].use_nodes:
+            mat = mesh.materials[0]
+            for node in mat.node_tree.nodes:
+                if node.type == "TEX_IMAGE" and node.image == image:
+                    mat.node_tree.nodes.active = node
+                    break
+
+        # Set canvas image
+        ts = context.tool_settings
+        if hasattr(ts.image_paint, "canvas"):
+            ts.image_paint.canvas = image
+
+    # Set brush color
+    if layer_type == "COLOR":
+        # Restore filament color
+        settings = context.scene.mmu_paint
+        idx = settings.active_filament_index
+        if 0 <= idx < len(settings.filaments):
+            _set_brush_color(context, tuple(settings.filaments[idx].color[:]))
+    else:
+        # For seam/support, use enforce color as default brush
+        bg, enforce, block = _layer_colors(layer_type)
+        _set_brush_color(context, enforce)
+
+
+class MMU_OT_switch_aux_brush(bpy.types.Operator):
+    """Switch between enforce and block brush colors for seam/support layers"""
+
+    bl_idname = "mmu.switch_aux_brush"
+    bl_label = "Switch Brush Mode"
+    bl_options = {"INTERNAL"}
+
+    layer_type: bpy.props.EnumProperty(
+        name="Layer",
+        items=[
+            ("SEAM", "Seam", ""),
+            ("SUPPORT", "Support", ""),
+        ],
+        default="SEAM",
+    )
+
+    mode: bpy.props.EnumProperty(
+        name="Mode",
+        items=[
+            ("ENFORCE", "Enforce", "Paint enforce regions"),
+            ("BLOCK", "Block", "Paint block regions"),
+        ],
+        default="BLOCK",
+    )
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj is not None and obj.type == "MESH"
+
+    def execute(self, context):
+        from .helpers import _layer_colors
+        bg, enforce, block = _layer_colors(self.layer_type)
+        if self.mode == "ENFORCE":
+            _set_brush_color(context, enforce)
+        else:
+            _set_brush_color(context, block)
+        return {"FINISHED"}

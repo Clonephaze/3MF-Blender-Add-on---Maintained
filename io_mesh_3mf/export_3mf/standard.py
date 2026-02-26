@@ -83,6 +83,96 @@ class BaseExporter:
             return name
         return f"{{{MODEL_NAMESPACE}}}{name}"
 
+    def _extract_auxiliary_segmentation(
+        self,
+        original_object: bpy.types.Object,
+        eval_object: bpy.types.Object,
+        mesh: bpy.types.Mesh,
+        layer_type: str,
+    ) -> dict:
+        """Extract seam or support segmentation strings from a paint texture.
+
+        Uses the same segmentation codec as color paint but with a fixed
+        2-state palette (enforce / block) plus a background state (auto).
+
+        :param original_object: The original (non-evaluated) Blender object.
+        :param eval_object: The evaluated Blender object (with modifiers applied).
+        :param mesh: The mesh with loop_triangles already calculated.
+        :param layer_type: ``"SEAM"`` or ``"SUPPORT"``.
+        :return: Dict mapping loop_triangle index -> hex segmentation string.
+        """
+        from .segmentation import texture_to_segmentation
+        from ..paint.helpers import (
+            _layer_flag_key, _layer_colors_key, _layer_uv_name,
+            _layer_colors, LAYER_BACKGROUND,
+        )
+
+        original_mesh = original_object.data
+        flag_key = _layer_flag_key(layer_type)
+
+        if not (flag_key in original_mesh and original_mesh[flag_key]):
+            return {}
+
+        uv_name = _layer_uv_name(layer_type)
+        bg, enforce, block = _layer_colors(layer_type)
+
+        # Find the paint texture for this layer
+        paint_texture = None
+        image_suffix = f"_{uv_name}"
+
+        # Try by naming convention first
+        target_name = f"{original_mesh.name}{image_suffix}"
+        paint_texture = bpy.data.images.get(target_name)
+
+        # Fallback: scan material nodes for matching label/name
+        if not paint_texture:
+            for mat_slot in original_object.material_slots:
+                if mat_slot.material and mat_slot.material.use_nodes:
+                    for node in mat_slot.material.node_tree.nodes:
+                        if node.type == "TEX_IMAGE" and node.image:
+                            if (node.label == uv_name
+                                    or node.name == uv_name
+                                    or image_suffix in node.image.name):
+                                paint_texture = node.image
+                                break
+                    if paint_texture:
+                        break
+
+        if not paint_texture:
+            debug(f"  No {layer_type} paint texture found for export")
+            return {}
+
+        # Build extruder_colors mapping so _build_state_map produces correct
+        # states:  0-based idx -> RGB tuple.
+        #   idx 0 -> enforce (ext_num 1 -> state 1)
+        #   idx 1 -> block   (ext_num 2 -> state 2)
+        #   idx 2 -> bg      (ext_num 3 -> state 0 via default_extruder=3)
+        extruder_colors = {
+            0: list(enforce),
+            1: list(block),
+            2: list(LAYER_BACKGROUND),
+        }
+
+        debug(f"  Exporting {layer_type} paint texture '{paint_texture.name}'")
+
+        try:
+            seg_strings = texture_to_segmentation(
+                eval_object,
+                paint_texture,
+                extruder_colors,
+                default_extruder=3,
+                max_depth=self.ctx.options.subdivision_depth,
+            )
+            debug(
+                f"  Generated {len(seg_strings)} {layer_type} segmentation strings"
+            )
+            return seg_strings
+        except Exception as e:
+            debug(f"  WARNING: Failed to export {layer_type} segmentation: {e}")
+            import traceback
+            traceback.print_exc()
+            return {}
+
 
 class StandardExporter(BaseExporter):
     """Exports standard 3MF files (core spec with optional basematerials and triangle sets)."""
@@ -548,6 +638,8 @@ class StandardExporter(BaseExporter):
 
             # Generate segmentation strings from UV texture if in PAINT mode
             segmentation_strings = {}
+            seam_strings = {}
+            support_strings = {}
             debug(
                 f"[standard] Checking PAINT export: mode={ctx.options.use_orca_format}",
                 f", has_uv={bool(mesh.uv_layers.active)}"
@@ -555,6 +647,12 @@ class StandardExporter(BaseExporter):
             if ctx.options.use_orca_format == "PAINT" and mesh.uv_layers.active:
                 segmentation_strings = self._extract_segmentation(
                     original_object, blender_object, mesh
+                )
+                seam_strings = self._extract_auxiliary_segmentation(
+                    original_object, blender_object, mesh, "SEAM"
+                )
+                support_strings = self._extract_auxiliary_segmentation(
+                    original_object, blender_object, mesh, "SUPPORT"
                 )
 
             debug(
@@ -583,6 +681,8 @@ class StandardExporter(BaseExporter):
                     if ctx.material_resource_id
                     else None,
                     segmentation_strings,
+                    seam_strings=seam_strings,
+                    support_strings=support_strings,
                 )
 
             # Write triangle sets if present (auto-export utility metadata)

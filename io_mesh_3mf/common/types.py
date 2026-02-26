@@ -47,6 +47,8 @@ class ResourceObject:
     triangle_sets: Optional[dict] = None
     triangle_uvs: Optional[dict] = None
     segmentation_strings: Optional[dict] = None
+    seam_strings: Optional[dict] = None
+    support_strings: Optional[dict] = None
     default_extruder: Optional[int] = None
 
 

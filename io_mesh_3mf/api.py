@@ -752,6 +752,7 @@ def export_3mf(
     """
     from .export_3mf.context import ExportContext, ExportOptions
     from .export_3mf.archive import create_archive
+    from .export_3mf.components import collect_mesh_objects
     from .export_3mf.geometry import check_non_manifold_geometry
     from .export_3mf.standard import StandardExporter
     from .export_3mf.orca import OrcaExporter
@@ -824,7 +825,7 @@ def export_3mf(
         blender_objects = objects
     elif use_selection:
         blender_objects = context.selected_objects
-        mesh_objects = [obj for obj in blender_objects if obj.type == "MESH"]
+        mesh_objects = collect_mesh_objects(blender_objects, export_hidden=True)
         if not mesh_objects:
             error("Export cancelled: No mesh objects in selection")
             result.status = "CANCELLED"
@@ -836,7 +837,9 @@ def export_3mf(
         on_progress(20, "Checking geometry…")
 
     # Non-manifold check.
-    mesh_objects = [obj for obj in blender_objects if obj.type == "MESH"]
+    # Use collect_mesh_objects to walk into Empty hierarchies (e.g. when
+    # the caller passes a parent Empty grouping several mesh children).
+    mesh_objects = collect_mesh_objects(blender_objects, export_hidden=True)
     if mesh_objects:
         non_manifold = check_non_manifold_geometry(mesh_objects, use_mesh_modifiers)
         if non_manifold:
@@ -853,20 +856,24 @@ def export_3mf(
 
     scale = export_unit_scale(context, global_scale)
 
-    # Check if any mesh has multi-material face assignments.
+    # Check if any mesh has materials assigned.
     # Must check EVALUATED objects because Geometry Nodes "Set Material"
     # nodes only create material slots on the evaluated depsgraph copy.
-    has_multi_materials = False
+    # We detect ANY material (not just multi-material) because slicers
+    # like Orca/BambuStudio ignore core-spec <basematerials> and only
+    # read the Orca-style colorgroup/paint_color attributes written by
+    # OrcaExporter.
+    has_materials = False
     if mesh_objects and use_mesh_modifiers:
         depsgraph = context.evaluated_depsgraph_get()
         for obj in mesh_objects:
             eval_obj = obj.evaluated_get(depsgraph)
-            if len(eval_obj.material_slots) > 1:
-                has_multi_materials = True
+            if len(eval_obj.material_slots) >= 1:
+                has_materials = True
                 break
     elif mesh_objects:
-        has_multi_materials = any(
-            len(obj.material_slots) > 1 for obj in mesh_objects
+        has_materials = any(
+            len(obj.material_slots) >= 1 for obj in mesh_objects
         )
 
     # Dispatch to exporter.
@@ -885,10 +892,12 @@ def export_3mf(
             # Orca-specific API features requested — use OrcaExporter
             # regardless of material mode so project/object settings are written
             exporter = OrcaExporter(ctx)
-        elif has_multi_materials:
-            # Face-level material assignments detected — use OrcaExporter
-            # so slicers receive paint_color attributes they understand.
-            debug("Multi-material faces detected, using Orca exporter for slicer compatibility")
+        elif has_materials:
+            # Material assignments detected — use OrcaExporter so slicers
+            # receive colorgroup/paint_color attributes they understand.
+            # Orca/BambuStudio ignore core-spec <basematerials>, so even
+            # single-colour objects need the Orca path.
+            debug("Materials detected, using Orca exporter for slicer compatibility")
             exporter = OrcaExporter(ctx)
         else:
             exporter = StandardExporter(ctx)

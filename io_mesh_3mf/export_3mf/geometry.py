@@ -147,6 +147,8 @@ def write_triangles(
     texture_groups: Optional[Dict[str, Dict]] = None,
     basematerials_resource_id: Optional[str] = None,
     segmentation_strings: Optional[Dict[int, str]] = None,
+    seam_strings: Optional[Dict[int, str]] = None,
+    support_strings: Optional[Dict[int, str]] = None,
 ) -> None:
     """
     Writes a list of triangles into the specified mesh element.
@@ -164,6 +166,8 @@ def write_triangles(
     :param texture_groups: Dict of material_name -> texture group data for UV mapping.
     :param basematerials_resource_id: The ID of the basematerials resource for per-face material refs.
     :param segmentation_strings: Dict of face_index -> segmentation hash string (for PAINT mode).
+    :param seam_strings: Dict of face_index -> seam segmentation hash string.
+    :param support_strings: Dict of face_index -> support segmentation hash string.
     """
     debug(
         f"[write_triangles] mode={use_orca_format}, slicer={mmu_slicer_format},",
@@ -218,6 +222,12 @@ def write_triangles(
                 else:
                     triangle_element.attrib["paint_color"] = seg_string
                     seg_strings_written += 1
+
+                # Seam / support attributes are independent of color paint
+                if seam_strings and tri_idx in seam_strings and seam_strings[tri_idx]:
+                    triangle_element.attrib["paint_seam"] = seam_strings[tri_idx]
+                if support_strings and tri_idx in support_strings and support_strings[tri_idx]:
+                    triangle_element.attrib["paint_supports"] = support_strings[tri_idx]
                 continue
 
         # Handle multi-material color zones (BASEMATERIAL mode only)
@@ -277,12 +287,23 @@ def write_triangles(
 
                 elif triangle_material_name in material_name_to_index:
                     material_index = material_name_to_index[triangle_material_name]
-                    if material_index != object_material_list_index:
-                        if basematerials_resource_id:
-                            triangle_element.attrib[pid_name] = str(
-                                basematerials_resource_id
-                            )
-                        triangle_element.attrib[p1_name] = str(material_index)
+                    # Always write per-triangle pid/p1 so slicers like
+                    # Orca see the color even for single-material objects.
+                    # Previously this was gated by
+                    #   ``material_index != object_material_list_index``
+                    # which meant single-colour objects got no per-triangle
+                    # attributes and Orca ignored the object-level pid.
+                    if basematerials_resource_id:
+                        triangle_element.attrib[pid_name] = str(
+                            basematerials_resource_id
+                        )
+                    triangle_element.attrib[p1_name] = str(material_index)
+
+        # Seam / support for triangles not handled by the segmentation branch
+        if seam_strings and tri_idx in seam_strings and seam_strings[tri_idx]:
+            triangle_element.attrib["paint_seam"] = seam_strings[tri_idx]
+        if support_strings and tri_idx in support_strings and support_strings[tri_idx]:
+            triangle_element.attrib["paint_supports"] = support_strings[tri_idx]
 
     if segmentation_strings:
         debug(

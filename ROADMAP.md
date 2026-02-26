@@ -21,15 +21,10 @@ Features and improvements organized by priority. Complexity ratings help with pl
 
 ## 🖨️ Slicer Compatibility
 
-### General
-| Status | Feature | Complexity | Description |
-|--------|---------|------------|-------------|
-| 💭 | Seam/Support Painting | 🟡 | Research if/how slicers support painting seams/supports for better print results
-
 ### Cura
 | Status | Feature | Complexity | Description |
 |--------|---------|------------|-------------|
-| 💭 | MMU Research Needed | 🔴 | Import/Export of cura MMU Data Needed
+| 💭 | MMU Research Needed | 🔴 | Import/Export of cura MMU Data Needed (I'll be honest, I don't want to do this. PRs would be very welcome) |
 
 ---
 
@@ -45,7 +40,7 @@ Features and improvements organized by priority. Complexity ratings help with pl
 ### Research Needed
 *Requires investigation*
 
-- [ ] Seam/support painting formats (No idea if we can add this in any way slicers support it)
+- [ ] Cura MMU Data: Research how to read/write MMU data from Cura and represent it in Blender and export it back to 3MF. This is a low priority item, cura seems little used in the MMU community, but it would be a nice addition for users who rely on Cura for slicing. Cura stores MMU data in a png texture file using the blue hue. It supports 8 colors, and maps those colors to the first 8 values of blue. so 1/255 blue corresponds to material index 1, 2/255 to index 2, etc. It reads this data for color zones, but another file for actual color data. No seam or support data seems to be stored in the texture file. Cura doesn't seem to have seam data at all. All I've found so far. 
 ---
 
 ## 🤝 Contributing

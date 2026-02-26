@@ -48,6 +48,91 @@ DEFAULT_PALETTE = [
     (0.200, 0.200, 0.200),  # 16: Dark gray
 ]
 
+# ---------------------------------------------------------------------------
+#  Seam / Support paint layer constants
+# ---------------------------------------------------------------------------
+
+# Background color for seam/support textures (neutral gray — state 0 = auto)
+LAYER_BACKGROUND = (0.500, 0.500, 0.500)
+
+# Seam paint: enforce = cyan, block = dark red
+SEAM_ENFORCE_COLOR = (0.100, 0.800, 1.000)
+SEAM_BLOCK_COLOR = (0.800, 0.150, 0.150)
+
+# Support paint: enforce = green, block = red
+SUPPORT_ENFORCE_COLOR = (0.100, 0.900, 0.200)
+SUPPORT_BLOCK_COLOR = (1.000, 0.200, 0.100)
+
+# Layer property names on mesh.data
+SEAM_UV_LAYER = "Seam_Paint"
+SUPPORT_UV_LAYER = "Support_Paint"
+COLOR_UV_LAYER = "MMU_Paint"
+
+# Mesh custom property keys
+SEAM_FLAG_KEY = "3mf_has_seam_paint"
+SUPPORT_FLAG_KEY = "3mf_has_support_paint"
+SEAM_COLORS_KEY = "3mf_seam_paint_colors"
+SUPPORT_COLORS_KEY = "3mf_support_paint_colors"
+
+
+def _layer_colors(layer_type):
+    """Return ``(background, enforce, block)`` sRGB tuples for a paint layer type."""
+    if layer_type == "SEAM":
+        return LAYER_BACKGROUND, SEAM_ENFORCE_COLOR, SEAM_BLOCK_COLOR
+    elif layer_type == "SUPPORT":
+        return LAYER_BACKGROUND, SUPPORT_ENFORCE_COLOR, SUPPORT_BLOCK_COLOR
+    return None
+
+
+def _layer_uv_name(layer_type):
+    """Return the UV layer name for the given paint layer type."""
+    if layer_type == "SEAM":
+        return SEAM_UV_LAYER
+    elif layer_type == "SUPPORT":
+        return SUPPORT_UV_LAYER
+    return COLOR_UV_LAYER
+
+
+def _layer_flag_key(layer_type):
+    """Return the mesh custom property flag key for a layer type."""
+    if layer_type == "SEAM":
+        return SEAM_FLAG_KEY
+    elif layer_type == "SUPPORT":
+        return SUPPORT_FLAG_KEY
+    return "3mf_is_paint_texture"
+
+
+def _layer_colors_key(layer_type):
+    """Return the mesh custom property colors key for a layer type."""
+    if layer_type == "SEAM":
+        return SEAM_COLORS_KEY
+    elif layer_type == "SUPPORT":
+        return SUPPORT_COLORS_KEY
+    return "3mf_paint_extruder_colors"
+
+
+def _get_layer_image(obj, layer_type):
+    """Find the paint texture image for a specific layer on the object, or None."""
+    if not obj or not obj.data:
+        return None
+    uv_name = _layer_uv_name(layer_type)
+    suffix = f"_{uv_name}"
+    # Search images by naming convention: {mesh_name}_{uv_layer_name}
+    mesh_name = obj.data.name
+    target_name = f"{mesh_name}{suffix}"
+    img = bpy.data.images.get(target_name)
+    if img:
+        return img
+    # Fallback: scan materials for TEX_IMAGE nodes whose image name contains the suffix
+    if obj.data.materials:
+        for mat in obj.data.materials:
+            if mat and mat.use_nodes:
+                for node in mat.node_tree.nodes:
+                    if node.type == "TEX_IMAGE" and node.image:
+                        if suffix in node.image.name:
+                            return node.image
+    return None
+
 
 # ===================================================================
 #  Utility helpers
