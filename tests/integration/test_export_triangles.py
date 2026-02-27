@@ -56,7 +56,7 @@ class ExportTriangleMaterialTests(Blender3mfTestCase):
         mat = self.create_red_material()
         cube.data.materials.append(mat)
 
-        tris = self._export_and_get_triangles(use_orca_format="STANDARD")
+        tris = self._export_and_get_triangles(use_orca_format="AUTO")
         # Triangles in Orca mode should have material references
         self.assertGreater(len(tris), 0, "Should have triangles")
 
@@ -86,7 +86,7 @@ class ExportTriangleMaterialTests(Blender3mfTestCase):
         bm_obj.to_mesh(mesh)
         bm_obj.free()
 
-        tris = self._export_and_get_triangles(use_orca_format="STANDARD")
+        tris = self._export_and_get_triangles(use_orca_format="AUTO")
         self.assertGreater(len(tris), 0)
 
         # Collect all paint_color values
@@ -111,7 +111,7 @@ class ExportTriangleMaterialTests(Blender3mfTestCase):
         """Geometry-only export has no pid/p1 attributes."""
         bpy.ops.mesh.primitive_cube_add(location=(0, 0, 0))
 
-        tris = self._export_and_get_triangles(use_orca_format="STANDARD")
+        tris = self._export_and_get_triangles(use_orca_format="AUTO")
         self.assertGreater(len(tris), 0)
 
         for t in tris:
@@ -125,7 +125,7 @@ class ExportTriangleMaterialTests(Blender3mfTestCase):
         """All triangle vertex indices are non-negative integers."""
         bpy.ops.mesh.primitive_cube_add(location=(0, 0, 0))
 
-        tris = self._export_and_get_triangles(use_orca_format="STANDARD")
+        tris = self._export_and_get_triangles(use_orca_format="AUTO")
         for t in tris:
             for attr in ("v1", "v2", "v3"):
                 val = t.get(attr) or t.get(f"{{{MODEL_NS}}}{attr}")

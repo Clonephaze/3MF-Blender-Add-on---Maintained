@@ -19,7 +19,7 @@ class OrcaExportStructureTests(Blender3mfTestCase):
     """Verify Orca exporter produces correct multi-file archive structure."""
 
     def _export_orca_cube(self, count=1, **extra_kwargs):
-        """Create cubes with materials and export in Orca BASEMATERIAL mode."""
+        """Create cubes with materials and export in AUTO mode (auto-promotes to Orca)."""
         for i in range(count):
             bpy.ops.mesh.primitive_cube_add(location=(i * 3, 0, 0))
             cube = bpy.context.object
@@ -34,7 +34,7 @@ class OrcaExportStructureTests(Blender3mfTestCase):
 
         result = bpy.ops.export_mesh.threemf(
             filepath=str(self.temp_file),
-            use_orca_format="STANDARD",
+            use_orca_format="AUTO",
             **extra_kwargs,
         )
         self.assertIn("FINISHED", result)
@@ -133,7 +133,7 @@ class OrcaExportStructureTests(Blender3mfTestCase):
             bpy.context.object.data.materials.append(mat)
 
         result = bpy.ops.export_mesh.threemf(
-            filepath=str(self.temp_file), use_orca_format="STANDARD"
+            filepath=str(self.temp_file), use_orca_format="AUTO"
         )
         self.assertIn("FINISHED", result)
 
@@ -159,7 +159,7 @@ class OrcaRoundtripTests(Blender3mfTestCase):
             bpy.context.object.data.materials.append(mat)
 
         bpy.ops.export_mesh.threemf(
-            filepath=str(self.temp_file), use_orca_format="STANDARD"
+            filepath=str(self.temp_file), use_orca_format="AUTO"
         )
         self.clean_scene()
 
@@ -176,7 +176,7 @@ class OrcaRoundtripTests(Blender3mfTestCase):
         original_verts = len(bpy.context.object.data.vertices)
 
         bpy.ops.export_mesh.threemf(
-            filepath=str(self.temp_file), use_orca_format="STANDARD"
+            filepath=str(self.temp_file), use_orca_format="AUTO"
         )
         self.clean_scene()
 
@@ -205,7 +205,7 @@ class OrcaRoundtripTests(Blender3mfTestCase):
         bm.free()
 
         bpy.ops.export_mesh.threemf(
-            filepath=str(self.temp_file), use_orca_format="STANDARD"
+            filepath=str(self.temp_file), use_orca_format="AUTO"
         )
         self.clean_scene()
 
@@ -224,7 +224,7 @@ class OrcaProjectMetadataTests(Blender3mfTestCase):
         bpy.context.object.data.materials.append(mat)
 
         bpy.ops.export_mesh.threemf(
-            filepath=str(self.temp_file), use_orca_format="STANDARD"
+            filepath=str(self.temp_file), use_orca_format="AUTO"
         )
 
         with zipfile.ZipFile(str(self.temp_file), "r") as archive:
@@ -246,7 +246,7 @@ class OrcaProjectMetadataTests(Blender3mfTestCase):
         bpy.context.object.data.materials.append(mat)
 
         bpy.ops.export_mesh.threemf(
-            filepath=str(self.temp_file), use_orca_format="STANDARD"
+            filepath=str(self.temp_file), use_orca_format="AUTO"
         )
 
         with zipfile.ZipFile(str(self.temp_file), "r") as archive:

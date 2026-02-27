@@ -58,6 +58,23 @@ if TYPE_CHECKING:
     from .context import ExportContext
 
 
+def _is_object_excluded(obj: bpy.types.Object, ctx) -> bool:
+    """Return True if *obj* should be excluded from export.
+
+    Checks (in order):
+    1. **Viewport visibility** — ``visible_get()`` accounts for the per-object
+       eye icon, collection visibility toggles, and view-layer excludes.
+       Skipped when ``export_hidden`` is *True*.
+    2. **Render disabled** — the camera-icon on the object
+       (``obj.hide_render``).  Skipped when ``skip_disabled`` is *False*.
+    """
+    if not ctx.options.export_hidden and not obj.visible_get():
+        return True
+    if ctx.options.skip_disabled and obj.hide_render:
+        return True
+    return False
+
+
 class BaseExporter:
     """Base class for format-specific exporters."""
 
@@ -77,7 +94,7 @@ class BaseExporter:
         In standard 3MF mode with default_namespace, they need the prefix.
         """
         if (
-            self.ctx.options.use_orca_format in ("PAINT", "STANDARD")
+            self.ctx.options.use_orca_format in ("PAINT", "AUTO")
             or self.ctx.options.mmu_slicer_format == "PRUSA"
         ):
             return name
@@ -211,7 +228,9 @@ class StandardExporter(BaseExporter):
         # Resolve all mesh objects recursively (descends into nested empties)
         # Used for material scanning; write_objects handles hierarchy itself.
         all_mesh_objects = collect_mesh_objects(
-            blender_objects, export_hidden=ctx.options.export_hidden
+            blender_objects,
+            export_hidden=ctx.options.export_hidden,
+            skip_disabled=ctx.options.skip_disabled,
         )
 
         (
@@ -368,14 +387,14 @@ class StandardExporter(BaseExporter):
         total_objects = sum(
             1
             for obj in blender_objects
-            if not (obj.hide_get() and not ctx.options.export_hidden)
+            if not (_is_object_excluded(obj, ctx))
             and obj.parent is None
             and obj.type in {"MESH", "EMPTY"}
         )
         processed_objects = 0
 
         for blender_object in blender_objects:
-            if blender_object.hide_get() and not ctx.options.export_hidden:
+            if _is_object_excluded(blender_object, ctx):
                 hidden_skipped += 1
                 continue
             if blender_object.parent is not None:
@@ -438,8 +457,8 @@ class StandardExporter(BaseExporter):
         if hidden_skipped > 0:
             ctx.safe_report(
                 {"INFO"},
-                f"Skipped {hidden_skipped} hidden object(s). "
-                "Enable 'Include Hidden' to export them.",
+                f"Skipped {hidden_skipped} hidden/disabled object(s). "
+                "Enable 'Include Hidden' or disable 'Skip Disabled' to export them.",
             )
 
     def write_object_resource(
@@ -578,9 +597,9 @@ class StandardExporter(BaseExporter):
                             has_textured_material = True
                             break
 
-                # In STANDARD mode, use face colors mapped to colorgroup IDs
+                # In AUTO mode, use face colors mapped to colorgroup IDs
                 if (
-                    ctx.options.use_orca_format == "STANDARD"
+                    ctx.options.use_orca_format == "AUTO"
                     and ctx.vertex_colors
                     and ctx.options.mmu_slicer_format == "ORCA"
                 ):
@@ -868,7 +887,7 @@ class StandardExporter(BaseExporter):
                         break
 
             if (
-                ctx.options.use_orca_format == "STANDARD"
+                ctx.options.use_orca_format == "AUTO"
                 and ctx.vertex_colors
                 and ctx.options.mmu_slicer_format == "ORCA"
             ):

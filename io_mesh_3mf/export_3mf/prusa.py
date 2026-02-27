@@ -71,7 +71,9 @@ class PrusaExporter(BaseExporter):
         # For PAINT mode, collect colors from paint texture metadata instead of face materials
         paint_colors_collected = False
         mesh_objects = collect_mesh_objects(
-            blender_objects, export_hidden=ctx.options.export_hidden
+            blender_objects,
+            export_hidden=ctx.options.export_hidden,
+            skip_disabled=ctx.options.skip_disabled,
         )
         for blender_object in mesh_objects:
             original_object = blender_object

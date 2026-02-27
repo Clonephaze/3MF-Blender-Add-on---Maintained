@@ -95,7 +95,9 @@ class OrcaExporter(BaseExporter):
         paint_colors_collected = False
         if ctx.options.use_orca_format == "PAINT":
             mesh_objs_for_paint = collect_mesh_objects(
-                blender_objects, export_hidden=ctx.options.export_hidden
+                blender_objects,
+                export_hidden=ctx.options.export_hidden,
+                skip_disabled=ctx.options.skip_disabled,
             )
             for blender_object in mesh_objs_for_paint:
                 original_object = blender_object
@@ -145,9 +147,10 @@ class OrcaExporter(BaseExporter):
         # Generate build UUID
         build_uuid = str(uuid.uuid4())
 
-        # Collect mesh objects recursively (walks into nested empties)
         mesh_objects = collect_mesh_objects(
-            blender_objects, export_hidden=ctx.options.export_hidden
+            blender_objects,
+            export_hidden=ctx.options.export_hidden,
+            skip_disabled=ctx.options.skip_disabled,
         )
 
         if not mesh_objects:

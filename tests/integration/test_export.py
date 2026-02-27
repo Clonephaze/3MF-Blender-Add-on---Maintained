@@ -192,10 +192,10 @@ class ExportMaterialTests(Blender3mfTestCase):
         bmesh.update_edit_mesh(cube.data)
         bpy.ops.object.mode_set(mode='OBJECT')
 
-        # Export in STANDARD mode (the default)
+        # Export in AUTO mode (the default)
         result = bpy.ops.export_mesh.threemf(
             filepath=str(self.temp_file),
-            use_orca_format='STANDARD',
+            use_orca_format='AUTO',
         )
 
         self.assertIn('FINISHED', result)
@@ -273,7 +273,7 @@ class ExportMaterialTests(Blender3mfTestCase):
 
         result = bpy.ops.export_mesh.threemf(
             filepath=str(self.temp_file),
-            use_orca_format='STANDARD',
+            use_orca_format='AUTO',
         )
 
         self.assertIn('FINISHED', result)
