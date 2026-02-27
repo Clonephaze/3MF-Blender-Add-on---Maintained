@@ -20,6 +20,7 @@ Slicer-specific import helpers.
 
 from .detection import detect_vendor
 from .colors import (
+    read_all_slicer_colors,
     read_orca_filament_colors,
     read_prusa_slic3r_colors,
     read_blender_addon_colors,
@@ -35,6 +36,7 @@ from .paint import (
 
 __all__ = [
     "detect_vendor",
+    "read_all_slicer_colors",
     "read_orca_filament_colors",
     "read_prusa_slic3r_colors",
     "read_blender_addon_colors",

@@ -401,7 +401,7 @@ def subdivide_triangle_with_segmentation(
                 v0=v0_idx,
                 v1=v1_idx,
                 v2=v2_idx,
-                state=TriangleState.NONE,
+                state=TriangleState.DEFAULT,
                 source_triangle_index=source_triangle_index,
             )
         ]

@@ -90,8 +90,13 @@ class EXPORT_OT_threemf_preset(AddPresetBase, bpy.types.Operator):
     ]
 
 
+# Cache for dynamic enum to prevent Blender GC issues.
+_thumbnail_image_cache: list = []
+
+
 def _thumbnail_image_items(self, context):
     """Dynamic enum callback listing images in the current .blend file."""
+    global _thumbnail_image_cache
     items = []
     for img in bpy.data.images:
         # Skip internal renders, viewers, and zero-pixel images.
@@ -102,7 +107,8 @@ def _thumbnail_image_items(self, context):
     items.append(
         ("__CUSTOM_PATH__", "Custom File Path", "Enter a file path manually", "FILEBROWSER", len(items))
     )
-    return items
+    _thumbnail_image_cache = items
+    return _thumbnail_image_cache
 
 
 # Cache for dynamic enum to prevent Blender GC issues.

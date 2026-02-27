@@ -27,7 +27,7 @@ The output format is slicer-agnostic — works for both paint_color and mmu_segm
 import numpy as np
 from typing import Tuple, List, Dict
 from ..common.segmentation import SegmentationNode, SegmentationEncoder
-from ..common.logging import debug
+from ..common.logging import debug, DEBUG_MODE
 
 # Maximum subdivision depth (7 gives 4^7 = 16384 potential leaf nodes per triangle)
 MAX_SUBDIVISION_DEPTH = 7
@@ -284,10 +284,13 @@ def texture_to_segmentation(
     state_map = _build_state_map(pixels, color_to_extruder, default_extruder)
     t_state = time.perf_counter()
 
-    unique_states = np.unique(state_map)
-    debug(
-        f"  State map built in {t_state - t_cache:.2f}s, unique states: {list(unique_states)}"
-    )
+    if DEBUG_MODE:
+        unique_states = np.unique(state_map)
+        debug(
+            f"  State map built in {t_state - t_cache:.2f}s, unique states: {list(unique_states)}"
+        )
+    else:
+        debug(f"  State map built in {t_state - t_cache:.2f}s")
 
     if not mesh.uv_layers or not mesh.uv_layers.active:
         return {}

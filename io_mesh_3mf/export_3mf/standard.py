@@ -715,6 +715,9 @@ class StandardExporter(BaseExporter):
                 )
                 write_metadata(metadatagroup_element, metadata, ctx.options.use_orca_format)
 
+        # Clean up the temporary mesh created by to_mesh()
+        blender_object.to_mesh_clear()
+
         return new_resource_id, mesh_transformation
 
     def _extract_segmentation(

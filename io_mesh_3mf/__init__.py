@@ -429,6 +429,15 @@ def register() -> None:
     register_paint()
     register_panels()
 
+    # Register API in bpy.app.driver_namespace for addon discovery.
+    # The api module self-registers on import, but we explicitly call it here
+    # to ensure it's available after addon enable (not just first import).
+    try:
+        from . import api
+        api._register_api()
+    except Exception:
+        pass  # Non-critical — API still works via direct import
+
 
 def _remove_menu_entries() -> None:
     """Remove our import/export menu entries, tolerating stale references.
@@ -452,6 +461,13 @@ def _remove_menu_entries() -> None:
 
 
 def unregister() -> None:
+    # Unregister API from bpy.app.driver_namespace.
+    try:
+        from . import api
+        api._unregister_api()
+    except Exception:
+        pass
+
     unregister_panels()
     unregister_paint()
 
