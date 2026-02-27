@@ -84,7 +84,151 @@ from .common.units import (
     export_unit_scale,
 )
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# API Version & Registry
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# This module self-registers in bpy.app.driver_namespace so other addons can
+# discover and use the 3MF API without parsing addon directories.
+#
+# Usage from another addon:
+#
+#     import bpy
+#     threemf_api = bpy.app.driver_namespace.get("io_mesh_3mf")
+#     if threemf_api is not None:
+#         result = threemf_api.import_3mf("/path/to/model.3mf")
+#
+# Or using the provided discovery helper (see API.md):
+#
+#     from io_mesh_3mf.api import get_api, is_available
+#     if is_available():
+#         api = get_api()
+#         result = api.import_3mf("/path/to/model.3mf")
+
+#: API version following semantic versioning (MAJOR.MINOR.PATCH).
+#: - MAJOR: Breaking changes to existing functions/signatures
+#: - MINOR: New features, backward-compatible
+#: - PATCH: Bug fixes only
+API_VERSION = (1, 0, 0)
+
+#: Human-readable version string
+API_VERSION_STRING = ".".join(str(v) for v in API_VERSION)
+
+#: Capability flags for feature detection. Other addons can check these
+#: to determine what functionality is available without version parsing.
+API_CAPABILITIES = frozenset({
+    "import",              # import_3mf() available
+    "export",              # export_3mf() available
+    "inspect",             # inspect_3mf() available
+    "batch",               # batch_import/batch_export available
+    "callbacks",           # on_progress, on_warning, on_object_created
+    "target_collection",   # import to specific collection
+    "orca_format",         # Orca/BambuStudio export format
+    "prusa_format",        # PrusaSlicer export format
+    "paint_mode",          # MMU paint segmentation
+    "project_template",    # Custom Orca project template
+    "object_settings",     # Per-object Orca settings
+    "building_blocks",     # colors, types, segmentation sub-namespaces
+})
+
+#: Registry key in bpy.app.driver_namespace
+_REGISTRY_KEY = "io_mesh_3mf"
+
+
+def _register_api() -> None:
+    """Register this API module in bpy.app.driver_namespace for discovery."""
+    import sys
+    bpy.app.driver_namespace[_REGISTRY_KEY] = sys.modules[__name__]
+    debug(f"Registered 3MF API v{API_VERSION_STRING} in driver_namespace")
+
+
+def _unregister_api() -> None:
+    """Remove the API from bpy.app.driver_namespace."""
+    bpy.app.driver_namespace.pop(_REGISTRY_KEY, None)
+
+
+def is_available() -> bool:
+    """Check if the 3MF API is registered and available.
+
+    :return: True if the API is registered in bpy.app.driver_namespace.
+
+    Example::
+
+        from io_mesh_3mf.api import is_available
+        if is_available():
+            print("3MF API is ready")
+    """
+    return _REGISTRY_KEY in bpy.app.driver_namespace
+
+
+def get_api():
+    """Get the registered 3MF API module.
+
+    :return: The io_mesh_3mf.api module, or None if not registered.
+    :rtype: module | None
+
+    Example::
+
+        from io_mesh_3mf.api import get_api
+        api = get_api()
+        if api:
+            result = api.import_3mf("/model.3mf")
+    """
+    return bpy.app.driver_namespace.get(_REGISTRY_KEY)
+
+
+def has_capability(capability: str) -> bool:
+    """Check if a specific API capability is available.
+
+    Use this for forward-compatible feature detection instead of version
+    checks. New capabilities may be added in minor versions.
+
+    :param capability: Capability name (e.g., "paint_mode", "batch").
+    :return: True if the capability is supported.
+
+    Example::
+
+        from io_mesh_3mf.api import has_capability
+        if has_capability("object_settings"):
+            # Safe to use object_settings parameter
+            result = export_3mf(path, object_settings={...})
+    """
+    return capability in API_CAPABILITIES
+
+
+def check_version(minimum: Tuple[int, int, int]) -> bool:
+    """Check if the API version meets a minimum requirement.
+
+    :param minimum: Tuple of (major, minor, patch) minimum version.
+    :return: True if API_VERSION >= minimum.
+
+    Example::
+
+        from io_mesh_3mf.api import check_version
+        if check_version((1, 2, 0)):
+            # Use features added in v1.2.0
+            ...
+    """
+    return API_VERSION >= minimum
+
+
+# Auto-register when this module is imported (deferred to first use for safety)
+try:
+    _register_api()
+except Exception:
+    pass  # Blender may not be fully initialized during startup
+
+
 __all__ = [
+    # --- API discovery & versioning ---
+    "API_VERSION",
+    "API_VERSION_STRING",
+    "API_CAPABILITIES",
+    "is_available",
+    "get_api",
+    "has_capability",
+    "check_version",
     # --- Core functions ---
     "import_3mf",
     "export_3mf",
@@ -430,10 +574,7 @@ def import_3mf(
     from .import_3mf.scene import apply_grid_layout
     from .import_3mf.slicer import (
         detect_vendor,
-        read_orca_filament_colors,
-        read_prusa_slic3r_colors,
-        read_blender_addon_colors,
-        read_prusa_object_extruders,
+        read_all_slicer_colors,
     )
     from .import_3mf.materials import (
         read_materials as _read_materials_impl,
@@ -579,11 +720,8 @@ def import_3mf(
         if on_progress:
             on_progress(20, "Reading filament colours…")
 
-        # Read filament colours.
-        read_orca_filament_colors(ctx, filepath)
-        read_prusa_slic3r_colors(ctx, filepath)
-        read_blender_addon_colors(ctx, filepath)
-        read_prusa_object_extruders(ctx, filepath)
+        # Read filament colours (single archive open, priority order).
+        read_all_slicer_colors(ctx, filepath)
 
         # Metadata.
         for metadata_node in root.iterfind("./3mf:metadata", MODEL_NAMESPACES):

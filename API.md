@@ -31,6 +31,88 @@ print(info.unit, info.num_objects, info.num_triangles_total)
 
 ---
 
+## API Discovery (for Other Addons)
+
+The 3MF addon registers itself in `bpy.app.driver_namespace["io_mesh_3mf"]` when enabled. This allows other Blender addons to discover and use the API **without parsing addon directories**.
+
+### Quick Discovery Check
+
+```python
+import bpy
+
+# Check if 3MF addon is available
+threemf_api = bpy.app.driver_namespace.get("io_mesh_3mf")
+if threemf_api is not None:
+    result = threemf_api.import_3mf("/path/to/model.3mf")
+    print(f"Imported {result.num_loaded} objects")
+else:
+    print("3MF Format addon not installed or enabled")
+```
+
+### Using the Discovery Helper
+
+For robust integration, use the built-in discovery functions:
+
+```python
+from io_mesh_3mf.api import is_available, get_api, has_capability, check_version
+
+# Check availability
+if is_available():
+    api = get_api()
+    result = api.import_3mf("/model.3mf")
+
+# Feature detection (forward-compatible)
+if has_capability("object_settings"):
+    result = export_3mf(path, object_settings={...})
+
+# Version checking
+if check_version((1, 2, 0)):
+    # Use features added in v1.2.0
+    ...
+```
+
+### API Version & Capabilities
+
+```python
+from io_mesh_3mf.api import API_VERSION, API_VERSION_STRING, API_CAPABILITIES
+
+print(f"3MF API v{API_VERSION_STRING}")  # e.g., "1.0.0"
+print(f"Version tuple: {API_VERSION}")    # e.g., (1, 0, 0)
+print(f"Capabilities: {API_CAPABILITIES}")
+```
+
+**Available capabilities:**
+
+| Capability | Description |
+|------------|-------------|
+| `import` | `import_3mf()` available |
+| `export` | `export_3mf()` available |
+| `inspect` | `inspect_3mf()` available |
+| `batch` | `batch_import()` / `batch_export()` available |
+| `callbacks` | `on_progress`, `on_warning`, `on_object_created` |
+| `target_collection` | Import to specific collection |
+| `orca_format` | Orca/BambuStudio export format |
+| `prusa_format` | PrusaSlicer export format |
+| `paint_mode` | MMU paint segmentation |
+| `project_template` | Custom Orca project template |
+| `object_settings` | Per-object Orca settings |
+| `building_blocks` | `colors`, `types`, `segmentation` sub-namespaces |
+
+### Standalone Discovery Module
+
+For addons that want **zero runtime dependency** on the 3MF addon, copy `io_mesh_3mf/threemf_discovery.py` into your addon. It provides the same discovery functions without requiring the 3MF addon to be imported:
+
+```python
+# In your addon:
+from .threemf_discovery import get_threemf_api, is_threemf_available
+
+if is_threemf_available():
+    api = get_threemf_api()
+    result = api.export_3mf("/output.3mf", use_selection=True)
+```
+
+---
+
 ## Core Functions
 
 ### `import_3mf(filepath, **kwargs) → ImportResult`
