@@ -30,7 +30,7 @@ Quick start::
     # Export
     result = export_3mf(
         "/path/to/output.3mf",
-        use_orca_format="STANDARD",
+        use_orca_format="AUTO",
         use_selection=True,
     )
     print(result.status, result.num_written)
@@ -811,11 +811,12 @@ def export_3mf(
     objects=None,
     use_selection: bool = False,
     export_hidden: bool = False,
+    skip_disabled: bool = True,
     global_scale: float = 1.0,
     use_mesh_modifiers: bool = True,
     coordinate_precision: int = 9,
     compression_level: int = 3,
-    use_orca_format: str = "STANDARD",
+    use_orca_format: str = "AUTO",
     use_components: bool = True,
     mmu_slicer_format: str = "ORCA",
     subdivision_depth: int = 7,
@@ -838,15 +839,21 @@ def export_3mf(
         If *None*, falls back to ``use_selection`` logic or all scene objects.
     :param use_selection: Export selected objects only (ignored when *objects* is given).
     :param export_hidden: Include hidden objects.
+    :param skip_disabled: Skip objects disabled for rendering (camera icon)
+        and objects in excluded/hidden collections (default *True*).
     :param global_scale: Scale multiplier (default 1.0).
     :param use_mesh_modifiers: Apply modifiers before exporting.
     :param coordinate_precision: Decimal precision for vertex coordinates.
     :param compression_level: ZIP deflate compression level (0–9, default 3).
         0 = no compression (fastest, largest), 9 = max compression (slowest,
         smallest). 3 balances speed and file size.
-    :param use_orca_format: ``"STANDARD"`` | ``"PAINT"``.  When
-        *project_template* or *object_settings* is provided, the Orca
-        exporter is used automatically even if this is ``"STANDARD"``.
+    :param use_orca_format: ``"AUTO"`` | ``"STANDARD"`` | ``"PAINT"``.
+        ``AUTO`` (default) detects materials and paint data, choosing the
+        best exporter automatically.  ``STANDARD`` always uses the
+        spec-compliant StandardExporter with proper component instancing.
+        ``PAINT`` forces segmentation export.  When *project_template* or
+        *object_settings* is provided, the Orca exporter is used
+        automatically even in ``AUTO`` mode.
     :param use_components: Use component instances for linked duplicates.
     :param mmu_slicer_format: ``"ORCA"`` | ``"PRUSA"`` (only relevant when
         *use_orca_format* is ``"PAINT"``).
@@ -905,6 +912,7 @@ def export_3mf(
     options = ExportOptions(
         use_selection=use_selection,
         export_hidden=export_hidden,
+        skip_disabled=skip_disabled,
         global_scale=global_scale,
         use_mesh_modifiers=use_mesh_modifiers,
         coordinate_precision=coordinate_precision,
@@ -1026,19 +1034,19 @@ def export_3mf(
                         "features and will be ignored for PrusaSlicer export"
                     )
                 exporter = PrusaExporter(ctx)
-        elif ctx.project_template_path or ctx.object_settings:
-            # Orca-specific API features requested — use OrcaExporter
-            # regardless of material mode so project/object settings are written
-            exporter = OrcaExporter(ctx)
-        elif has_materials:
-            # Material assignments detected — use OrcaExporter so slicers
-            # receive colorgroup/paint_color attributes they understand.
-            # Orca/BambuStudio ignore core-spec <basematerials>, so even
-            # single-colour objects need the Orca path.
-            debug("Materials detected, using Orca exporter for slicer compatibility")
-            exporter = OrcaExporter(ctx)
-        else:
+        elif use_orca_format == "STANDARD":
+            # Explicit standard mode — always spec-compliant
+            debug("API: Standard mode requested, using StandardExporter")
             exporter = StandardExporter(ctx)
+        else:
+            # AUTO mode
+            if ctx.project_template_path or ctx.object_settings:
+                exporter = OrcaExporter(ctx)
+            elif has_materials:
+                debug("API AUTO: materials detected, using OrcaExporter")
+                exporter = OrcaExporter(ctx)
+            else:
+                exporter = StandardExporter(ctx)
 
         status_set = exporter.execute(context, archive, blender_objects, scale)
         result.status = next(iter(status_set)) if status_set else "FINISHED"
@@ -1156,7 +1164,7 @@ def batch_export(
         results = batch_export([
             ("cubes.3mf", cubes),
             ("spheres.3mf", spheres),
-        ], use_orca_format="STANDARD")
+        ], use_orca_format="AUTO")
     """
     results: List[ExportResult] = []
     total = len(items)
