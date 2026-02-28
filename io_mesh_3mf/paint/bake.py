@@ -624,9 +624,13 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
                 links = mat.node_tree.links
                 if state["emit_node"]:
                     if state["original_surface_socket"]:
+                        output_node = [
+                            n for n in nodes
+                            if n.type == "OUTPUT_MATERIAL" and n.is_active_output
+                        ][0]
                         links.new(
                             state["original_surface_socket"],
-                            [n for n in nodes if n.type == "OUTPUT_MATERIAL" and n.is_active_output][0].inputs["Surface"],
+                            output_node.inputs["Surface"],
                         )
                     nodes.remove(state["emit_node"])
                     state["emit_node"] = None
