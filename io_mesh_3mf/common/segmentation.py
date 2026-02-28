@@ -18,10 +18,13 @@ and Orca Slicer (paint_color attribute). The hash format is slicer-agnostic.
 The format encodes a recursive subdivision tree with material/color assignments per region.
 
 Format Reference (from PrusaSlicer TriangleSelector.cpp):
-- Each nibble (4 bits) encodes: xxyy
-  - yy = number of split sides (0=leaf, 1-3=subdivided)
-  - xx = special_side (if split) OR state (if leaf with state < 3)
-- If leaf AND xx == 0b11: next nibble contains (state - 3)
+
+- Each nibble (4 bits) encodes: ``xxyy``
+
+  - ``yy`` = number of split sides (0=leaf, 1-3=subdivided)
+  - ``xx`` = special_side (if split) OR state (if leaf with state < 3)
+
+- If leaf AND ``xx == 0b11``: next nibble contains ``(state - 3)``
 - Tree is traversed depth-first, children in reverse order
 """
 
@@ -108,7 +111,8 @@ class SegmentationDecoder:
     The hex string is stored in REVERSED order in the 3MF file, so we reverse
     it before parsing. Each nibble (hex character) encodes tree structure info.
 
-    Usage:
+    Usage::
+
         decoder = SegmentationDecoder()
         tree = decoder.decode("00000444344043040...")
 

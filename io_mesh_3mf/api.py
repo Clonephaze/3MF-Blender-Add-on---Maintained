@@ -1042,11 +1042,25 @@ def export_3mf(
             # AUTO mode
             if ctx.project_template_path or ctx.object_settings:
                 exporter = OrcaExporter(ctx)
-            elif has_materials:
-                debug("API AUTO: materials detected, using OrcaExporter")
-                exporter = OrcaExporter(ctx)
             else:
-                exporter = StandardExporter(ctx)
+                # Check for MMU paint textures
+                has_paint = any(
+                    obj.data.get("3mf_is_paint_texture")
+                    for obj in mesh_objects
+                    if obj.type == "MESH" and obj.data is not None
+                )
+                if has_paint:
+                    debug("API AUTO: paint textures detected — promoting to PAINT mode")
+                    ctx.options.use_orca_format = "PAINT"
+                    if mmu_slicer_format == "ORCA":
+                        exporter = OrcaExporter(ctx)
+                    else:
+                        exporter = PrusaExporter(ctx)
+                elif has_materials:
+                    debug("API AUTO: materials detected, using OrcaExporter")
+                    exporter = OrcaExporter(ctx)
+                else:
+                    exporter = StandardExporter(ctx)
 
         status_set = exporter.execute(context, archive, blender_objects, scale)
         result.status = next(iter(status_set)) if status_set else "FINISHED"

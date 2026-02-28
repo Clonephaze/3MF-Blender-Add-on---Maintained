@@ -1,7 +1,7 @@
 """
 Integration tests for ``io_mesh_3mf.export_3mf.geometry.write_triangles``.
 
-Covers material assignment modes (STANDARD / BASEMATERIAL), segmentation
+Covers material assignment modes (STANDARD / AUTO / PAINT), segmentation
 string writing (PAINT mode for Orca and Prusa slicer formats), per-face
 pid/p1 attributes, and ``write_metadata``.
 """
@@ -165,7 +165,7 @@ class ExportPrusaTriangleTests(Blender3mfTestCase):
             xml_text = model_data.decode("utf-8")
             # Look for slic3rpe namespace attribute or mmu_segmentation
             # Note: may not be present if no paint texture — that's OK for
-            # BASEMATERIAL mode via PRUSA, which uses paint codes on triangles
+            # PAINT mode via PRUSA, which uses paint codes on triangles
             # This test verifies the export doesn't crash
             _ = "mmu_segmentation" in xml_text or "slic3rpe" in xml_text
             self.assertTrue(

@@ -101,7 +101,8 @@ def _select_exporter(ctx, context, mesh_objects, has_materials):
         if obj.type == "MESH" and obj.data is not None
     )
     if has_paint:
-        debug("AUTO: MMU paint textures detected")
+        debug("AUTO: MMU paint textures detected — promoting to PAINT mode")
+        ctx.options.use_orca_format = "PAINT"
         if slicer == "ORCA":
             return OrcaExporter(ctx)
         elif slicer == "PRUSA":

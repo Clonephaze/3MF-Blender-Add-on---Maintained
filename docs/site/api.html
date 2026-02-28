@@ -1,0 +1,783 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Core API &mdash; 3MF Format API — v1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=8d563738"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="API Discovery" href="discovery.html" />
+    <link rel="prev" title="Recipes" href="recipes.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #2b2b2b" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            3MF Format for Blender
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="guide.html">Getting Started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="guide.html#quick-start">Quick Start</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guide.html#export-format-reference">Export Format Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guide.html#callbacks">Callbacks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guide.html#error-handling">Error Handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guide.html#cli-usage">CLI Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guide.html#notes">Notes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="recipes.html">Recipes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#import-with-material-painting">Import with Material Painting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#import-into-a-specific-collection">Import into a Specific Collection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#export-for-orca-slicer">Export for Orca Slicer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#export-for-prusaslicer-with-mmu-paint">Export for PrusaSlicer with MMU Paint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#custom-orca-project-template">Custom Orca Project Template</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#round-trip-conversion">Round-Trip Conversion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#inspect-without-importing">Inspect Without Importing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#batch-operations">Batch Operations</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Core API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#version-capabilities">Version &amp; Capabilities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#io_mesh_3mf.api.API_VERSION"><code class="docutils literal notranslate"><span class="pre">API_VERSION</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#io_mesh_3mf.api.API_VERSION_STRING"><code class="docutils literal notranslate"><span class="pre">API_VERSION_STRING</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#io_mesh_3mf.api.API_CAPABILITIES"><code class="docutils literal notranslate"><span class="pre">API_CAPABILITIES</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#result-dataclasses">Result Dataclasses</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#io_mesh_3mf.api.ImportResult"><code class="docutils literal notranslate"><span class="pre">ImportResult</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#io_mesh_3mf.api.ExportResult"><code class="docutils literal notranslate"><span class="pre">ExportResult</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#io_mesh_3mf.api.InspectResult"><code class="docutils literal notranslate"><span class="pre">InspectResult</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#import">Import</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#io_mesh_3mf.api.import_3mf"><code class="docutils literal notranslate"><span class="pre">import_3mf()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#export">Export</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#io_mesh_3mf.api.export_3mf"><code class="docutils literal notranslate"><span class="pre">export_3mf()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#inspect">Inspect</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#io_mesh_3mf.api.inspect_3mf"><code class="docutils literal notranslate"><span class="pre">inspect_3mf()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#batch-operations">Batch Operations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#io_mesh_3mf.api.batch_import"><code class="docutils literal notranslate"><span class="pre">batch_import()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#io_mesh_3mf.api.batch_export"><code class="docutils literal notranslate"><span class="pre">batch_export()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#callback-types">Callback Types</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="discovery.html">API Discovery</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="discovery.html#direct-discovery-from-api">Direct Discovery (from <code class="docutils literal notranslate"><span class="pre">api</span></code>)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.api.is_available"><code class="docutils literal notranslate"><span class="pre">is_available()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.api.get_api"><code class="docutils literal notranslate"><span class="pre">get_api()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.api.has_capability"><code class="docutils literal notranslate"><span class="pre">has_capability()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.api.check_version"><code class="docutils literal notranslate"><span class="pre">check_version()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="discovery.html#standalone-discovery-helper">Standalone Discovery Helper</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.threemf_discovery.is_threemf_available"><code class="docutils literal notranslate"><span class="pre">is_threemf_available()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.threemf_discovery.get_threemf_api"><code class="docutils literal notranslate"><span class="pre">get_threemf_api()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.threemf_discovery.get_threemf_version"><code class="docutils literal notranslate"><span class="pre">get_threemf_version()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.threemf_discovery.check_threemf_version"><code class="docutils literal notranslate"><span class="pre">check_threemf_version()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.threemf_discovery.has_threemf_capability"><code class="docutils literal notranslate"><span class="pre">has_threemf_capability()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="building-blocks.html">Building Blocks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="building-blocks.html#module-io_mesh_3mf.common.colors">Colors</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.colors.srgb_to_linear"><code class="docutils literal notranslate"><span class="pre">srgb_to_linear()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.colors.linear_to_srgb"><code class="docutils literal notranslate"><span class="pre">linear_to_srgb()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.colors.hex_to_rgb"><code class="docutils literal notranslate"><span class="pre">hex_to_rgb()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.colors.hex_to_linear_rgb"><code class="docutils literal notranslate"><span class="pre">hex_to_linear_rgb()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.colors.rgb_to_hex"><code class="docutils literal notranslate"><span class="pre">rgb_to_hex()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.colors.linear_rgb_to_hex"><code class="docutils literal notranslate"><span class="pre">linear_rgb_to_hex()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="building-blocks.html#module-io_mesh_3mf.common.units">Units</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.units.import_unit_scale"><code class="docutils literal notranslate"><span class="pre">import_unit_scale()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.units.export_unit_scale"><code class="docutils literal notranslate"><span class="pre">export_unit_scale()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="building-blocks.html#module-io_mesh_3mf.common.types">Types (Dataclasses)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceObject"><code class="docutils literal notranslate"><span class="pre">ResourceObject</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.Component"><code class="docutils literal notranslate"><span class="pre">Component</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial"><code class="docutils literal notranslate"><span class="pre">ResourceMaterial</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceTexture"><code class="docutils literal notranslate"><span class="pre">ResourceTexture</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceTextureGroup"><code class="docutils literal notranslate"><span class="pre">ResourceTextureGroup</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceComposite"><code class="docutils literal notranslate"><span class="pre">ResourceComposite</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceMultiproperties"><code class="docutils literal notranslate"><span class="pre">ResourceMultiproperties</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourcePBRTextureDisplay"><code class="docutils literal notranslate"><span class="pre">ResourcePBRTextureDisplay</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceColorgroup"><code class="docutils literal notranslate"><span class="pre">ResourceColorgroup</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourcePBRDisplayProps"><code class="docutils literal notranslate"><span class="pre">ResourcePBRDisplayProps</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="building-blocks.html#module-io_mesh_3mf.common.segmentation">Segmentation Codec</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState"><code class="docutils literal notranslate"><span class="pre">TriangleState</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationNode"><code class="docutils literal notranslate"><span class="pre">SegmentationNode</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.SubdividedTriangle"><code class="docutils literal notranslate"><span class="pre">SubdividedTriangle</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationDecoder"><code class="docutils literal notranslate"><span class="pre">SegmentationDecoder</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleSubdivider"><code class="docutils literal notranslate"><span class="pre">TriangleSubdivider</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationEncoder"><code class="docutils literal notranslate"><span class="pre">SegmentationEncoder</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.decode_segmentation_string"><code class="docutils literal notranslate"><span class="pre">decode_segmentation_string()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.subdivide_triangle_with_segmentation"><code class="docutils literal notranslate"><span class="pre">subdivide_triangle_with_segmentation()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="building-blocks.html#module-io_mesh_3mf.common.extensions">Extensions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.Extension"><code class="docutils literal notranslate"><span class="pre">Extension</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.ExtensionType"><code class="docutils literal notranslate"><span class="pre">ExtensionType</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager"><code class="docutils literal notranslate"><span class="pre">ExtensionManager</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.get_extension_by_namespace"><code class="docutils literal notranslate"><span class="pre">get_extension_by_namespace()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.get_extension_by_prefix"><code class="docutils literal notranslate"><span class="pre">get_extension_by_prefix()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.list_official_extensions"><code class="docutils literal notranslate"><span class="pre">list_official_extensions()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.list_vendor_extensions"><code class="docutils literal notranslate"><span class="pre">list_vendor_extensions()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="building-blocks.html#module-io_mesh_3mf.common.metadata">Metadata</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.metadata.Metadata"><code class="docutils literal notranslate"><span class="pre">Metadata</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.metadata.MetadataEntry"><code class="docutils literal notranslate"><span class="pre">MetadataEntry</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #2b2b2b" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">3MF Format for Blender</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Core API</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="core-api">
+<h1>Core API<a class="headerlink" href="#core-api" title="Link to this heading"></a></h1>
+<p>The public API lives in <a class="reference internal" href="#module-io_mesh_3mf.api" title="io_mesh_3mf.api: Programmatic 3MF import, export, and inspection."><code class="xref py py-mod docutils literal notranslate"><span class="pre">io_mesh_3mf.api</span></code></a>.  All functions return
+lightweight result dataclasses — they never raise exceptions for normal
+failures (corrupt files, empty scenes, etc.).</p>
+<section id="version-capabilities">
+<span id="module-io_mesh_3mf.api"></span><h2>Version &amp; Capabilities<a class="headerlink" href="#version-capabilities" title="Link to this heading"></a></h2>
+<dl class="py data">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.API_VERSION">
+<span class="sig-name descname"><span class="pre">API_VERSION</span></span><a class="headerlink" href="#io_mesh_3mf.api.API_VERSION" title="Link to this definition"></a></dt>
+<dd><p>API version following semantic versioning (MAJOR.MINOR.PATCH).
+- MAJOR: Breaking changes to existing functions/signatures
+- MINOR: New features, backward-compatible
+- PATCH: Bug fixes only</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.API_VERSION_STRING">
+<span class="sig-name descname"><span class="pre">API_VERSION_STRING</span></span><a class="headerlink" href="#io_mesh_3mf.api.API_VERSION_STRING" title="Link to this definition"></a></dt>
+<dd><p>Human-readable version string</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.API_CAPABILITIES">
+<span class="sig-name descname"><span class="pre">API_CAPABILITIES</span></span><a class="headerlink" href="#io_mesh_3mf.api.API_CAPABILITIES" title="Link to this definition"></a></dt>
+<dd><p>Capability flags for feature detection. Other addons can check these
+to determine what functionality is available without version parsing.</p>
+</dd></dl>
+
+</section>
+<section id="result-dataclasses">
+<h2>Result Dataclasses<a class="headerlink" href="#result-dataclasses" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.ImportResult">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ImportResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">status</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'FINISHED'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_loaded</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">objects</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.14)"><span class="pre">List</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">warnings</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.14)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/io_mesh_3mf/api.html#ImportResult"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.api.ImportResult" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Return value from <a class="reference internal" href="#io_mesh_3mf.api.import_3mf" title="io_mesh_3mf.api.import_3mf"><code class="xref py py-func docutils literal notranslate"><span class="pre">import_3mf()</span></code></a>.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.ImportResult.status">
+<span class="sig-name descname"><span class="pre">status</span></span><a class="headerlink" href="#io_mesh_3mf.api.ImportResult.status" title="Link to this definition"></a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">&quot;FINISHED&quot;</span></code> on success, <code class="docutils literal notranslate"><span class="pre">&quot;CANCELLED&quot;</span></code> on failure.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.ImportResult.num_loaded">
+<span class="sig-name descname"><span class="pre">num_loaded</span></span><a class="headerlink" href="#io_mesh_3mf.api.ImportResult.num_loaded" title="Link to this definition"></a></dt>
+<dd><p>Number of objects successfully imported.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.ImportResult.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><a class="headerlink" href="#io_mesh_3mf.api.ImportResult.objects" title="Link to this definition"></a></dt>
+<dd><p>List of <code class="docutils literal notranslate"><span class="pre">bpy.types.Object</span></code> instances created during import.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.ImportResult.warnings">
+<span class="sig-name descname"><span class="pre">warnings</span></span><a class="headerlink" href="#io_mesh_3mf.api.ImportResult.warnings" title="Link to this definition"></a></dt>
+<dd><p>Accumulated warning messages (if any).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.ExportResult">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ExportResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">status</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'FINISHED'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_written</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filepath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">warnings</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.14)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/io_mesh_3mf/api.html#ExportResult"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.api.ExportResult" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Return value from <a class="reference internal" href="#io_mesh_3mf.api.export_3mf" title="io_mesh_3mf.api.export_3mf"><code class="xref py py-func docutils literal notranslate"><span class="pre">export_3mf()</span></code></a>.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.ExportResult.status">
+<span class="sig-name descname"><span class="pre">status</span></span><a class="headerlink" href="#io_mesh_3mf.api.ExportResult.status" title="Link to this definition"></a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">&quot;FINISHED&quot;</span></code> on success, <code class="docutils literal notranslate"><span class="pre">&quot;CANCELLED&quot;</span></code> on failure.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.ExportResult.num_written">
+<span class="sig-name descname"><span class="pre">num_written</span></span><a class="headerlink" href="#io_mesh_3mf.api.ExportResult.num_written" title="Link to this definition"></a></dt>
+<dd><p>Number of objects written to the archive.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.ExportResult.filepath">
+<span class="sig-name descname"><span class="pre">filepath</span></span><a class="headerlink" href="#io_mesh_3mf.api.ExportResult.filepath" title="Link to this definition"></a></dt>
+<dd><p>Absolute path of the written <code class="docutils literal notranslate"><span class="pre">.3mf</span></code> file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.ExportResult.warnings">
+<span class="sig-name descname"><span class="pre">warnings</span></span><a class="headerlink" href="#io_mesh_3mf.api.ExportResult.warnings" title="Link to this definition"></a></dt>
+<dd><p>Accumulated warning messages (if any).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.InspectResult">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">InspectResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">status</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'OK'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">error_message</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unit</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metadata</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict[str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">str]</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">objects</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.14)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.14)"><span class="pre">Dict</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">materials</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.14)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.14)"><span class="pre">Dict</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">textures</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.14)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.14)"><span class="pre">Dict</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extensions_used</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Set" title="(in Python v3.14)"><span class="pre">Set</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vendor_format</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">archive_files</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.14)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_objects</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_triangles_total</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_vertices_total</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">warnings</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.14)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/io_mesh_3mf/api.html#InspectResult"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.api.InspectResult" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Return value from <a class="reference internal" href="#io_mesh_3mf.api.inspect_3mf" title="io_mesh_3mf.api.inspect_3mf"><code class="xref py py-func docutils literal notranslate"><span class="pre">inspect_3mf()</span></code></a>.</p>
+<p>A lightweight summary of a 3MF archive’s contents, extracted <em>without</em>
+creating any Blender objects or materials.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.InspectResult.status">
+<span class="sig-name descname"><span class="pre">status</span></span><a class="headerlink" href="#io_mesh_3mf.api.InspectResult.status" title="Link to this definition"></a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">&quot;OK&quot;</span></code> on success, <code class="docutils literal notranslate"><span class="pre">&quot;ERROR&quot;</span></code> on failure.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.InspectResult.error_message">
+<span class="sig-name descname"><span class="pre">error_message</span></span><a class="headerlink" href="#io_mesh_3mf.api.InspectResult.error_message" title="Link to this definition"></a></dt>
+<dd><p>Human-readable error string when <code class="docutils literal notranslate"><span class="pre">status</span> <span class="pre">==</span> <span class="pre">&quot;ERROR&quot;</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.InspectResult.unit">
+<span class="sig-name descname"><span class="pre">unit</span></span><a class="headerlink" href="#io_mesh_3mf.api.InspectResult.unit" title="Link to this definition"></a></dt>
+<dd><p>The unit declared in the model file (<code class="docutils literal notranslate"><span class="pre">&quot;millimeter&quot;</span></code> etc.).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.InspectResult.metadata">
+<span class="sig-name descname"><span class="pre">metadata</span></span><a class="headerlink" href="#io_mesh_3mf.api.InspectResult.metadata" title="Link to this definition"></a></dt>
+<dd><p>Top-level <code class="docutils literal notranslate"><span class="pre">&lt;metadata&gt;</span></code> key/value pairs from the model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Dict[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.InspectResult.objects">
+<span class="sig-name descname"><span class="pre">objects</span></span><a class="headerlink" href="#io_mesh_3mf.api.InspectResult.objects" title="Link to this definition"></a></dt>
+<dd><p>Per-object summary dicts with keys:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;id&quot;</span></code> — resource ID string</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;name&quot;</span></code> — object name (or <code class="docutils literal notranslate"><span class="pre">&quot;&quot;</span></code> if unnamed)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;type&quot;</span></code> — object type attribute (<code class="docutils literal notranslate"><span class="pre">&quot;model&quot;</span></code> / <code class="docutils literal notranslate"><span class="pre">&quot;solidsupport&quot;</span></code> / …)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;num_vertices&quot;</span></code> — vertex count</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;num_triangles&quot;</span></code> — triangle count</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;num_components&quot;</span></code> — number of component references</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;has_materials&quot;</span></code> — whether face materials are present</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;has_segmentation&quot;</span></code> — whether MMU paint segmentation is present</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List[Dict]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.InspectResult.materials">
+<span class="sig-name descname"><span class="pre">materials</span></span><a class="headerlink" href="#io_mesh_3mf.api.InspectResult.materials" title="Link to this definition"></a></dt>
+<dd><p>Per-material-group summary dicts with keys:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;id&quot;</span></code> — resource ID string</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;type&quot;</span></code> — <code class="docutils literal notranslate"><span class="pre">&quot;basematerials&quot;</span></code> | <code class="docutils literal notranslate"><span class="pre">&quot;colorgroup&quot;</span></code> | <code class="docutils literal notranslate"><span class="pre">&quot;texture2dgroup&quot;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;count&quot;</span></code> — number of entries in the group</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List[Dict]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.InspectResult.textures">
+<span class="sig-name descname"><span class="pre">textures</span></span><a class="headerlink" href="#io_mesh_3mf.api.InspectResult.textures" title="Link to this definition"></a></dt>
+<dd><p>Per-texture summary dicts with keys:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;id&quot;</span></code> — resource ID string</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;path&quot;</span></code> — internal archive path</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;contenttype&quot;</span></code> — MIME type string</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List[Dict]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.InspectResult.extensions_used">
+<span class="sig-name descname"><span class="pre">extensions_used</span></span><a class="headerlink" href="#io_mesh_3mf.api.InspectResult.extensions_used" title="Link to this definition"></a></dt>
+<dd><p>Set of namespace URIs for extensions referenced
+in the model’s <code class="docutils literal notranslate"><span class="pre">requiredextensions</span></code> / <code class="docutils literal notranslate"><span class="pre">recommendedextensions</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Set[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.InspectResult.vendor_format">
+<span class="sig-name descname"><span class="pre">vendor_format</span></span><a class="headerlink" href="#io_mesh_3mf.api.InspectResult.vendor_format" title="Link to this definition"></a></dt>
+<dd><p>Detected slicer vendor format (<code class="docutils literal notranslate"><span class="pre">&quot;orca&quot;</span></code> / <code class="docutils literal notranslate"><span class="pre">None</span></code>).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a> | None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.InspectResult.archive_files">
+<span class="sig-name descname"><span class="pre">archive_files</span></span><a class="headerlink" href="#io_mesh_3mf.api.InspectResult.archive_files" title="Link to this definition"></a></dt>
+<dd><p>List of all file paths inside the ZIP archive.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.InspectResult.num_objects">
+<span class="sig-name descname"><span class="pre">num_objects</span></span><a class="headerlink" href="#io_mesh_3mf.api.InspectResult.num_objects" title="Link to this definition"></a></dt>
+<dd><p>Total number of <code class="docutils literal notranslate"><span class="pre">&lt;object&gt;</span></code> resources.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.InspectResult.num_triangles_total">
+<span class="sig-name descname"><span class="pre">num_triangles_total</span></span><a class="headerlink" href="#io_mesh_3mf.api.InspectResult.num_triangles_total" title="Link to this definition"></a></dt>
+<dd><p>Sum of all triangle counts across objects.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.InspectResult.num_vertices_total">
+<span class="sig-name descname"><span class="pre">num_vertices_total</span></span><a class="headerlink" href="#io_mesh_3mf.api.InspectResult.num_vertices_total" title="Link to this definition"></a></dt>
+<dd><p>Sum of all vertex counts across objects.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.InspectResult.warnings">
+<span class="sig-name descname"><span class="pre">warnings</span></span><a class="headerlink" href="#io_mesh_3mf.api.InspectResult.warnings" title="Link to this definition"></a></dt>
+<dd><p>Accumulated warnings during inspection.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="import">
+<h2>Import<a class="headerlink" href="#import" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.import_3mf">
+<span class="sig-name descname"><span class="pre">import_3mf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filepath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">global_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">import_materials</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'MATERIALS'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reuse_materials</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">import_location</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'KEEP'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">origin_to_geometry</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'KEEP'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grid_spacing</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">auto_smooth</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">auto_smooth_angle</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.5236</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">paint_uv_method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'SMART'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">paint_texture_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_collection</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">on_progress</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><span class="pre">Callable</span></a><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">on_warning</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><span class="pre">Callable</span></a><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">on_object_created</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><span class="pre">Callable</span></a><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#io_mesh_3mf.api.ImportResult" title="io_mesh_3mf.api.ImportResult"><span class="pre">ImportResult</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/api.html#import_3mf"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.api.import_3mf" title="Link to this definition"></a></dt>
+<dd><p>Import a 3MF file into the current Blender scene.</p>
+<p>This is the headless/programmatic counterpart to the <code class="docutils literal notranslate"><span class="pre">Import3MF</span></code>
+operator.  It skips UI-specific behaviour (progress bars, camera zoom,
+paint popups) but runs the exact same import pipeline.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filepath</strong> – Path to the <code class="docutils literal notranslate"><span class="pre">.3mf</span></code> file to import.</p></li>
+<li><p><strong>global_scale</strong> – Scale multiplier (default 1.0).</p></li>
+<li><p><strong>import_materials</strong> – <code class="docutils literal notranslate"><span class="pre">&quot;MATERIALS&quot;</span></code> | <code class="docutils literal notranslate"><span class="pre">&quot;PAINT&quot;</span></code> | <code class="docutils literal notranslate"><span class="pre">&quot;NONE&quot;</span></code>.</p></li>
+<li><p><strong>reuse_materials</strong> – Reuse existing Blender materials by name/color.</p></li>
+<li><p><strong>import_location</strong> – <code class="docutils literal notranslate"><span class="pre">&quot;ORIGIN&quot;</span></code> | <code class="docutils literal notranslate"><span class="pre">&quot;CURSOR&quot;</span></code> | <code class="docutils literal notranslate"><span class="pre">&quot;KEEP&quot;</span></code> | <code class="docutils literal notranslate"><span class="pre">&quot;GRID&quot;</span></code>.</p></li>
+<li><p><strong>origin_to_geometry</strong> – <code class="docutils literal notranslate"><span class="pre">&quot;KEEP&quot;</span></code> | <code class="docutils literal notranslate"><span class="pre">&quot;CENTER&quot;</span></code> | <code class="docutils literal notranslate"><span class="pre">&quot;BOTTOM&quot;</span></code>.</p></li>
+<li><p><strong>grid_spacing</strong> – Spacing between objects in grid layout mode.</p></li>
+<li><p><strong>auto_smooth</strong> – Apply Smooth by Angle modifier to imported objects.</p></li>
+<li><p><strong>auto_smooth_angle</strong> – Maximum angle (radians) for smooth shading
+(default 0.5236 = 30 degrees).</p></li>
+<li><p><strong>paint_uv_method</strong> – <code class="docutils literal notranslate"><span class="pre">&quot;SMART&quot;</span></code> (default) or <code class="docutils literal notranslate"><span class="pre">&quot;LIGHTMAP&quot;</span></code>.
+Smart UV groups adjacent faces; Lightmap gives each face unique space.</p></li>
+<li><p><strong>paint_texture_size</strong> – Override texture resolution (0 = auto).</p></li>
+<li><p><strong>target_collection</strong> – Name of an existing Blender collection to place
+imported objects into.  If <em>None</em>, objects are added to the active
+collection.  If the named collection does not exist it will be created
+and linked to the scene.</p></li>
+<li><p><strong>on_progress</strong> – Optional <code class="docutils literal notranslate"><span class="pre">(percentage:</span> <span class="pre">int,</span> <span class="pre">message:</span> <span class="pre">str)</span></code> callback.</p></li>
+<li><p><strong>on_warning</strong> – Optional <code class="docutils literal notranslate"><span class="pre">(message:</span> <span class="pre">str)</span></code> callback fired for each warning.</p></li>
+<li><p><strong>on_object_created</strong> – Optional callback fired after each Blender
+object is built.  Receives <code class="docutils literal notranslate"><span class="pre">(blender_object,</span> <span class="pre">resource_id)</span></code> arguments.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#io_mesh_3mf.api.ImportResult" title="io_mesh_3mf.api.ImportResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">ImportResult</span></code></a> with status, loaded count, and object list.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="export">
+<h2>Export<a class="headerlink" href="#export" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.export_3mf">
+<span class="sig-name descname"><span class="pre">export_3mf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filepath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">objects</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_selection</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">export_hidden</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_disabled</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">global_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_mesh_modifiers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_precision</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">9</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">compression_level</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_orca_format</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'AUTO'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_components</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mmu_slicer_format</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'ORCA'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subdivision_depth</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">7</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thumbnail_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'AUTO'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thumbnail_resolution</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">256</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thumbnail_image</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">project_template</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">object_settings</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.14)"><span class="pre">Dict</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">on_progress</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><span class="pre">Callable</span></a><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">on_warning</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><span class="pre">Callable</span></a><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#io_mesh_3mf.api.ExportResult" title="io_mesh_3mf.api.ExportResult"><span class="pre">ExportResult</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/api.html#export_3mf"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.api.export_3mf" title="Link to this definition"></a></dt>
+<dd><p>Export Blender objects to a 3MF file.</p>
+<p>This is the headless/programmatic counterpart to the <code class="docutils literal notranslate"><span class="pre">Export3MF</span></code>
+operator.  It skips UI-specific behaviour (progress bars, status text)
+but runs the exact same export pipeline.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filepath</strong> – Destination path for the <code class="docutils literal notranslate"><span class="pre">.3mf</span></code> file.</p></li>
+<li><p><strong>objects</strong> – Explicit list of <code class="docutils literal notranslate"><span class="pre">bpy.types.Object</span></code> to export.
+If <em>None</em>, falls back to <code class="docutils literal notranslate"><span class="pre">use_selection</span></code> logic or all scene objects.</p></li>
+<li><p><strong>use_selection</strong> – Export selected objects only (ignored when <em>objects</em> is given).</p></li>
+<li><p><strong>export_hidden</strong> – Include hidden objects.</p></li>
+<li><p><strong>skip_disabled</strong> – Skip objects disabled for rendering (camera icon)
+and objects in excluded/hidden collections (default <em>True</em>).</p></li>
+<li><p><strong>global_scale</strong> – Scale multiplier (default 1.0).</p></li>
+<li><p><strong>use_mesh_modifiers</strong> – Apply modifiers before exporting.</p></li>
+<li><p><strong>coordinate_precision</strong> – Decimal precision for vertex coordinates.</p></li>
+<li><p><strong>compression_level</strong> – ZIP deflate compression level (0–9, default 3).
+0 = no compression (fastest, largest), 9 = max compression (slowest,
+smallest). 3 balances speed and file size.</p></li>
+<li><p><strong>use_orca_format</strong> – <code class="docutils literal notranslate"><span class="pre">&quot;AUTO&quot;</span></code> | <code class="docutils literal notranslate"><span class="pre">&quot;STANDARD&quot;</span></code> | <code class="docutils literal notranslate"><span class="pre">&quot;PAINT&quot;</span></code>.
+<code class="docutils literal notranslate"><span class="pre">AUTO</span></code> (default) detects materials and paint data, choosing the
+best exporter automatically.  <code class="docutils literal notranslate"><span class="pre">STANDARD</span></code> always uses the
+spec-compliant StandardExporter with proper component instancing.
+<code class="docutils literal notranslate"><span class="pre">PAINT</span></code> forces segmentation export.  When <em>project_template</em> or
+<em>object_settings</em> is provided, the Orca exporter is used
+automatically even in <code class="docutils literal notranslate"><span class="pre">AUTO</span></code> mode.</p></li>
+<li><p><strong>use_components</strong> – Use component instances for linked duplicates.</p></li>
+<li><p><strong>mmu_slicer_format</strong> – <code class="docutils literal notranslate"><span class="pre">&quot;ORCA&quot;</span></code> | <code class="docutils literal notranslate"><span class="pre">&quot;PRUSA&quot;</span></code> (only relevant when
+<em>use_orca_format</em> is <code class="docutils literal notranslate"><span class="pre">&quot;PAINT&quot;</span></code>).</p></li>
+<li><p><strong>subdivision_depth</strong> – Maximum recursive subdivision depth for paint
+segmentation (4–10, default 7). Higher = finer detail but slower.</p></li>
+<li><p><strong>thumbnail_mode</strong> – <code class="docutils literal notranslate"><span class="pre">&quot;AUTO&quot;</span></code> (render clean preview), <code class="docutils literal notranslate"><span class="pre">&quot;CUSTOM&quot;</span></code>
+(use <em>thumbnail_image</em>), or <code class="docutils literal notranslate"><span class="pre">&quot;NONE&quot;</span></code> (no thumbnail).</p></li>
+<li><p><strong>thumbnail_resolution</strong> – Width and height in pixels for AUTO mode
+(default 256).</p></li>
+<li><p><strong>thumbnail_image</strong> – Absolute path to an image file for CUSTOM mode.</p></li>
+<li><p><strong>project_template</strong> – Absolute path to a JSON file to use as the Orca
+<code class="docutils literal notranslate"><span class="pre">project_settings.config</span></code> instead of the built-in template.  The
+addon loads this file, patches <code class="docutils literal notranslate"><span class="pre">filament_colour</span></code> and resizes
+filament arrays to match the export, then writes it to the archive.
+If the file does not exist or is invalid JSON, a warning is logged
+and the built-in template is used as a fallback.  Only relevant for
+Orca/BambuStudio exports (<code class="docutils literal notranslate"><span class="pre">mmu_slicer_format=&quot;ORCA&quot;</span></code>).</p></li>
+<li><p><strong>object_settings</strong> – <p>Per-object Orca Slicer setting overrides.
+A dict mapping <code class="docutils literal notranslate"><span class="pre">bpy.types.Object</span></code> instances to dicts of
+<code class="docutils literal notranslate"><span class="pre">{setting_key:</span> <span class="pre">value_string}</span></code> pairs.  These are written as
+<code class="docutils literal notranslate"><span class="pre">&lt;metadata&gt;</span></code> entries in <code class="docutils literal notranslate"><span class="pre">model_settings.config</span></code> so that Orca
+applies different print settings to individual objects.  Keys are
+passed through without validation — any valid Orca setting key
+(e.g. <code class="docutils literal notranslate"><span class="pre">&quot;layer_height&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;wall_loops&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;sparse_infill_speed&quot;</span></code>)
+is accepted.  Objects not present in this dict use project defaults.</p>
+<p>Example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">object_settings</span><span class="o">=</span><span class="p">{</span>
+    <span class="n">supports_obj</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;layer_height&quot;</span><span class="p">:</span> <span class="s2">&quot;0.12&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;wall_loops&quot;</span><span class="p">:</span> <span class="s2">&quot;2&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;sparse_infill_speed&quot;</span><span class="p">:</span> <span class="s2">&quot;50&quot;</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="c1"># other objects use project defaults</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</p></li>
+<li><p><strong>on_progress</strong> – Optional <code class="docutils literal notranslate"><span class="pre">(percentage:</span> <span class="pre">int,</span> <span class="pre">message:</span> <span class="pre">str)</span></code> callback.</p></li>
+<li><p><strong>on_warning</strong> – Optional <code class="docutils literal notranslate"><span class="pre">(message:</span> <span class="pre">str)</span></code> callback for warnings.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#io_mesh_3mf.api.ExportResult" title="io_mesh_3mf.api.ExportResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">ExportResult</span></code></a> with status, written count, and filepath.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="inspect">
+<h2>Inspect<a class="headerlink" href="#inspect" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.inspect_3mf">
+<span class="sig-name descname"><span class="pre">inspect_3mf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filepath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#io_mesh_3mf.api.InspectResult" title="io_mesh_3mf.api.InspectResult"><span class="pre">InspectResult</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/api.html#inspect_3mf"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.api.inspect_3mf" title="Link to this definition"></a></dt>
+<dd><p>Inspect a 3MF file without importing anything into Blender.</p>
+<p>Opens the archive, parses the XML model file(s), and returns a
+summary of objects, materials, textures, metadata, and extensions.
+No Blender objects, meshes, or materials are created.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filepath</strong> – Path to the <code class="docutils literal notranslate"><span class="pre">.3mf</span></code> file.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#io_mesh_3mf.api.InspectResult" title="io_mesh_3mf.api.InspectResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">InspectResult</span></code></a> with archive metadata and statistics.</p>
+</dd>
+</dl>
+<p>Example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">info</span> <span class="o">=</span> <span class="n">inspect_3mf</span><span class="p">(</span><span class="s2">&quot;model.3mf&quot;</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">info</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">&quot;OK&quot;</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">info</span><span class="o">.</span><span class="n">objects</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">obj</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">obj</span><span class="p">[</span><span class="s1">&#39;num_triangles&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> tris&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+<section id="batch-operations">
+<h2>Batch Operations<a class="headerlink" href="#batch-operations" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.batch_import">
+<span class="sig-name descname"><span class="pre">batch_import</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filepaths</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.14)"><span class="pre">Sequence</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">on_progress</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><span class="pre">Callable</span></a><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">on_warning</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><span class="pre">Callable</span></a><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">on_object_created</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><span class="pre">Callable</span></a><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">import_kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.14)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#io_mesh_3mf.api.ImportResult" title="io_mesh_3mf.api.ImportResult"><span class="pre">ImportResult</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/io_mesh_3mf/api.html#batch_import"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.api.batch_import" title="Link to this definition"></a></dt>
+<dd><p>Import multiple 3MF files in sequence with per-file error isolation.</p>
+<p>Each file is imported independently — a failure in one file does not
+prevent the others from being processed.  All keyword arguments
+supported by <a class="reference internal" href="#io_mesh_3mf.api.import_3mf" title="io_mesh_3mf.api.import_3mf"><code class="xref py py-func docutils literal notranslate"><span class="pre">import_3mf()</span></code></a> can be passed via <code class="docutils literal notranslate"><span class="pre">**import_kwargs</span></code>
+and will be applied to every file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filepaths</strong> – Sequence of <code class="docutils literal notranslate"><span class="pre">.3mf</span></code> file paths to import.</p></li>
+<li><p><strong>on_progress</strong> – Optional global progress callback.  Receives
+<code class="docutils literal notranslate"><span class="pre">(percentage,</span> <span class="pre">message)</span></code> where percentage spans 0-100 across
+<em>all</em> files.</p></li>
+<li><p><strong>on_warning</strong> – Warning callback forwarded to each <a class="reference internal" href="#io_mesh_3mf.api.import_3mf" title="io_mesh_3mf.api.import_3mf"><code class="xref py py-func docutils literal notranslate"><span class="pre">import_3mf()</span></code></a> call.</p></li>
+<li><p><strong>on_object_created</strong> – Object-created callback forwarded to each call.</p></li>
+<li><p><strong>import_kwargs</strong> – Keyword arguments forwarded to <a class="reference internal" href="#io_mesh_3mf.api.import_3mf" title="io_mesh_3mf.api.import_3mf"><code class="xref py py-func docutils literal notranslate"><span class="pre">import_3mf()</span></code></a>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>List of <a class="reference internal" href="#io_mesh_3mf.api.ImportResult" title="io_mesh_3mf.api.ImportResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">ImportResult</span></code></a>, one per input file (same order).</p>
+</dd>
+</dl>
+<p>Example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">results</span> <span class="o">=</span> <span class="n">batch_import</span><span class="p">(</span>
+    <span class="p">[</span><span class="s2">&quot;a.3mf&quot;</span><span class="p">,</span> <span class="s2">&quot;b.3mf&quot;</span><span class="p">,</span> <span class="s2">&quot;c.3mf&quot;</span><span class="p">],</span>
+    <span class="n">import_materials</span><span class="o">=</span><span class="s2">&quot;PAINT&quot;</span><span class="p">,</span>
+    <span class="n">target_collection</span><span class="o">=</span><span class="s2">&quot;Imports&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">total</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">num_loaded</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">results</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Imported </span><span class="si">{</span><span class="n">total</span><span class="si">}</span><span class="s2"> objects total&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="io_mesh_3mf.api.batch_export">
+<span class="sig-name descname"><span class="pre">batch_export</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">items</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.14)"><span class="pre">Sequence</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.14)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.14)"><span class="pre">List</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">on_progress</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><span class="pre">Callable</span></a><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">on_warning</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><span class="pre">Callable</span></a><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">export_kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.14)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#io_mesh_3mf.api.ExportResult" title="io_mesh_3mf.api.ExportResult"><span class="pre">ExportResult</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/io_mesh_3mf/api.html#batch_export"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.api.batch_export" title="Link to this definition"></a></dt>
+<dd><p>Export multiple 3MF files in sequence with per-file error isolation.</p>
+<p>Each item is a <code class="docutils literal notranslate"><span class="pre">(filepath,</span> <span class="pre">objects)</span></code> tuple.  If <em>objects</em> is <code class="docutils literal notranslate"><span class="pre">None</span></code>,
+the export falls back to the <code class="docutils literal notranslate"><span class="pre">use_selection</span></code> / all-scene logic from
+<a class="reference internal" href="#io_mesh_3mf.api.export_3mf" title="io_mesh_3mf.api.export_3mf"><code class="xref py py-func docutils literal notranslate"><span class="pre">export_3mf()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>items</strong> – Sequence of <code class="docutils literal notranslate"><span class="pre">(filepath,</span> <span class="pre">objects_or_None)</span></code> tuples.</p></li>
+<li><p><strong>on_progress</strong> – Optional global progress callback.</p></li>
+<li><p><strong>on_warning</strong> – Warning callback forwarded to each <a class="reference internal" href="#io_mesh_3mf.api.export_3mf" title="io_mesh_3mf.api.export_3mf"><code class="xref py py-func docutils literal notranslate"><span class="pre">export_3mf()</span></code></a> call.</p></li>
+<li><p><strong>export_kwargs</strong> – Keyword arguments forwarded to <a class="reference internal" href="#io_mesh_3mf.api.export_3mf" title="io_mesh_3mf.api.export_3mf"><code class="xref py py-func docutils literal notranslate"><span class="pre">export_3mf()</span></code></a>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>List of <a class="reference internal" href="#io_mesh_3mf.api.ExportResult" title="io_mesh_3mf.api.ExportResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">ExportResult</span></code></a>, one per item (same order).</p>
+</dd>
+</dl>
+<p>Example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cubes</span> <span class="o">=</span> <span class="p">[</span><span class="n">o</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">bpy</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">objects</span> <span class="k">if</span> <span class="s2">&quot;Cube&quot;</span> <span class="ow">in</span> <span class="n">o</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
+<span class="n">spheres</span> <span class="o">=</span> <span class="p">[</span><span class="n">o</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">bpy</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">objects</span> <span class="k">if</span> <span class="s2">&quot;Sphere&quot;</span> <span class="ow">in</span> <span class="n">o</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">batch_export</span><span class="p">([</span>
+    <span class="p">(</span><span class="s2">&quot;cubes.3mf&quot;</span><span class="p">,</span> <span class="n">cubes</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;spheres.3mf&quot;</span><span class="p">,</span> <span class="n">spheres</span><span class="p">),</span>
+<span class="p">],</span> <span class="n">use_orca_format</span><span class="o">=</span><span class="s2">&quot;AUTO&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+<section id="callback-types">
+<h2>Callback Types<a class="headerlink" href="#callback-types" title="Link to this heading"></a></h2>
+<p>The following type aliases describe the callback signatures accepted by
+the import/export functions:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">ProgressCallback</span></code></dt><dd><p><code class="docutils literal notranslate"><span class="pre">Callable[[int,</span> <span class="pre">str],</span> <span class="pre">None]</span></code> — receives <code class="docutils literal notranslate"><span class="pre">(percentage,</span> <span class="pre">message)</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">WarningCallback</span></code></dt><dd><p><code class="docutils literal notranslate"><span class="pre">Callable[[str],</span> <span class="pre">None]</span></code> — receives a warning message string.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">ObjectCreatedCallback</span></code></dt><dd><p><code class="docutils literal notranslate"><span class="pre">Callable[[Any,</span> <span class="pre">str],</span> <span class="pre">None]</span></code> — receives <code class="docutils literal notranslate"><span class="pre">(blender_object,</span> <span class="pre">resource_id)</span></code>.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="recipes.html" class="btn btn-neutral float-left" title="Recipes" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="discovery.html" class="btn btn-neutral float-right" title="API Discovery" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Jack.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

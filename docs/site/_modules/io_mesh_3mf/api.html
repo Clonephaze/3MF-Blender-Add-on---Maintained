@@ -1,0 +1,1642 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>io_mesh_3mf.api &mdash; 3MF Format API — v1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #2b2b2b" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            3MF Format for Blender
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../guide.html">Getting Started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../guide.html#quick-start">Quick Start</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide.html#export-format-reference">Export Format Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide.html#callbacks">Callbacks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide.html#error-handling">Error Handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide.html#cli-usage">CLI Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide.html#notes">Notes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../recipes.html">Recipes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../recipes.html#import-with-material-painting">Import with Material Painting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../recipes.html#import-into-a-specific-collection">Import into a Specific Collection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../recipes.html#export-for-orca-slicer">Export for Orca Slicer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../recipes.html#export-for-prusaslicer-with-mmu-paint">Export for PrusaSlicer with MMU Paint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../recipes.html#custom-orca-project-template">Custom Orca Project Template</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../recipes.html#round-trip-conversion">Round-Trip Conversion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../recipes.html#inspect-without-importing">Inspect Without Importing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../recipes.html#batch-operations">Batch Operations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">Core API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../api.html#version-capabilities">Version &amp; Capabilities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../api.html#io_mesh_3mf.api.API_VERSION"><code class="docutils literal notranslate"><span class="pre">API_VERSION</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api.html#io_mesh_3mf.api.API_VERSION_STRING"><code class="docutils literal notranslate"><span class="pre">API_VERSION_STRING</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api.html#io_mesh_3mf.api.API_CAPABILITIES"><code class="docutils literal notranslate"><span class="pre">API_CAPABILITIES</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../api.html#result-dataclasses">Result Dataclasses</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../api.html#io_mesh_3mf.api.ImportResult"><code class="docutils literal notranslate"><span class="pre">ImportResult</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api.html#io_mesh_3mf.api.ExportResult"><code class="docutils literal notranslate"><span class="pre">ExportResult</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api.html#io_mesh_3mf.api.InspectResult"><code class="docutils literal notranslate"><span class="pre">InspectResult</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../api.html#import">Import</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../api.html#io_mesh_3mf.api.import_3mf"><code class="docutils literal notranslate"><span class="pre">import_3mf()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../api.html#export">Export</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../api.html#io_mesh_3mf.api.export_3mf"><code class="docutils literal notranslate"><span class="pre">export_3mf()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../api.html#inspect">Inspect</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../api.html#io_mesh_3mf.api.inspect_3mf"><code class="docutils literal notranslate"><span class="pre">inspect_3mf()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../api.html#batch-operations">Batch Operations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../api.html#io_mesh_3mf.api.batch_import"><code class="docutils literal notranslate"><span class="pre">batch_import()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api.html#io_mesh_3mf.api.batch_export"><code class="docutils literal notranslate"><span class="pre">batch_export()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../api.html#callback-types">Callback Types</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../discovery.html">API Discovery</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../discovery.html#direct-discovery-from-api">Direct Discovery (from <code class="docutils literal notranslate"><span class="pre">api</span></code>)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../discovery.html#io_mesh_3mf.api.is_available"><code class="docutils literal notranslate"><span class="pre">is_available()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../discovery.html#io_mesh_3mf.api.get_api"><code class="docutils literal notranslate"><span class="pre">get_api()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../discovery.html#io_mesh_3mf.api.has_capability"><code class="docutils literal notranslate"><span class="pre">has_capability()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../discovery.html#io_mesh_3mf.api.check_version"><code class="docutils literal notranslate"><span class="pre">check_version()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../discovery.html#standalone-discovery-helper">Standalone Discovery Helper</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../discovery.html#io_mesh_3mf.threemf_discovery.is_threemf_available"><code class="docutils literal notranslate"><span class="pre">is_threemf_available()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../discovery.html#io_mesh_3mf.threemf_discovery.get_threemf_api"><code class="docutils literal notranslate"><span class="pre">get_threemf_api()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../discovery.html#io_mesh_3mf.threemf_discovery.get_threemf_version"><code class="docutils literal notranslate"><span class="pre">get_threemf_version()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../discovery.html#io_mesh_3mf.threemf_discovery.check_threemf_version"><code class="docutils literal notranslate"><span class="pre">check_threemf_version()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../discovery.html#io_mesh_3mf.threemf_discovery.has_threemf_capability"><code class="docutils literal notranslate"><span class="pre">has_threemf_capability()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../building-blocks.html">Building Blocks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../building-blocks.html#module-io_mesh_3mf.common.colors">Colors</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.colors.srgb_to_linear"><code class="docutils literal notranslate"><span class="pre">srgb_to_linear()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.colors.linear_to_srgb"><code class="docutils literal notranslate"><span class="pre">linear_to_srgb()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.colors.hex_to_rgb"><code class="docutils literal notranslate"><span class="pre">hex_to_rgb()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.colors.hex_to_linear_rgb"><code class="docutils literal notranslate"><span class="pre">hex_to_linear_rgb()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.colors.rgb_to_hex"><code class="docutils literal notranslate"><span class="pre">rgb_to_hex()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.colors.linear_rgb_to_hex"><code class="docutils literal notranslate"><span class="pre">linear_rgb_to_hex()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../building-blocks.html#module-io_mesh_3mf.common.units">Units</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.units.import_unit_scale"><code class="docutils literal notranslate"><span class="pre">import_unit_scale()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.units.export_unit_scale"><code class="docutils literal notranslate"><span class="pre">export_unit_scale()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../building-blocks.html#module-io_mesh_3mf.common.types">Types (Dataclasses)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.types.ResourceObject"><code class="docutils literal notranslate"><span class="pre">ResourceObject</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.types.Component"><code class="docutils literal notranslate"><span class="pre">Component</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial"><code class="docutils literal notranslate"><span class="pre">ResourceMaterial</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.types.ResourceTexture"><code class="docutils literal notranslate"><span class="pre">ResourceTexture</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.types.ResourceTextureGroup"><code class="docutils literal notranslate"><span class="pre">ResourceTextureGroup</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.types.ResourceComposite"><code class="docutils literal notranslate"><span class="pre">ResourceComposite</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.types.ResourceMultiproperties"><code class="docutils literal notranslate"><span class="pre">ResourceMultiproperties</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.types.ResourcePBRTextureDisplay"><code class="docutils literal notranslate"><span class="pre">ResourcePBRTextureDisplay</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.types.ResourceColorgroup"><code class="docutils literal notranslate"><span class="pre">ResourceColorgroup</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.types.ResourcePBRDisplayProps"><code class="docutils literal notranslate"><span class="pre">ResourcePBRDisplayProps</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../building-blocks.html#module-io_mesh_3mf.common.segmentation">Segmentation Codec</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState"><code class="docutils literal notranslate"><span class="pre">TriangleState</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationNode"><code class="docutils literal notranslate"><span class="pre">SegmentationNode</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.segmentation.SubdividedTriangle"><code class="docutils literal notranslate"><span class="pre">SubdividedTriangle</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationDecoder"><code class="docutils literal notranslate"><span class="pre">SegmentationDecoder</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.segmentation.TriangleSubdivider"><code class="docutils literal notranslate"><span class="pre">TriangleSubdivider</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationEncoder"><code class="docutils literal notranslate"><span class="pre">SegmentationEncoder</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.segmentation.decode_segmentation_string"><code class="docutils literal notranslate"><span class="pre">decode_segmentation_string()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.segmentation.subdivide_triangle_with_segmentation"><code class="docutils literal notranslate"><span class="pre">subdivide_triangle_with_segmentation()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../building-blocks.html#module-io_mesh_3mf.common.extensions">Extensions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.extensions.Extension"><code class="docutils literal notranslate"><span class="pre">Extension</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.extensions.ExtensionType"><code class="docutils literal notranslate"><span class="pre">ExtensionType</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager"><code class="docutils literal notranslate"><span class="pre">ExtensionManager</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.extensions.get_extension_by_namespace"><code class="docutils literal notranslate"><span class="pre">get_extension_by_namespace()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.extensions.get_extension_by_prefix"><code class="docutils literal notranslate"><span class="pre">get_extension_by_prefix()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.extensions.list_official_extensions"><code class="docutils literal notranslate"><span class="pre">list_official_extensions()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.extensions.list_vendor_extensions"><code class="docutils literal notranslate"><span class="pre">list_vendor_extensions()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../building-blocks.html#module-io_mesh_3mf.common.metadata">Metadata</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.metadata.Metadata"><code class="docutils literal notranslate"><span class="pre">Metadata</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../building-blocks.html#io_mesh_3mf.common.metadata.MetadataEntry"><code class="docutils literal notranslate"><span class="pre">MetadataEntry</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #2b2b2b" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">3MF Format for Blender</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">io_mesh_3mf.api</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for io_mesh_3mf.api</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Blender add-on to import and export 3MF files.</span>
+<span class="c1"># Copyright (C) 2025 Jack (modernization for Blender 4.2+)</span>
+<span class="c1"># This add-on is free software; you can redistribute it and/or modify it under the terms of the GNU General Public</span>
+<span class="c1"># License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later</span>
+<span class="c1"># version.</span>
+<span class="c1"># This add-on is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied</span>
+<span class="c1"># warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.</span>
+<span class="c1"># You should have received a copy of the GNU General Public License along with this program; if not, write to the Free</span>
+<span class="c1"># Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.</span>
+
+<span class="c1"># &lt;pep8 compliant&gt;</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Public API for programmatic 3MF import and export.</span>
+
+<span class="sd">These entry points let other Blender addons, CLI scripts, and headless</span>
+<span class="sd">automation workflows import or export 3MF files *without* going through</span>
+<span class="sd">Blender operator invocation (``bpy.ops``).  They build the appropriate</span>
+<span class="sd">context objects, run the same pipeline code as the operators, and return</span>
+<span class="sd">lightweight result dataclasses.</span>
+
+<span class="sd">Quick start::</span>
+
+<span class="sd">    from io_mesh_3mf.api import import_3mf, export_3mf</span>
+
+<span class="sd">    # Import</span>
+<span class="sd">    result = import_3mf(&quot;/path/to/model.3mf&quot;, import_materials=&quot;PAINT&quot;)</span>
+<span class="sd">    print(result.status, result.num_loaded, result.objects)</span>
+
+<span class="sd">    # Export</span>
+<span class="sd">    result = export_3mf(</span>
+<span class="sd">        &quot;/path/to/output.3mf&quot;,</span>
+<span class="sd">        use_orca_format=&quot;AUTO&quot;,</span>
+<span class="sd">        use_selection=True,</span>
+<span class="sd">    )</span>
+<span class="sd">    print(result.status, result.num_written)</span>
+
+<span class="sd">Inspect without importing::</span>
+
+<span class="sd">    from io_mesh_3mf.api import inspect_3mf</span>
+
+<span class="sd">    info = inspect_3mf(&quot;/path/to/model.3mf&quot;)</span>
+<span class="sd">    print(info.unit, info.num_objects, info.num_triangles_total)</span>
+<span class="sd">    for obj in info.objects:</span>
+<span class="sd">        print(obj[&quot;name&quot;], obj[&quot;num_vertices&quot;], obj[&quot;num_triangles&quot;])</span>
+
+<span class="sd">Batch operations::</span>
+
+<span class="sd">    from io_mesh_3mf.api import batch_import</span>
+
+<span class="sd">    results = batch_import([&quot;/a.3mf&quot;, &quot;/b.3mf&quot;], import_materials=&quot;PAINT&quot;)</span>
+<span class="sd">    for r in results:</span>
+<span class="sd">        print(r.status, r.num_loaded)</span>
+
+<span class="sd">Building blocks for custom workflows::</span>
+
+<span class="sd">    from io_mesh_3mf.api import colors, types, segmentation, units</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">xml.etree.ElementTree</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">zipfile</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">bpy</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common.constants</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">RELS_MIMETYPE</span><span class="p">,</span>
+    <span class="n">MODEL_MIMETYPE</span><span class="p">,</span>
+    <span class="n">MODEL_NAMESPACES</span><span class="p">,</span>
+    <span class="n">SUPPORTED_EXTENSIONS</span><span class="p">,</span>
+    <span class="n">MATERIAL_NAMESPACE</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common.extensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExtensionManager</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common.logging</span><span class="w"> </span><span class="kn">import</span> <span class="n">debug</span><span class="p">,</span> <span class="n">warn</span><span class="p">,</span> <span class="n">error</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common.metadata</span><span class="w"> </span><span class="kn">import</span> <span class="n">Metadata</span><span class="p">,</span> <span class="n">MetadataEntry</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common.annotations</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotations</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common.units</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">blender_to_metre</span><span class="p">,</span>
+    <span class="n">threemf_to_metre</span><span class="p">,</span>
+    <span class="n">export_unit_scale</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<span class="c1"># ═══════════════════════════════════════════════════════════════════════════</span>
+<span class="c1"># API Version &amp; Registry</span>
+<span class="c1"># ═══════════════════════════════════════════════════════════════════════════</span>
+<span class="c1">#</span>
+<span class="c1"># This module self-registers in bpy.app.driver_namespace so other addons can</span>
+<span class="c1"># discover and use the 3MF API without parsing addon directories.</span>
+<span class="c1">#</span>
+<span class="c1"># Usage from another addon:</span>
+<span class="c1">#</span>
+<span class="c1">#     import bpy</span>
+<span class="c1">#     threemf_api = bpy.app.driver_namespace.get(&quot;io_mesh_3mf&quot;)</span>
+<span class="c1">#     if threemf_api is not None:</span>
+<span class="c1">#         result = threemf_api.import_3mf(&quot;/path/to/model.3mf&quot;)</span>
+<span class="c1">#</span>
+<span class="c1"># Or using the provided discovery helper (see API.md):</span>
+<span class="c1">#</span>
+<span class="c1">#     from io_mesh_3mf.api import get_api, is_available</span>
+<span class="c1">#     if is_available():</span>
+<span class="c1">#         api = get_api()</span>
+<span class="c1">#         result = api.import_3mf(&quot;/path/to/model.3mf&quot;)</span>
+
+<span class="c1">#: API version following semantic versioning (MAJOR.MINOR.PATCH).</span>
+<span class="c1">#: - MAJOR: Breaking changes to existing functions/signatures</span>
+<span class="c1">#: - MINOR: New features, backward-compatible</span>
+<span class="c1">#: - PATCH: Bug fixes only</span>
+<span class="n">API_VERSION</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+<span class="c1">#: Human-readable version string</span>
+<span class="n">API_VERSION_STRING</span> <span class="o">=</span> <span class="s2">&quot;.&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">API_VERSION</span><span class="p">)</span>
+
+<span class="c1">#: Capability flags for feature detection. Other addons can check these</span>
+<span class="c1">#: to determine what functionality is available without version parsing.</span>
+<span class="n">API_CAPABILITIES</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span>
+    <span class="s2">&quot;import&quot;</span><span class="p">,</span>              <span class="c1"># import_3mf() available</span>
+    <span class="s2">&quot;export&quot;</span><span class="p">,</span>              <span class="c1"># export_3mf() available</span>
+    <span class="s2">&quot;inspect&quot;</span><span class="p">,</span>             <span class="c1"># inspect_3mf() available</span>
+    <span class="s2">&quot;batch&quot;</span><span class="p">,</span>               <span class="c1"># batch_import/batch_export available</span>
+    <span class="s2">&quot;callbacks&quot;</span><span class="p">,</span>           <span class="c1"># on_progress, on_warning, on_object_created</span>
+    <span class="s2">&quot;target_collection&quot;</span><span class="p">,</span>   <span class="c1"># import to specific collection</span>
+    <span class="s2">&quot;orca_format&quot;</span><span class="p">,</span>         <span class="c1"># Orca/BambuStudio export format</span>
+    <span class="s2">&quot;prusa_format&quot;</span><span class="p">,</span>        <span class="c1"># PrusaSlicer export format</span>
+    <span class="s2">&quot;paint_mode&quot;</span><span class="p">,</span>          <span class="c1"># MMU paint segmentation</span>
+    <span class="s2">&quot;project_template&quot;</span><span class="p">,</span>    <span class="c1"># Custom Orca project template</span>
+    <span class="s2">&quot;object_settings&quot;</span><span class="p">,</span>     <span class="c1"># Per-object Orca settings</span>
+    <span class="s2">&quot;building_blocks&quot;</span><span class="p">,</span>     <span class="c1"># colors, types, segmentation sub-namespaces</span>
+<span class="p">})</span>
+
+<span class="c1">#: Registry key in bpy.app.driver_namespace</span>
+<span class="n">_REGISTRY_KEY</span> <span class="o">=</span> <span class="s2">&quot;io_mesh_3mf&quot;</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_register_api</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Register this API module in bpy.app.driver_namespace for discovery.&quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+    <span class="n">bpy</span><span class="o">.</span><span class="n">app</span><span class="o">.</span><span class="n">driver_namespace</span><span class="p">[</span><span class="n">_REGISTRY_KEY</span><span class="p">]</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="vm">__name__</span><span class="p">]</span>
+    <span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Registered 3MF API v</span><span class="si">{</span><span class="n">API_VERSION_STRING</span><span class="si">}</span><span class="s2"> in driver_namespace&quot;</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_unregister_api</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Remove the API from bpy.app.driver_namespace.&quot;&quot;&quot;</span>
+    <span class="n">bpy</span><span class="o">.</span><span class="n">app</span><span class="o">.</span><span class="n">driver_namespace</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">_REGISTRY_KEY</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="is_available">
+<a class="viewcode-back" href="../../discovery.html#io_mesh_3mf.api.is_available">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">is_available</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if the 3MF API is registered and available.</span>
+
+<span class="sd">    :return: True if the API is registered in bpy.app.driver_namespace.</span>
+
+<span class="sd">    Example::</span>
+
+<span class="sd">        from io_mesh_3mf.api import is_available</span>
+<span class="sd">        if is_available():</span>
+<span class="sd">            print(&quot;3MF API is ready&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">_REGISTRY_KEY</span> <span class="ow">in</span> <span class="n">bpy</span><span class="o">.</span><span class="n">app</span><span class="o">.</span><span class="n">driver_namespace</span></div>
+
+
+
+<div class="viewcode-block" id="get_api">
+<a class="viewcode-back" href="../../discovery.html#io_mesh_3mf.api.get_api">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_api</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get the registered 3MF API module.</span>
+
+<span class="sd">    :return: The io_mesh_3mf.api module, or None if not registered.</span>
+<span class="sd">    :rtype: module | None</span>
+
+<span class="sd">    Example::</span>
+
+<span class="sd">        from io_mesh_3mf.api import get_api</span>
+<span class="sd">        api = get_api()</span>
+<span class="sd">        if api:</span>
+<span class="sd">            result = api.import_3mf(&quot;/model.3mf&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">bpy</span><span class="o">.</span><span class="n">app</span><span class="o">.</span><span class="n">driver_namespace</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">_REGISTRY_KEY</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="has_capability">
+<a class="viewcode-back" href="../../discovery.html#io_mesh_3mf.api.has_capability">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">has_capability</span><span class="p">(</span><span class="n">capability</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if a specific API capability is available.</span>
+
+<span class="sd">    Use this for forward-compatible feature detection instead of version</span>
+<span class="sd">    checks. New capabilities may be added in minor versions.</span>
+
+<span class="sd">    :param capability: Capability name (e.g., &quot;paint_mode&quot;, &quot;batch&quot;).</span>
+<span class="sd">    :return: True if the capability is supported.</span>
+
+<span class="sd">    Example::</span>
+
+<span class="sd">        from io_mesh_3mf.api import has_capability</span>
+<span class="sd">        if has_capability(&quot;object_settings&quot;):</span>
+<span class="sd">            # Safe to use object_settings parameter</span>
+<span class="sd">            result = export_3mf(path, object_settings={...})</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">capability</span> <span class="ow">in</span> <span class="n">API_CAPABILITIES</span></div>
+
+
+
+<div class="viewcode-block" id="check_version">
+<a class="viewcode-back" href="../../discovery.html#io_mesh_3mf.api.check_version">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">check_version</span><span class="p">(</span><span class="n">minimum</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if the API version meets a minimum requirement.</span>
+
+<span class="sd">    :param minimum: Tuple of (major, minor, patch) minimum version.</span>
+<span class="sd">    :return: True if API_VERSION &gt;= minimum.</span>
+
+<span class="sd">    Example::</span>
+
+<span class="sd">        from io_mesh_3mf.api import check_version</span>
+<span class="sd">        if check_version((1, 2, 0)):</span>
+<span class="sd">            # Use features added in v1.2.0</span>
+<span class="sd">            ...</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">API_VERSION</span> <span class="o">&gt;=</span> <span class="n">minimum</span></div>
+
+
+
+<span class="c1"># Auto-register when this module is imported (deferred to first use for safety)</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="n">_register_api</span><span class="p">()</span>
+<span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+    <span class="k">pass</span>  <span class="c1"># Blender may not be fully initialized during startup</span>
+
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="c1"># --- API discovery &amp; versioning ---</span>
+    <span class="s2">&quot;API_VERSION&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;API_VERSION_STRING&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;API_CAPABILITIES&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;is_available&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;get_api&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;has_capability&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;check_version&quot;</span><span class="p">,</span>
+    <span class="c1"># --- Core functions ---</span>
+    <span class="s2">&quot;import_3mf&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;export_3mf&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;inspect_3mf&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;batch_import&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;batch_export&quot;</span><span class="p">,</span>
+    <span class="c1"># --- Result types ---</span>
+    <span class="s2">&quot;ImportResult&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;ExportResult&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;InspectResult&quot;</span><span class="p">,</span>
+    <span class="c1"># --- Building-block sub-namespaces ---</span>
+    <span class="s2">&quot;colors&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;types&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;segmentation&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;units&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;extensions&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;xml_tools&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;metadata&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;components&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<span class="c1"># ═══════════════════════════════════════════════════════════════════════════</span>
+<span class="c1"># Result dataclasses</span>
+<span class="c1"># ═══════════════════════════════════════════════════════════════════════════</span>
+
+<div class="viewcode-block" id="ImportResult">
+<a class="viewcode-back" href="../../api.html#io_mesh_3mf.api.ImportResult">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ImportResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return value from :func:`import_3mf`.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        status: ``&quot;FINISHED&quot;`` on success, ``&quot;CANCELLED&quot;`` on failure.</span>
+<span class="sd">        num_loaded: Number of objects successfully imported.</span>
+<span class="sd">        objects: List of ``bpy.types.Object`` instances created during import.</span>
+<span class="sd">        warnings: Accumulated warning messages (if any).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">status</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;FINISHED&quot;</span>
+    <span class="n">num_loaded</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">objects</span><span class="p">:</span> <span class="n">List</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">warnings</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="ExportResult">
+<a class="viewcode-back" href="../../api.html#io_mesh_3mf.api.ExportResult">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ExportResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return value from :func:`export_3mf`.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        status: ``&quot;FINISHED&quot;`` on success, ``&quot;CANCELLED&quot;`` on failure.</span>
+<span class="sd">        num_written: Number of objects written to the archive.</span>
+<span class="sd">        filepath: Absolute path of the written ``.3mf`` file.</span>
+<span class="sd">        warnings: Accumulated warning messages (if any).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">status</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;FINISHED&quot;</span>
+    <span class="n">num_written</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">filepath</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">warnings</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="InspectResult">
+<a class="viewcode-back" href="../../api.html#io_mesh_3mf.api.InspectResult">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">InspectResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return value from :func:`inspect_3mf`.</span>
+
+<span class="sd">    A lightweight summary of a 3MF archive&#39;s contents, extracted *without*</span>
+<span class="sd">    creating any Blender objects or materials.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        status: ``&quot;OK&quot;`` on success, ``&quot;ERROR&quot;`` on failure.</span>
+<span class="sd">        error_message: Human-readable error string when ``status == &quot;ERROR&quot;``.</span>
+<span class="sd">        unit: The unit declared in the model file (``&quot;millimeter&quot;`` etc.).</span>
+<span class="sd">        metadata: Top-level ``&lt;metadata&gt;`` key/value pairs from the model.</span>
+<span class="sd">        objects: Per-object summary dicts with keys:</span>
+
+<span class="sd">            - ``&quot;id&quot;`` — resource ID string</span>
+<span class="sd">            - ``&quot;name&quot;`` — object name (or ``&quot;&quot;`` if unnamed)</span>
+<span class="sd">            - ``&quot;type&quot;`` — object type attribute (``&quot;model&quot;`` / ``&quot;solidsupport&quot;`` / …)</span>
+<span class="sd">            - ``&quot;num_vertices&quot;`` — vertex count</span>
+<span class="sd">            - ``&quot;num_triangles&quot;`` — triangle count</span>
+<span class="sd">            - ``&quot;num_components&quot;`` — number of component references</span>
+<span class="sd">            - ``&quot;has_materials&quot;`` — whether face materials are present</span>
+<span class="sd">            - ``&quot;has_segmentation&quot;`` — whether MMU paint segmentation is present</span>
+
+<span class="sd">        materials: Per-material-group summary dicts with keys:</span>
+
+<span class="sd">            - ``&quot;id&quot;`` — resource ID string</span>
+<span class="sd">            - ``&quot;type&quot;`` — ``&quot;basematerials&quot;`` | ``&quot;colorgroup&quot;`` | ``&quot;texture2dgroup&quot;``</span>
+<span class="sd">            - ``&quot;count&quot;`` — number of entries in the group</span>
+
+<span class="sd">        textures: Per-texture summary dicts with keys:</span>
+
+<span class="sd">            - ``&quot;id&quot;`` — resource ID string</span>
+<span class="sd">            - ``&quot;path&quot;`` — internal archive path</span>
+<span class="sd">            - ``&quot;contenttype&quot;`` — MIME type string</span>
+
+<span class="sd">        extensions_used: Set of namespace URIs for extensions referenced</span>
+<span class="sd">            in the model&#39;s ``requiredextensions`` / ``recommendedextensions``.</span>
+<span class="sd">        vendor_format: Detected slicer vendor format (``&quot;orca&quot;`` / ``None``).</span>
+<span class="sd">        archive_files: List of all file paths inside the ZIP archive.</span>
+<span class="sd">        num_objects: Total number of ``&lt;object&gt;`` resources.</span>
+<span class="sd">        num_triangles_total: Sum of all triangle counts across objects.</span>
+<span class="sd">        num_vertices_total: Sum of all vertex counts across objects.</span>
+<span class="sd">        warnings: Accumulated warnings during inspection.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">status</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;OK&quot;</span>
+    <span class="n">error_message</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">unit</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="n">objects</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">materials</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">textures</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">extensions_used</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">set</span><span class="p">)</span>
+    <span class="n">vendor_format</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">archive_files</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">num_objects</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">num_triangles_total</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">num_vertices_total</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">warnings</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># ═══════════════════════════════════════════════════════════════════════════</span>
+<span class="c1"># Callback type aliases (for documentation clarity)</span>
+<span class="c1"># ═══════════════════════════════════════════════════════════════════════════</span>
+
+<span class="c1"># Called with (percentage: int 0-100, message: str)</span>
+<span class="n">ProgressCallback</span> <span class="o">=</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span>
+<span class="c1"># Called with (warning_message: str)</span>
+<span class="n">WarningCallback</span> <span class="o">=</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span>
+<span class="c1"># Called with (blender_object, resource_id: str) after each object is built</span>
+<span class="n">ObjectCreatedCallback</span> <span class="o">=</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span>
+
+
+<span class="c1"># ═══════════════════════════════════════════════════════════════════════════</span>
+<span class="c1"># inspect_3mf  — read-only archive inspection (no Blender objects created)</span>
+<span class="c1"># ═══════════════════════════════════════════════════════════════════════════</span>
+
+<div class="viewcode-block" id="inspect_3mf">
+<a class="viewcode-back" href="../../api.html#io_mesh_3mf.api.inspect_3mf">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">inspect_3mf</span><span class="p">(</span><span class="n">filepath</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">InspectResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Inspect a 3MF file without importing anything into Blender.</span>
+
+<span class="sd">    Opens the archive, parses the XML model file(s), and returns a</span>
+<span class="sd">    summary of objects, materials, textures, metadata, and extensions.</span>
+<span class="sd">    No Blender objects, meshes, or materials are created.</span>
+
+<span class="sd">    :param filepath: Path to the ``.3mf`` file.</span>
+<span class="sd">    :return: :class:`InspectResult` with archive metadata and statistics.</span>
+
+<span class="sd">    Example::</span>
+
+<span class="sd">        info = inspect_3mf(&quot;model.3mf&quot;)</span>
+<span class="sd">        if info.status == &quot;OK&quot;:</span>
+<span class="sd">            for obj in info.objects:</span>
+<span class="sd">                print(f&quot;{obj[&#39;name&#39;]}: {obj[&#39;num_triangles&#39;]} tris&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.common.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">MODEL_DEFAULT_UNIT</span>
+
+    <span class="n">filepath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">InspectResult</span><span class="p">()</span>
+
+    <span class="c1"># --- Open archive -------------------------------------------------------</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">archive</span> <span class="o">=</span> <span class="n">zipfile</span><span class="o">.</span><span class="n">ZipFile</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="n">zipfile</span><span class="o">.</span><span class="n">BadZipFile</span><span class="p">,</span> <span class="ne">EnvironmentError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;ERROR&quot;</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">error_message</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Unable to read archive: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="n">result</span><span class="o">.</span><span class="n">archive_files</span> <span class="o">=</span> <span class="n">archive</span><span class="o">.</span><span class="n">namelist</span><span class="p">()</span>
+
+    <span class="c1"># --- Find model files ---------------------------------------------------</span>
+    <span class="c1"># Look for [Content_Types].xml to resolve MIME types, but fall back to</span>
+    <span class="c1"># scanning for *.model files if the content-types file is missing.</span>
+    <span class="n">model_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">archive_files</span><span class="p">:</span>
+        <span class="n">lower</span> <span class="o">=</span> <span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">lower</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.model&quot;</span><span class="p">):</span>
+            <span class="n">model_paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">model_paths</span><span class="p">:</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;ERROR&quot;</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">error_message</span> <span class="o">=</span> <span class="s2">&quot;No .model files found in archive&quot;</span>
+        <span class="n">archive</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="c1"># --- Parse each model file ----------------------------------------------</span>
+    <span class="k">for</span> <span class="n">model_path</span> <span class="ow">in</span> <span class="n">model_paths</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">archive</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">model_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">tree</span> <span class="o">=</span> <span class="n">xml</span><span class="o">.</span><span class="n">etree</span><span class="o">.</span><span class="n">ElementTree</span><span class="o">.</span><span class="n">ElementTree</span><span class="p">(</span><span class="n">file</span><span class="o">=</span><span class="n">f</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">xml</span><span class="o">.</span><span class="n">etree</span><span class="o">.</span><span class="n">ElementTree</span><span class="o">.</span><span class="n">ParseError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Malformed XML in </span><span class="si">{</span><span class="n">model_path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">continue</span>
+
+        <span class="n">root</span> <span class="o">=</span> <span class="n">tree</span><span class="o">.</span><span class="n">getroot</span><span class="p">()</span>
+
+        <span class="c1"># Unit.</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="o">.</span><span class="n">unit</span><span class="p">:</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">unit</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;unit&quot;</span><span class="p">,</span> <span class="n">MODEL_DEFAULT_UNIT</span><span class="p">)</span>
+
+        <span class="c1"># Top-level metadata.</span>
+        <span class="k">for</span> <span class="n">meta_node</span> <span class="ow">in</span> <span class="n">root</span><span class="o">.</span><span class="n">iterfind</span><span class="p">(</span><span class="s2">&quot;./3mf:metadata&quot;</span><span class="p">,</span> <span class="n">MODEL_NAMESPACES</span><span class="p">):</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">meta_node</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">name</span><span class="p">:</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">metadata</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">meta_node</span><span class="o">.</span><span class="n">text</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="c1"># Extensions referenced.</span>
+        <span class="k">for</span> <span class="n">attr_key</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;requiredextensions&quot;</span><span class="p">,</span> <span class="s2">&quot;recommendedextensions&quot;</span><span class="p">):</span>
+            <span class="n">ext_str</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">attr_key</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">ext_str</span><span class="p">:</span>
+                <span class="n">resolved</span> <span class="o">=</span> <span class="n">_resolve_prefixes</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">ext_str</span><span class="p">)</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">extensions_used</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">resolved</span><span class="p">)</span>
+
+        <span class="c1"># Vendor detection (lightweight — check namespace presence).</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.import_3mf.slicer</span><span class="w"> </span><span class="kn">import</span> <span class="n">detect_vendor</span>
+        <span class="n">detected</span> <span class="o">=</span> <span class="n">detect_vendor</span><span class="p">(</span><span class="n">root</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">detected</span> <span class="ow">and</span> <span class="n">result</span><span class="o">.</span><span class="n">vendor_format</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">vendor_format</span> <span class="o">=</span> <span class="n">detected</span>
+
+        <span class="c1"># ---- Materials / textures ------------------------------------------</span>
+        <span class="n">_inspect_materials</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+        <span class="n">_inspect_textures</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+
+        <span class="c1"># ---- Objects -------------------------------------------------------</span>
+        <span class="k">for</span> <span class="n">obj_node</span> <span class="ow">in</span> <span class="n">root</span><span class="o">.</span><span class="n">iterfind</span><span class="p">(</span>
+            <span class="s2">&quot;./3mf:resources/3mf:object&quot;</span><span class="p">,</span> <span class="n">MODEL_NAMESPACES</span>
+        <span class="p">):</span>
+            <span class="n">obj_id</span> <span class="o">=</span> <span class="n">obj_node</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="n">obj_name</span> <span class="o">=</span> <span class="n">obj_node</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="n">obj_type</span> <span class="o">=</span> <span class="n">obj_node</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="s2">&quot;model&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Count vertices.</span>
+            <span class="n">vert_nodes</span> <span class="o">=</span> <span class="n">obj_node</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span>
+                <span class="s2">&quot;./3mf:mesh/3mf:vertices/3mf:vertex&quot;</span><span class="p">,</span> <span class="n">MODEL_NAMESPACES</span>
+            <span class="p">)</span>
+            <span class="n">num_verts</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">vert_nodes</span><span class="p">)</span>
+
+            <span class="c1"># Count triangles.</span>
+            <span class="n">tri_nodes</span> <span class="o">=</span> <span class="n">obj_node</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span>
+                <span class="s2">&quot;./3mf:mesh/3mf:triangles/3mf:triangle&quot;</span><span class="p">,</span> <span class="n">MODEL_NAMESPACES</span>
+            <span class="p">)</span>
+            <span class="n">num_tris</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">tri_nodes</span><span class="p">)</span>
+
+            <span class="c1"># Count components.</span>
+            <span class="n">comp_nodes</span> <span class="o">=</span> <span class="n">obj_node</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span>
+                <span class="s2">&quot;./3mf:components/3mf:component&quot;</span><span class="p">,</span> <span class="n">MODEL_NAMESPACES</span>
+            <span class="p">)</span>
+            <span class="n">num_components</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">comp_nodes</span><span class="p">)</span>
+
+            <span class="c1"># Check for materials (pid/pindex on object or any triangle).</span>
+            <span class="n">has_materials</span> <span class="o">=</span> <span class="s2">&quot;pid&quot;</span> <span class="ow">in</span> <span class="n">obj_node</span><span class="o">.</span><span class="n">attrib</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">has_materials</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">tri</span> <span class="ow">in</span> <span class="n">tri_nodes</span><span class="p">[:</span><span class="mi">1</span><span class="p">]:</span>
+                    <span class="k">if</span> <span class="s2">&quot;pid&quot;</span> <span class="ow">in</span> <span class="n">tri</span><span class="o">.</span><span class="n">attrib</span><span class="p">:</span>
+                        <span class="n">has_materials</span> <span class="o">=</span> <span class="kc">True</span>
+                        <span class="k">break</span>
+
+            <span class="c1"># Check for segmentation (slic3rpe or Orca paint_color).</span>
+            <span class="n">has_seg</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">for</span> <span class="n">tri</span> <span class="ow">in</span> <span class="n">tri_nodes</span><span class="p">[:</span><span class="mi">1</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="n">tri</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="s2">&quot;{http://schemas.slic3r.org/3mf/2017/06}mmu_segmentation&quot;</span>
+                <span class="p">):</span>
+                    <span class="n">has_seg</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="k">break</span>
+                <span class="k">if</span> <span class="n">tri</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;paint_color&quot;</span><span class="p">):</span>
+                    <span class="n">has_seg</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="k">break</span>
+
+            <span class="n">obj_summary</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">obj_id</span><span class="p">,</span>
+                <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">obj_name</span><span class="p">,</span>
+                <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">obj_type</span><span class="p">,</span>
+                <span class="s2">&quot;num_vertices&quot;</span><span class="p">:</span> <span class="n">num_verts</span><span class="p">,</span>
+                <span class="s2">&quot;num_triangles&quot;</span><span class="p">:</span> <span class="n">num_tris</span><span class="p">,</span>
+                <span class="s2">&quot;num_components&quot;</span><span class="p">:</span> <span class="n">num_components</span><span class="p">,</span>
+                <span class="s2">&quot;has_materials&quot;</span><span class="p">:</span> <span class="n">has_materials</span><span class="p">,</span>
+                <span class="s2">&quot;has_segmentation&quot;</span><span class="p">:</span> <span class="n">has_seg</span><span class="p">,</span>
+            <span class="p">}</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">obj_summary</span><span class="p">)</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">num_triangles_total</span> <span class="o">+=</span> <span class="n">num_tris</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">num_vertices_total</span> <span class="o">+=</span> <span class="n">num_verts</span>
+
+    <span class="n">result</span><span class="o">.</span><span class="n">num_objects</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">objects</span><span class="p">)</span>
+    <span class="n">archive</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<span class="c1"># ═══════════════════════════════════════════════════════════════════════════</span>
+<span class="c1"># import_3mf</span>
+<span class="c1"># ═══════════════════════════════════════════════════════════════════════════</span>
+
+<div class="viewcode-block" id="import_3mf">
+<a class="viewcode-back" href="../../api.html#io_mesh_3mf.api.import_3mf">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">import_3mf</span><span class="p">(</span>
+    <span class="n">filepath</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">global_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">import_materials</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;MATERIALS&quot;</span><span class="p">,</span>
+    <span class="n">reuse_materials</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">import_location</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;KEEP&quot;</span><span class="p">,</span>
+    <span class="n">origin_to_geometry</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;KEEP&quot;</span><span class="p">,</span>
+    <span class="n">grid_spacing</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
+    <span class="n">auto_smooth</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">auto_smooth_angle</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5236</span><span class="p">,</span>
+    <span class="n">paint_uv_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;SMART&quot;</span><span class="p">,</span>
+    <span class="n">paint_texture_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">target_collection</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">on_progress</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ProgressCallback</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">on_warning</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">WarningCallback</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">on_object_created</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ObjectCreatedCallback</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ImportResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Import a 3MF file into the current Blender scene.</span>
+
+<span class="sd">    This is the headless/programmatic counterpart to the ``Import3MF``</span>
+<span class="sd">    operator.  It skips UI-specific behaviour (progress bars, camera zoom,</span>
+<span class="sd">    paint popups) but runs the exact same import pipeline.</span>
+
+<span class="sd">    :param filepath: Path to the ``.3mf`` file to import.</span>
+<span class="sd">    :param global_scale: Scale multiplier (default 1.0).</span>
+<span class="sd">    :param import_materials: ``&quot;MATERIALS&quot;`` | ``&quot;PAINT&quot;`` | ``&quot;NONE&quot;``.</span>
+<span class="sd">    :param reuse_materials: Reuse existing Blender materials by name/color.</span>
+<span class="sd">    :param import_location: ``&quot;ORIGIN&quot;`` | ``&quot;CURSOR&quot;`` | ``&quot;KEEP&quot;`` | ``&quot;GRID&quot;``.</span>
+<span class="sd">    :param origin_to_geometry: ``&quot;KEEP&quot;`` | ``&quot;CENTER&quot;`` | ``&quot;BOTTOM&quot;``.</span>
+<span class="sd">    :param grid_spacing: Spacing between objects in grid layout mode.</span>
+<span class="sd">    :param auto_smooth: Apply Smooth by Angle modifier to imported objects.</span>
+<span class="sd">    :param auto_smooth_angle: Maximum angle (radians) for smooth shading</span>
+<span class="sd">        (default 0.5236 = 30 degrees).</span>
+<span class="sd">    :param paint_uv_method: ``&quot;SMART&quot;`` (default) or ``&quot;LIGHTMAP&quot;``.</span>
+<span class="sd">        Smart UV groups adjacent faces; Lightmap gives each face unique space.</span>
+<span class="sd">    :param paint_texture_size: Override texture resolution (0 = auto).</span>
+<span class="sd">    :param target_collection: Name of an existing Blender collection to place</span>
+<span class="sd">        imported objects into.  If *None*, objects are added to the active</span>
+<span class="sd">        collection.  If the named collection does not exist it will be created</span>
+<span class="sd">        and linked to the scene.</span>
+<span class="sd">    :param on_progress: Optional ``(percentage: int, message: str)`` callback.</span>
+<span class="sd">    :param on_warning: Optional ``(message: str)`` callback fired for each warning.</span>
+<span class="sd">    :param on_object_created: Optional callback fired after each Blender</span>
+<span class="sd">        object is built.  Receives ``(blender_object, resource_id)`` arguments.</span>
+<span class="sd">    :return: :class:`ImportResult` with status, loaded count, and object list.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.import_3mf.context</span><span class="w"> </span><span class="kn">import</span> <span class="n">ImportContext</span><span class="p">,</span> <span class="n">ImportOptions</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.import_3mf</span><span class="w"> </span><span class="kn">import</span> <span class="n">archive</span> <span class="k">as</span> <span class="n">archive_mod</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.import_3mf</span><span class="w"> </span><span class="kn">import</span> <span class="n">geometry</span> <span class="k">as</span> <span class="n">geometry_mod</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.import_3mf</span><span class="w"> </span><span class="kn">import</span> <span class="n">builder</span> <span class="k">as</span> <span class="n">builder_mod</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.import_3mf.scene</span><span class="w"> </span><span class="kn">import</span> <span class="n">apply_grid_layout</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.import_3mf.slicer</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">detect_vendor</span><span class="p">,</span>
+        <span class="n">read_all_slicer_colors</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.import_3mf.materials</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">read_materials</span> <span class="k">as</span> <span class="n">_read_materials_impl</span><span class="p">,</span>
+        <span class="n">read_textures</span> <span class="k">as</span> <span class="n">_read_textures_impl</span><span class="p">,</span>
+        <span class="n">read_texture_groups</span> <span class="k">as</span> <span class="n">_read_texture_groups_impl</span><span class="p">,</span>
+        <span class="n">extract_textures_from_archive</span> <span class="k">as</span> <span class="n">_extract_textures_impl</span><span class="p">,</span>
+        <span class="n">read_pbr_metallic_properties</span> <span class="k">as</span> <span class="n">_read_pbr_metallic_impl</span><span class="p">,</span>
+        <span class="n">read_pbr_specular_properties</span> <span class="k">as</span> <span class="n">_read_pbr_specular_impl</span><span class="p">,</span>
+        <span class="n">read_pbr_translucent_properties</span> <span class="k">as</span> <span class="n">_read_pbr_translucent_impl</span><span class="p">,</span>
+        <span class="n">read_pbr_texture_display_properties</span> <span class="k">as</span> <span class="n">_read_pbr_texture_display_impl</span><span class="p">,</span>
+        <span class="n">read_composite_materials</span> <span class="k">as</span> <span class="n">_read_composite_impl</span><span class="p">,</span>
+        <span class="n">read_multiproperties</span> <span class="k">as</span> <span class="n">_read_multiproperties_impl</span><span class="p">,</span>
+        <span class="n">store_passthrough_materials</span> <span class="k">as</span> <span class="n">_store_passthrough_impl</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">filepath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">ImportResult</span><span class="p">()</span>
+    <span class="n">warnings_list</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">warnings</span>
+
+    <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
+        <span class="n">on_progress</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;Starting import…&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Build context (no operator).</span>
+    <span class="n">options</span> <span class="o">=</span> <span class="n">ImportOptions</span><span class="p">(</span>
+        <span class="n">global_scale</span><span class="o">=</span><span class="n">global_scale</span><span class="p">,</span>
+        <span class="n">import_materials</span><span class="o">=</span><span class="n">import_materials</span><span class="p">,</span>
+        <span class="n">reuse_materials</span><span class="o">=</span><span class="n">reuse_materials</span><span class="p">,</span>
+        <span class="n">import_location</span><span class="o">=</span><span class="n">import_location</span><span class="p">,</span>
+        <span class="n">origin_to_geometry</span><span class="o">=</span><span class="n">origin_to_geometry</span><span class="p">,</span>
+        <span class="n">grid_spacing</span><span class="o">=</span><span class="n">grid_spacing</span><span class="p">,</span>
+        <span class="n">auto_smooth</span><span class="o">=</span><span class="n">auto_smooth</span><span class="p">,</span>
+        <span class="n">auto_smooth_angle</span><span class="o">=</span><span class="n">auto_smooth_angle</span><span class="p">,</span>
+        <span class="n">paint_uv_method</span><span class="o">=</span><span class="n">paint_uv_method</span><span class="p">,</span>
+        <span class="n">paint_texture_size</span><span class="o">=</span><span class="n">paint_texture_size</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">ctx</span> <span class="o">=</span> <span class="n">ImportContext</span><span class="p">(</span><span class="n">options</span><span class="o">=</span><span class="n">options</span><span class="p">,</span> <span class="n">operator</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+
+    <span class="c1"># Wire up warning callback (intercept ctx.safe_report for WARNING level).</span>
+    <span class="k">if</span> <span class="n">on_warning</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">_original_safe_report</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">safe_report</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_intercepted_safe_report</span><span class="p">(</span><span class="n">level</span><span class="p">,</span> <span class="n">message</span><span class="p">):</span>
+            <span class="n">_original_safe_report</span><span class="p">(</span><span class="n">level</span><span class="p">,</span> <span class="n">message</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s2">&quot;WARNING&quot;</span> <span class="ow">in</span> <span class="n">level</span><span class="p">:</span>
+                <span class="n">on_warning</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+                <span class="n">warnings_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+
+        <span class="n">ctx</span><span class="o">.</span><span class="n">safe_report</span> <span class="o">=</span> <span class="n">_intercepted_safe_report</span>  <span class="c1"># type: ignore[assignment]</span>
+
+    <span class="n">scene_metadata</span> <span class="o">=</span> <span class="n">Metadata</span><span class="p">()</span>
+    <span class="n">scene_metadata</span><span class="o">.</span><span class="n">retrieve</span><span class="p">(</span><span class="n">bpy</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">scene</span><span class="p">)</span>
+    <span class="k">del</span> <span class="n">scene_metadata</span><span class="p">[</span><span class="s2">&quot;Title&quot;</span><span class="p">]</span>
+    <span class="n">annotations_obj</span> <span class="o">=</span> <span class="n">Annotations</span><span class="p">()</span>
+    <span class="n">annotations_obj</span><span class="o">.</span><span class="n">retrieve</span><span class="p">()</span>
+
+    <span class="c1"># Switch to object mode, deselect everything.</span>
+    <span class="k">if</span> <span class="n">bpy</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">object</span><span class="o">.</span><span class="n">mode_set</span><span class="o">.</span><span class="n">poll</span><span class="p">():</span>
+        <span class="n">bpy</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">object</span><span class="o">.</span><span class="n">mode_set</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;OBJECT&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">bpy</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">object</span><span class="o">.</span><span class="n">select_all</span><span class="o">.</span><span class="n">poll</span><span class="p">():</span>
+        <span class="n">bpy</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">object</span><span class="o">.</span><span class="n">select_all</span><span class="p">(</span><span class="n">action</span><span class="o">=</span><span class="s2">&quot;DESELECT&quot;</span><span class="p">)</span>
+
+    <span class="c1"># --- Collection targeting -----------------------------------------------</span>
+    <span class="n">original_collection</span> <span class="o">=</span> <span class="n">bpy</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">view_layer</span><span class="o">.</span><span class="n">active_layer_collection</span>
+    <span class="k">if</span> <span class="n">target_collection</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">col</span> <span class="o">=</span> <span class="n">bpy</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">collections</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">target_collection</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">col</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">col</span> <span class="o">=</span> <span class="n">bpy</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">collections</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">target_collection</span><span class="p">)</span>
+            <span class="n">bpy</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">scene</span><span class="o">.</span><span class="n">collection</span><span class="o">.</span><span class="n">children</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="n">col</span><span class="p">)</span>
+        <span class="c1"># Find the layer collection wrapper for this collection.</span>
+        <span class="n">layer_col</span> <span class="o">=</span> <span class="n">_find_layer_collection</span><span class="p">(</span>
+            <span class="n">bpy</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">view_layer</span><span class="o">.</span><span class="n">layer_collection</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">layer_col</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">bpy</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">view_layer</span><span class="o">.</span><span class="n">active_layer_collection</span> <span class="o">=</span> <span class="n">layer_col</span>
+
+    <span class="n">ctx</span><span class="o">.</span><span class="n">current_archive_path</span> <span class="o">=</span> <span class="n">filepath</span>
+
+    <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
+        <span class="n">on_progress</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="s2">&quot;Reading archive…&quot;</span><span class="p">)</span>
+
+    <span class="c1"># --- Read archive -------------------------------------------------------</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">files_by_content_type</span> <span class="o">=</span> <span class="n">archive_mod</span><span class="o">.</span><span class="n">read_archive</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">filepath</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to read archive </span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;CANCELLED&quot;</span>
+        <span class="c1"># Restore collection.</span>
+        <span class="n">bpy</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">view_layer</span><span class="o">.</span><span class="n">active_layer_collection</span> <span class="o">=</span> <span class="n">original_collection</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="c1"># If no model files were found, the archive is unreadable or invalid.</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">files_by_content_type</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">MODEL_MIMETYPE</span><span class="p">):</span>
+        <span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No model files found in archive: </span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;CANCELLED&quot;</span>
+        <span class="n">bpy</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">view_layer</span><span class="o">.</span><span class="n">active_layer_collection</span> <span class="o">=</span> <span class="n">original_collection</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="c1"># Relationships &amp; content types.</span>
+    <span class="k">for</span> <span class="n">rels_file</span> <span class="ow">in</span> <span class="n">files_by_content_type</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">RELS_MIMETYPE</span><span class="p">,</span> <span class="p">[]):</span>
+        <span class="n">annotations_obj</span><span class="o">.</span><span class="n">add_rels</span><span class="p">(</span><span class="n">rels_file</span><span class="p">)</span>
+    <span class="n">annotations_obj</span><span class="o">.</span><span class="n">add_content_types</span><span class="p">(</span><span class="n">files_by_content_type</span><span class="p">)</span>
+    <span class="n">archive_mod</span><span class="o">.</span><span class="n">must_preserve</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">files_by_content_type</span><span class="p">,</span> <span class="n">annotations_obj</span><span class="p">)</span>
+
+    <span class="c1"># Stash slicer config files for round-trip export.</span>
+    <span class="n">archive_mod</span><span class="o">.</span><span class="n">stash_slicer_configs</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">filepath</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
+        <span class="n">on_progress</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="s2">&quot;Parsing model files…&quot;</span><span class="p">)</span>
+
+    <span class="c1"># --- Parse model files --------------------------------------------------</span>
+    <span class="k">for</span> <span class="n">model_file</span> <span class="ow">in</span> <span class="n">files_by_content_type</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">MODEL_MIMETYPE</span><span class="p">,</span> <span class="p">[]):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">document</span> <span class="o">=</span> <span class="n">xml</span><span class="o">.</span><span class="n">etree</span><span class="o">.</span><span class="n">ElementTree</span><span class="o">.</span><span class="n">ElementTree</span><span class="p">(</span><span class="n">file</span><span class="o">=</span><span class="n">model_file</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">xml</span><span class="o">.</span><span class="n">etree</span><span class="o">.</span><span class="n">ElementTree</span><span class="o">.</span><span class="n">ParseError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;3MF document is malformed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">warnings_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Malformed XML: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">document</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">root</span> <span class="o">=</span> <span class="n">document</span><span class="o">.</span><span class="n">getroot</span><span class="p">()</span>
+
+        <span class="c1"># Vendor detection.</span>
+        <span class="k">if</span> <span class="n">ctx</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">import_materials</span> <span class="o">!=</span> <span class="s2">&quot;NONE&quot;</span><span class="p">:</span>
+            <span class="n">ctx</span><span class="o">.</span><span class="n">vendor_format</span> <span class="o">=</span> <span class="n">detect_vendor</span><span class="p">(</span><span class="n">root</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ctx</span><span class="o">.</span><span class="n">vendor_format</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="c1"># Extension activation.</span>
+        <span class="n">_activate_extensions_api</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">root</span><span class="p">)</span>
+
+        <span class="c1"># Unit scale.</span>
+        <span class="n">context</span> <span class="o">=</span> <span class="n">bpy</span><span class="o">.</span><span class="n">context</span>
+        <span class="n">scale_unit</span> <span class="o">=</span> <span class="n">_import_unit_scale</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">root</span><span class="p">,</span> <span class="n">global_scale</span><span class="p">)</span>
+
+        <span class="c1"># Reset per-model resource dictionaries.</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">resource_objects</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">resource_materials</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">resource_textures</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">resource_texture_groups</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">orca_filament_colors</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">object_default_extruders</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
+            <span class="n">on_progress</span><span class="p">(</span><span class="mi">20</span><span class="p">,</span> <span class="s2">&quot;Reading filament colours…&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Read filament colours (single archive open, priority order).</span>
+        <span class="n">read_all_slicer_colors</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">filepath</span><span class="p">)</span>
+
+        <span class="c1"># Metadata.</span>
+        <span class="k">for</span> <span class="n">metadata_node</span> <span class="ow">in</span> <span class="n">root</span><span class="o">.</span><span class="n">iterfind</span><span class="p">(</span><span class="s2">&quot;./3mf:metadata&quot;</span><span class="p">,</span> <span class="n">MODEL_NAMESPACES</span><span class="p">):</span>
+            <span class="k">if</span> <span class="s2">&quot;name&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">metadata_node</span><span class="o">.</span><span class="n">attrib</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">metadata_node</span><span class="o">.</span><span class="n">attrib</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
+            <span class="n">preserve_str</span> <span class="o">=</span> <span class="n">metadata_node</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;preserve&quot;</span><span class="p">,</span> <span class="s2">&quot;0&quot;</span><span class="p">)</span>
+            <span class="n">preserve</span> <span class="o">=</span> <span class="n">preserve_str</span> <span class="o">!=</span> <span class="s2">&quot;0&quot;</span> <span class="ow">and</span> <span class="n">preserve_str</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">&quot;false&quot;</span>
+            <span class="n">datatype</span> <span class="o">=</span> <span class="n">metadata_node</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">metadata_node</span><span class="o">.</span><span class="n">text</span>
+            <span class="n">scene_metadata</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">MetadataEntry</span><span class="p">(</span>
+                <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">preserve</span><span class="o">=</span><span class="n">preserve</span><span class="p">,</span> <span class="n">datatype</span><span class="o">=</span><span class="n">datatype</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">value</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
+            <span class="n">on_progress</span><span class="p">(</span><span class="mi">30</span><span class="p">,</span> <span class="s2">&quot;Reading materials…&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Materials.</span>
+        <span class="k">if</span> <span class="n">ctx</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">import_materials</span> <span class="o">!=</span> <span class="s2">&quot;NONE&quot;</span><span class="p">:</span>
+            <span class="n">material_ns</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;m&quot;</span><span class="p">:</span> <span class="n">MATERIAL_NAMESPACE</span><span class="p">}</span>
+            <span class="n">pbr_metallic</span> <span class="o">=</span> <span class="n">_read_pbr_metallic_impl</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">root</span><span class="p">,</span> <span class="n">material_ns</span><span class="p">)</span>
+            <span class="n">pbr_specular</span> <span class="o">=</span> <span class="n">_read_pbr_specular_impl</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">root</span><span class="p">,</span> <span class="n">material_ns</span><span class="p">)</span>
+            <span class="n">pbr_translucent</span> <span class="o">=</span> <span class="n">_read_pbr_translucent_impl</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">root</span><span class="p">,</span> <span class="n">material_ns</span><span class="p">)</span>
+            <span class="n">_read_pbr_texture_display_impl</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">root</span><span class="p">,</span> <span class="n">material_ns</span><span class="p">)</span>
+
+            <span class="n">display_properties</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">display_properties</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">pbr_metallic</span><span class="p">)</span>
+            <span class="n">display_properties</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">pbr_specular</span><span class="p">)</span>
+            <span class="n">display_properties</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">pbr_translucent</span><span class="p">)</span>
+
+            <span class="n">_read_materials_impl</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">root</span><span class="p">,</span> <span class="n">material_ns</span><span class="p">,</span> <span class="n">display_properties</span><span class="p">)</span>
+            <span class="n">_read_textures_impl</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">root</span><span class="p">,</span> <span class="n">material_ns</span><span class="p">)</span>
+            <span class="n">_read_texture_groups_impl</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">root</span><span class="p">,</span> <span class="n">material_ns</span><span class="p">,</span> <span class="n">display_properties</span><span class="p">)</span>
+            <span class="n">_read_composite_impl</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">root</span><span class="p">,</span> <span class="n">material_ns</span><span class="p">)</span>
+            <span class="n">_read_multiproperties_impl</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">root</span><span class="p">,</span> <span class="n">material_ns</span><span class="p">)</span>
+
+        <span class="c1"># Extract textures.</span>
+        <span class="n">_extract_textures_impl</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">filepath</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
+            <span class="n">on_progress</span><span class="p">(</span><span class="mi">45</span><span class="p">,</span> <span class="s2">&quot;Reading geometry…&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Objects.</span>
+        <span class="n">geometry_mod</span><span class="o">.</span><span class="n">read_objects</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">root</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
+            <span class="n">on_progress</span><span class="p">(</span><span class="mi">60</span><span class="p">,</span> <span class="s2">&quot;Building Blender objects…&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Build items (pass progress_callback through if available).</span>
+        <span class="n">builder_mod</span><span class="o">.</span><span class="n">build_items</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">root</span><span class="p">,</span> <span class="n">scale_unit</span><span class="p">,</span> <span class="n">progress_callback</span><span class="o">=</span><span class="n">on_progress</span><span class="p">)</span>
+
+    <span class="c1"># Fire on_object_created for each built object.</span>
+    <span class="k">if</span> <span class="n">on_object_created</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">ctx</span><span class="o">.</span><span class="n">imported_objects</span><span class="p">:</span>
+            <span class="n">on_object_created</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)))</span>
+
+    <span class="c1"># Store scene data.</span>
+    <span class="n">scene_metadata</span><span class="o">.</span><span class="n">store</span><span class="p">(</span><span class="n">bpy</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">scene</span><span class="p">)</span>
+    <span class="n">annotations_obj</span><span class="o">.</span><span class="n">store</span><span class="p">()</span>
+    <span class="n">_store_passthrough_impl</span><span class="p">(</span><span class="n">ctx</span><span class="p">)</span>
+
+    <span class="c1"># Grid layout.</span>
+    <span class="k">if</span> <span class="n">ctx</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">import_location</span> <span class="o">==</span> <span class="s2">&quot;GRID&quot;</span><span class="p">:</span>
+        <span class="n">apply_grid_layout</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">imported_objects</span><span class="p">,</span> <span class="n">ctx</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">grid_spacing</span><span class="p">)</span>
+
+    <span class="c1"># Restore original collection.</span>
+    <span class="n">bpy</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">view_layer</span><span class="o">.</span><span class="n">active_layer_collection</span> <span class="o">=</span> <span class="n">original_collection</span>
+
+    <span class="n">result</span><span class="o">.</span><span class="n">num_loaded</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">num_loaded</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">objects</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">imported_objects</span><span class="p">)</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;FINISHED&quot;</span>
+
+    <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
+        <span class="n">on_progress</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;Import complete&quot;</span><span class="p">)</span>
+
+    <span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;API: Imported </span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">num_loaded</span><span class="si">}</span><span class="s2"> objects from </span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<span class="c1"># ═══════════════════════════════════════════════════════════════════════════</span>
+<span class="c1"># export_3mf</span>
+<span class="c1"># ═══════════════════════════════════════════════════════════════════════════</span>
+
+<div class="viewcode-block" id="export_3mf">
+<a class="viewcode-back" href="../../api.html#io_mesh_3mf.api.export_3mf">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">export_3mf</span><span class="p">(</span>
+    <span class="n">filepath</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">objects</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">use_selection</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">export_hidden</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">skip_disabled</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">global_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">use_mesh_modifiers</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">coordinate_precision</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">9</span><span class="p">,</span>
+    <span class="n">compression_level</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
+    <span class="n">use_orca_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;AUTO&quot;</span><span class="p">,</span>
+    <span class="n">use_components</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">mmu_slicer_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ORCA&quot;</span><span class="p">,</span>
+    <span class="n">subdivision_depth</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">7</span><span class="p">,</span>
+    <span class="n">thumbnail_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;AUTO&quot;</span><span class="p">,</span>
+    <span class="n">thumbnail_resolution</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">256</span><span class="p">,</span>
+    <span class="n">thumbnail_image</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+    <span class="n">project_template</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">object_settings</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">on_progress</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ProgressCallback</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">on_warning</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">WarningCallback</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExportResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Export Blender objects to a 3MF file.</span>
+
+<span class="sd">    This is the headless/programmatic counterpart to the ``Export3MF``</span>
+<span class="sd">    operator.  It skips UI-specific behaviour (progress bars, status text)</span>
+<span class="sd">    but runs the exact same export pipeline.</span>
+
+<span class="sd">    :param filepath: Destination path for the ``.3mf`` file.</span>
+<span class="sd">    :param objects: Explicit list of ``bpy.types.Object`` to export.</span>
+<span class="sd">        If *None*, falls back to ``use_selection`` logic or all scene objects.</span>
+<span class="sd">    :param use_selection: Export selected objects only (ignored when *objects* is given).</span>
+<span class="sd">    :param export_hidden: Include hidden objects.</span>
+<span class="sd">    :param skip_disabled: Skip objects disabled for rendering (camera icon)</span>
+<span class="sd">        and objects in excluded/hidden collections (default *True*).</span>
+<span class="sd">    :param global_scale: Scale multiplier (default 1.0).</span>
+<span class="sd">    :param use_mesh_modifiers: Apply modifiers before exporting.</span>
+<span class="sd">    :param coordinate_precision: Decimal precision for vertex coordinates.</span>
+<span class="sd">    :param compression_level: ZIP deflate compression level (0–9, default 3).</span>
+<span class="sd">        0 = no compression (fastest, largest), 9 = max compression (slowest,</span>
+<span class="sd">        smallest). 3 balances speed and file size.</span>
+<span class="sd">    :param use_orca_format: ``&quot;AUTO&quot;`` | ``&quot;STANDARD&quot;`` | ``&quot;PAINT&quot;``.</span>
+<span class="sd">        ``AUTO`` (default) detects materials and paint data, choosing the</span>
+<span class="sd">        best exporter automatically.  ``STANDARD`` always uses the</span>
+<span class="sd">        spec-compliant StandardExporter with proper component instancing.</span>
+<span class="sd">        ``PAINT`` forces segmentation export.  When *project_template* or</span>
+<span class="sd">        *object_settings* is provided, the Orca exporter is used</span>
+<span class="sd">        automatically even in ``AUTO`` mode.</span>
+<span class="sd">    :param use_components: Use component instances for linked duplicates.</span>
+<span class="sd">    :param mmu_slicer_format: ``&quot;ORCA&quot;`` | ``&quot;PRUSA&quot;`` (only relevant when</span>
+<span class="sd">        *use_orca_format* is ``&quot;PAINT&quot;``).</span>
+<span class="sd">    :param subdivision_depth: Maximum recursive subdivision depth for paint</span>
+<span class="sd">        segmentation (4–10, default 7). Higher = finer detail but slower.</span>
+<span class="sd">    :param thumbnail_mode: ``&quot;AUTO&quot;`` (render clean preview), ``&quot;CUSTOM&quot;``</span>
+<span class="sd">        (use *thumbnail_image*), or ``&quot;NONE&quot;`` (no thumbnail).</span>
+<span class="sd">    :param thumbnail_resolution: Width and height in pixels for AUTO mode</span>
+<span class="sd">        (default 256).</span>
+<span class="sd">    :param thumbnail_image: Absolute path to an image file for CUSTOM mode.</span>
+<span class="sd">    :param project_template: Absolute path to a JSON file to use as the Orca</span>
+<span class="sd">        ``project_settings.config`` instead of the built-in template.  The</span>
+<span class="sd">        addon loads this file, patches ``filament_colour`` and resizes</span>
+<span class="sd">        filament arrays to match the export, then writes it to the archive.</span>
+<span class="sd">        If the file does not exist or is invalid JSON, a warning is logged</span>
+<span class="sd">        and the built-in template is used as a fallback.  Only relevant for</span>
+<span class="sd">        Orca/BambuStudio exports (``mmu_slicer_format=&quot;ORCA&quot;``).</span>
+<span class="sd">    :param object_settings: Per-object Orca Slicer setting overrides.</span>
+<span class="sd">        A dict mapping ``bpy.types.Object`` instances to dicts of</span>
+<span class="sd">        ``{setting_key: value_string}`` pairs.  These are written as</span>
+<span class="sd">        ``&lt;metadata&gt;`` entries in ``model_settings.config`` so that Orca</span>
+<span class="sd">        applies different print settings to individual objects.  Keys are</span>
+<span class="sd">        passed through without validation — any valid Orca setting key</span>
+<span class="sd">        (e.g. ``&quot;layer_height&quot;``, ``&quot;wall_loops&quot;``, ``&quot;sparse_infill_speed&quot;``)</span>
+<span class="sd">        is accepted.  Objects not present in this dict use project defaults.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">            object_settings={</span>
+<span class="sd">                supports_obj: {</span>
+<span class="sd">                    &quot;layer_height&quot;: &quot;0.12&quot;,</span>
+<span class="sd">                    &quot;wall_loops&quot;: &quot;2&quot;,</span>
+<span class="sd">                    &quot;sparse_infill_speed&quot;: &quot;50&quot;,</span>
+<span class="sd">                },</span>
+<span class="sd">                # other objects use project defaults</span>
+<span class="sd">            }</span>
+
+<span class="sd">    :param on_progress: Optional ``(percentage: int, message: str)`` callback.</span>
+<span class="sd">    :param on_warning: Optional ``(message: str)`` callback for warnings.</span>
+<span class="sd">    :return: :class:`ExportResult` with status, written count, and filepath.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.export_3mf.context</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportContext</span><span class="p">,</span> <span class="n">ExportOptions</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.export_3mf.archive</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_archive</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.export_3mf.components</span><span class="w"> </span><span class="kn">import</span> <span class="n">collect_mesh_objects</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.export_3mf.geometry</span><span class="w"> </span><span class="kn">import</span> <span class="n">check_non_manifold_geometry</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.export_3mf.standard</span><span class="w"> </span><span class="kn">import</span> <span class="n">StandardExporter</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.export_3mf.orca</span><span class="w"> </span><span class="kn">import</span> <span class="n">OrcaExporter</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.export_3mf.prusa</span><span class="w"> </span><span class="kn">import</span> <span class="n">PrusaExporter</span>
+
+    <span class="n">filepath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">ExportResult</span><span class="p">(</span><span class="n">filepath</span><span class="o">=</span><span class="n">filepath</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
+        <span class="n">on_progress</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;Starting export…&quot;</span><span class="p">)</span>
+
+    <span class="n">options</span> <span class="o">=</span> <span class="n">ExportOptions</span><span class="p">(</span>
+        <span class="n">use_selection</span><span class="o">=</span><span class="n">use_selection</span><span class="p">,</span>
+        <span class="n">export_hidden</span><span class="o">=</span><span class="n">export_hidden</span><span class="p">,</span>
+        <span class="n">skip_disabled</span><span class="o">=</span><span class="n">skip_disabled</span><span class="p">,</span>
+        <span class="n">global_scale</span><span class="o">=</span><span class="n">global_scale</span><span class="p">,</span>
+        <span class="n">use_mesh_modifiers</span><span class="o">=</span><span class="n">use_mesh_modifiers</span><span class="p">,</span>
+        <span class="n">coordinate_precision</span><span class="o">=</span><span class="n">coordinate_precision</span><span class="p">,</span>
+        <span class="n">compression_level</span><span class="o">=</span><span class="n">compression_level</span><span class="p">,</span>
+        <span class="n">use_orca_format</span><span class="o">=</span><span class="n">use_orca_format</span><span class="p">,</span>
+        <span class="n">use_components</span><span class="o">=</span><span class="n">use_components</span><span class="p">,</span>
+        <span class="n">mmu_slicer_format</span><span class="o">=</span><span class="n">mmu_slicer_format</span><span class="p">,</span>
+        <span class="n">subdivision_depth</span><span class="o">=</span><span class="n">subdivision_depth</span><span class="p">,</span>
+        <span class="n">thumbnail_mode</span><span class="o">=</span><span class="n">thumbnail_mode</span><span class="p">,</span>
+        <span class="n">thumbnail_resolution</span><span class="o">=</span><span class="n">thumbnail_resolution</span><span class="p">,</span>
+        <span class="n">thumbnail_image</span><span class="o">=</span><span class="n">thumbnail_image</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">ctx</span> <span class="o">=</span> <span class="n">ExportContext</span><span class="p">(</span>
+        <span class="n">options</span><span class="o">=</span><span class="n">options</span><span class="p">,</span>
+        <span class="n">operator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">filepath</span><span class="o">=</span><span class="n">filepath</span><span class="p">,</span>
+        <span class="n">extension_manager</span><span class="o">=</span><span class="n">ExtensionManager</span><span class="p">(),</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Wire up custom project template path.</span>
+    <span class="k">if</span> <span class="n">project_template</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">project_template_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">project_template</span><span class="p">)</span>
+
+    <span class="c1"># Wire up per-object setting overrides (convert Object keys to name strings).</span>
+    <span class="k">if</span> <span class="n">object_settings</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">obj</span><span class="p">,</span> <span class="n">settings_dict</span> <span class="ow">in</span> <span class="n">object_settings</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">obj_name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+            <span class="n">ctx</span><span class="o">.</span><span class="n">object_settings</span><span class="p">[</span><span class="n">obj_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="nb">str</span><span class="p">(</span><span class="n">k</span><span class="p">):</span> <span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">settings_dict</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="p">}</span>
+
+    <span class="c1"># Wire up warning callback.</span>
+    <span class="k">if</span> <span class="n">on_warning</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">_original_safe_report</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">safe_report</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_intercepted_safe_report</span><span class="p">(</span><span class="n">level</span><span class="p">,</span> <span class="n">message</span><span class="p">):</span>
+            <span class="n">_original_safe_report</span><span class="p">(</span><span class="n">level</span><span class="p">,</span> <span class="n">message</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s2">&quot;WARNING&quot;</span> <span class="ow">in</span> <span class="n">level</span><span class="p">:</span>
+                <span class="n">on_warning</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+
+        <span class="n">ctx</span><span class="o">.</span><span class="n">safe_report</span> <span class="o">=</span> <span class="n">_intercepted_safe_report</span>  <span class="c1"># type: ignore[assignment]</span>
+
+    <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
+        <span class="n">on_progress</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="s2">&quot;Creating archive…&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Create archive.</span>
+    <span class="n">archive</span> <span class="o">=</span> <span class="n">create_archive</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="n">ctx</span><span class="o">.</span><span class="n">safe_report</span><span class="p">,</span> <span class="n">ctx</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">compression_level</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">archive</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;CANCELLED&quot;</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="c1"># Determine objects to export.</span>
+    <span class="n">context</span> <span class="o">=</span> <span class="n">bpy</span><span class="o">.</span><span class="n">context</span>
+    <span class="k">if</span> <span class="n">objects</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">blender_objects</span> <span class="o">=</span> <span class="n">objects</span>
+    <span class="k">elif</span> <span class="n">use_selection</span><span class="p">:</span>
+        <span class="n">blender_objects</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">selected_objects</span>
+        <span class="n">mesh_objects</span> <span class="o">=</span> <span class="n">collect_mesh_objects</span><span class="p">(</span><span class="n">blender_objects</span><span class="p">,</span> <span class="n">export_hidden</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">mesh_objects</span><span class="p">:</span>
+            <span class="n">error</span><span class="p">(</span><span class="s2">&quot;Export cancelled: No mesh objects in selection&quot;</span><span class="p">)</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;CANCELLED&quot;</span>
+            <span class="k">return</span> <span class="n">result</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">blender_objects</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">scene</span><span class="o">.</span><span class="n">objects</span>
+
+    <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
+        <span class="n">on_progress</span><span class="p">(</span><span class="mi">20</span><span class="p">,</span> <span class="s2">&quot;Checking geometry…&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Non-manifold check.</span>
+    <span class="c1"># Use collect_mesh_objects to walk into Empty hierarchies (e.g. when</span>
+    <span class="c1"># the caller passes a parent Empty grouping several mesh children).</span>
+    <span class="n">mesh_objects</span> <span class="o">=</span> <span class="n">collect_mesh_objects</span><span class="p">(</span><span class="n">blender_objects</span><span class="p">,</span> <span class="n">export_hidden</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">mesh_objects</span><span class="p">:</span>
+        <span class="n">non_manifold</span> <span class="o">=</span> <span class="n">check_non_manifold_geometry</span><span class="p">(</span><span class="n">mesh_objects</span><span class="p">,</span> <span class="n">use_mesh_modifiers</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">non_manifold</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Non-manifold geometry detected in: </span><span class="si">{</span><span class="n">non_manifold</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="n">warn</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="s2">&quot;Exported geometry contains non-manifold issues.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">on_warning</span><span class="p">:</span>
+                <span class="n">on_warning</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
+        <span class="n">on_progress</span><span class="p">(</span><span class="mi">30</span><span class="p">,</span> <span class="s2">&quot;Writing 3MF data…&quot;</span><span class="p">)</span>
+
+    <span class="n">scale</span> <span class="o">=</span> <span class="n">export_unit_scale</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">global_scale</span><span class="p">)</span>
+
+    <span class="c1"># Check if any mesh has materials assigned.</span>
+    <span class="c1"># Must check EVALUATED objects because Geometry Nodes &quot;Set Material&quot;</span>
+    <span class="c1"># nodes only create material slots on the evaluated depsgraph copy.</span>
+    <span class="c1"># We detect ANY material (not just multi-material) because slicers</span>
+    <span class="c1"># like Orca/BambuStudio ignore core-spec &lt;basematerials&gt; and only</span>
+    <span class="c1"># read the Orca-style colorgroup/paint_color attributes written by</span>
+    <span class="c1"># OrcaExporter.</span>
+    <span class="n">has_materials</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">if</span> <span class="n">mesh_objects</span> <span class="ow">and</span> <span class="n">use_mesh_modifiers</span><span class="p">:</span>
+        <span class="n">depsgraph</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">evaluated_depsgraph_get</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">mesh_objects</span><span class="p">:</span>
+            <span class="n">eval_obj</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="n">evaluated_get</span><span class="p">(</span><span class="n">depsgraph</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">eval_obj</span><span class="o">.</span><span class="n">material_slots</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">has_materials</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="k">break</span>
+    <span class="k">elif</span> <span class="n">mesh_objects</span><span class="p">:</span>
+        <span class="n">has_materials</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">material_slots</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">mesh_objects</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Dispatch to exporter.</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">use_orca_format</span> <span class="o">==</span> <span class="s2">&quot;PAINT&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">mmu_slicer_format</span> <span class="o">==</span> <span class="s2">&quot;ORCA&quot;</span><span class="p">:</span>
+                <span class="n">exporter</span> <span class="o">=</span> <span class="n">OrcaExporter</span><span class="p">(</span><span class="n">ctx</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">ctx</span><span class="o">.</span><span class="n">project_template_path</span> <span class="ow">or</span> <span class="n">ctx</span><span class="o">.</span><span class="n">object_settings</span><span class="p">:</span>
+                    <span class="n">warn</span><span class="p">(</span>
+                        <span class="s2">&quot;project_template and object_settings are Orca-specific &quot;</span>
+                        <span class="s2">&quot;features and will be ignored for PrusaSlicer export&quot;</span>
+                    <span class="p">)</span>
+                <span class="n">exporter</span> <span class="o">=</span> <span class="n">PrusaExporter</span><span class="p">(</span><span class="n">ctx</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">use_orca_format</span> <span class="o">==</span> <span class="s2">&quot;STANDARD&quot;</span><span class="p">:</span>
+            <span class="c1"># Explicit standard mode — always spec-compliant</span>
+            <span class="n">debug</span><span class="p">(</span><span class="s2">&quot;API: Standard mode requested, using StandardExporter&quot;</span><span class="p">)</span>
+            <span class="n">exporter</span> <span class="o">=</span> <span class="n">StandardExporter</span><span class="p">(</span><span class="n">ctx</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># AUTO mode</span>
+            <span class="k">if</span> <span class="n">ctx</span><span class="o">.</span><span class="n">project_template_path</span> <span class="ow">or</span> <span class="n">ctx</span><span class="o">.</span><span class="n">object_settings</span><span class="p">:</span>
+                <span class="n">exporter</span> <span class="o">=</span> <span class="n">OrcaExporter</span><span class="p">(</span><span class="n">ctx</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Check for MMU paint textures</span>
+                <span class="n">has_paint</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span>
+                    <span class="n">obj</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;3mf_is_paint_texture&quot;</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">mesh_objects</span>
+                    <span class="k">if</span> <span class="n">obj</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;MESH&quot;</span> <span class="ow">and</span> <span class="n">obj</span><span class="o">.</span><span class="n">data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="n">has_paint</span><span class="p">:</span>
+                    <span class="n">debug</span><span class="p">(</span><span class="s2">&quot;API AUTO: paint textures detected — promoting to PAINT mode&quot;</span><span class="p">)</span>
+                    <span class="n">ctx</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">use_orca_format</span> <span class="o">=</span> <span class="s2">&quot;PAINT&quot;</span>
+                    <span class="k">if</span> <span class="n">mmu_slicer_format</span> <span class="o">==</span> <span class="s2">&quot;ORCA&quot;</span><span class="p">:</span>
+                        <span class="n">exporter</span> <span class="o">=</span> <span class="n">OrcaExporter</span><span class="p">(</span><span class="n">ctx</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">exporter</span> <span class="o">=</span> <span class="n">PrusaExporter</span><span class="p">(</span><span class="n">ctx</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">has_materials</span><span class="p">:</span>
+                    <span class="n">debug</span><span class="p">(</span><span class="s2">&quot;API AUTO: materials detected, using OrcaExporter&quot;</span><span class="p">)</span>
+                    <span class="n">exporter</span> <span class="o">=</span> <span class="n">OrcaExporter</span><span class="p">(</span><span class="n">ctx</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">exporter</span> <span class="o">=</span> <span class="n">StandardExporter</span><span class="p">(</span><span class="n">ctx</span><span class="p">)</span>
+
+        <span class="n">status_set</span> <span class="o">=</span> <span class="n">exporter</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">archive</span><span class="p">,</span> <span class="n">blender_objects</span><span class="p">,</span> <span class="n">scale</span><span class="p">)</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">status_set</span><span class="p">))</span> <span class="k">if</span> <span class="n">status_set</span> <span class="k">else</span> <span class="s2">&quot;FINISHED&quot;</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Export failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;CANCELLED&quot;</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="n">result</span><span class="o">.</span><span class="n">num_written</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">num_written</span>
+
+    <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
+        <span class="n">on_progress</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;Export complete&quot;</span><span class="p">)</span>
+
+    <span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;API: Exported </span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">num_written</span><span class="si">}</span><span class="s2"> objects to </span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<span class="c1"># ═══════════════════════════════════════════════════════════════════════════</span>
+<span class="c1"># batch_import / batch_export</span>
+<span class="c1"># ═══════════════════════════════════════════════════════════════════════════</span>
+
+<div class="viewcode-block" id="batch_import">
+<a class="viewcode-back" href="../../api.html#io_mesh_3mf.api.batch_import">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">batch_import</span><span class="p">(</span>
+    <span class="n">filepaths</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">on_progress</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ProgressCallback</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">on_warning</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">WarningCallback</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">on_object_created</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ObjectCreatedCallback</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">import_kwargs</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">ImportResult</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Import multiple 3MF files in sequence with per-file error isolation.</span>
+
+<span class="sd">    Each file is imported independently — a failure in one file does not</span>
+<span class="sd">    prevent the others from being processed.  All keyword arguments</span>
+<span class="sd">    supported by :func:`import_3mf` can be passed via ``**import_kwargs``</span>
+<span class="sd">    and will be applied to every file.</span>
+
+<span class="sd">    :param filepaths: Sequence of ``.3mf`` file paths to import.</span>
+<span class="sd">    :param on_progress: Optional global progress callback.  Receives</span>
+<span class="sd">        ``(percentage, message)`` where percentage spans 0-100 across</span>
+<span class="sd">        *all* files.</span>
+<span class="sd">    :param on_warning: Warning callback forwarded to each :func:`import_3mf` call.</span>
+<span class="sd">    :param on_object_created: Object-created callback forwarded to each call.</span>
+<span class="sd">    :param import_kwargs: Keyword arguments forwarded to :func:`import_3mf`.</span>
+<span class="sd">    :return: List of :class:`ImportResult`, one per input file (same order).</span>
+
+<span class="sd">    Example::</span>
+
+<span class="sd">        results = batch_import(</span>
+<span class="sd">            [&quot;a.3mf&quot;, &quot;b.3mf&quot;, &quot;c.3mf&quot;],</span>
+<span class="sd">            import_materials=&quot;PAINT&quot;,</span>
+<span class="sd">            target_collection=&quot;Imports&quot;,</span>
+<span class="sd">        )</span>
+<span class="sd">        total = sum(r.num_loaded for r in results)</span>
+<span class="sd">        print(f&quot;Imported {total} objects total&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">results</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">ImportResult</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">total</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">filepaths</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">fp</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">filepaths</span><span class="p">):</span>
+        <span class="c1"># Per-file progress wrapper.</span>
+        <span class="n">file_progress</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ProgressCallback</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
+            <span class="n">base_pct</span> <span class="o">=</span> <span class="nb">int</span><span class="p">((</span><span class="n">idx</span> <span class="o">/</span> <span class="n">total</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span>
+            <span class="n">span_pct</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mi">100</span> <span class="o">/</span> <span class="n">total</span><span class="p">)</span> <span class="k">if</span> <span class="n">total</span> <span class="k">else</span> <span class="mi">100</span>
+
+            <span class="k">def</span><span class="w"> </span><span class="nf">_file_progress</span><span class="p">(</span><span class="n">pct</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">_base</span><span class="o">=</span><span class="n">base_pct</span><span class="p">,</span> <span class="n">_span</span><span class="o">=</span><span class="n">span_pct</span><span class="p">):</span>
+                <span class="n">overall</span> <span class="o">=</span> <span class="n">_base</span> <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">pct</span> <span class="o">*</span> <span class="n">_span</span> <span class="o">/</span> <span class="mi">100</span><span class="p">)</span>
+                <span class="n">on_progress</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">overall</span><span class="p">,</span> <span class="mi">100</span><span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">idx</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">total</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="n">msg</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="n">file_progress</span> <span class="o">=</span> <span class="n">_file_progress</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">r</span> <span class="o">=</span> <span class="n">import_3mf</span><span class="p">(</span>
+                <span class="n">fp</span><span class="p">,</span>
+                <span class="n">on_progress</span><span class="o">=</span><span class="n">file_progress</span><span class="p">,</span>
+                <span class="n">on_warning</span><span class="o">=</span><span class="n">on_warning</span><span class="p">,</span>
+                <span class="n">on_object_created</span><span class="o">=</span><span class="n">on_object_created</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">import_kwargs</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;batch_import: Failed on </span><span class="si">{</span><span class="n">fp</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">r</span> <span class="o">=</span> <span class="n">ImportResult</span><span class="p">(</span><span class="n">status</span><span class="o">=</span><span class="s2">&quot;CANCELLED&quot;</span><span class="p">,</span> <span class="n">warnings</span><span class="o">=</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)])</span>
+        <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
+        <span class="n">on_progress</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;Batch import complete&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">results</span></div>
+
+
+
+<div class="viewcode-block" id="batch_export">
+<a class="viewcode-back" href="../../api.html#io_mesh_3mf.api.batch_export">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">batch_export</span><span class="p">(</span>
+    <span class="n">items</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]]],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">on_progress</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ProgressCallback</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">on_warning</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">WarningCallback</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">export_kwargs</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">ExportResult</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Export multiple 3MF files in sequence with per-file error isolation.</span>
+
+<span class="sd">    Each item is a ``(filepath, objects)`` tuple.  If *objects* is ``None``,</span>
+<span class="sd">    the export falls back to the ``use_selection`` / all-scene logic from</span>
+<span class="sd">    :func:`export_3mf`.</span>
+
+<span class="sd">    :param items: Sequence of ``(filepath, objects_or_None)`` tuples.</span>
+<span class="sd">    :param on_progress: Optional global progress callback.</span>
+<span class="sd">    :param on_warning: Warning callback forwarded to each :func:`export_3mf` call.</span>
+<span class="sd">    :param export_kwargs: Keyword arguments forwarded to :func:`export_3mf`.</span>
+<span class="sd">    :return: List of :class:`ExportResult`, one per item (same order).</span>
+
+<span class="sd">    Example::</span>
+
+<span class="sd">        cubes = [o for o in bpy.data.objects if &quot;Cube&quot; in o.name]</span>
+<span class="sd">        spheres = [o for o in bpy.data.objects if &quot;Sphere&quot; in o.name]</span>
+<span class="sd">        results = batch_export([</span>
+<span class="sd">            (&quot;cubes.3mf&quot;, cubes),</span>
+<span class="sd">            (&quot;spheres.3mf&quot;, spheres),</span>
+<span class="sd">        ], use_orca_format=&quot;AUTO&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">results</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">ExportResult</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">total</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">items</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="p">(</span><span class="n">fp</span><span class="p">,</span> <span class="n">objs</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">items</span><span class="p">):</span>
+        <span class="n">file_progress</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ProgressCallback</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
+            <span class="n">base_pct</span> <span class="o">=</span> <span class="nb">int</span><span class="p">((</span><span class="n">idx</span> <span class="o">/</span> <span class="n">total</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span>
+            <span class="n">span_pct</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mi">100</span> <span class="o">/</span> <span class="n">total</span><span class="p">)</span> <span class="k">if</span> <span class="n">total</span> <span class="k">else</span> <span class="mi">100</span>
+
+            <span class="k">def</span><span class="w"> </span><span class="nf">_file_progress</span><span class="p">(</span><span class="n">pct</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">_base</span><span class="o">=</span><span class="n">base_pct</span><span class="p">,</span> <span class="n">_span</span><span class="o">=</span><span class="n">span_pct</span><span class="p">):</span>
+                <span class="n">overall</span> <span class="o">=</span> <span class="n">_base</span> <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">pct</span> <span class="o">*</span> <span class="n">_span</span> <span class="o">/</span> <span class="mi">100</span><span class="p">)</span>
+                <span class="n">on_progress</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">overall</span><span class="p">,</span> <span class="mi">100</span><span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">idx</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">total</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="n">msg</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="n">file_progress</span> <span class="o">=</span> <span class="n">_file_progress</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">r</span> <span class="o">=</span> <span class="n">export_3mf</span><span class="p">(</span>
+                <span class="n">fp</span><span class="p">,</span>
+                <span class="n">objects</span><span class="o">=</span><span class="n">objs</span><span class="p">,</span>
+                <span class="n">on_progress</span><span class="o">=</span><span class="n">file_progress</span><span class="p">,</span>
+                <span class="n">on_warning</span><span class="o">=</span><span class="n">on_warning</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">export_kwargs</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;batch_export: Failed on </span><span class="si">{</span><span class="n">fp</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">r</span> <span class="o">=</span> <span class="n">ExportResult</span><span class="p">(</span><span class="n">status</span><span class="o">=</span><span class="s2">&quot;CANCELLED&quot;</span><span class="p">,</span> <span class="n">filepath</span><span class="o">=</span><span class="n">fp</span><span class="p">,</span> <span class="n">warnings</span><span class="o">=</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)])</span>
+        <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
+        <span class="n">on_progress</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;Batch export complete&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">results</span></div>
+
+
+
+<span class="c1"># ═══════════════════════════════════════════════════════════════════════════</span>
+<span class="c1"># Internal helpers</span>
+<span class="c1"># ═══════════════════════════════════════════════════════════════════════════</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_find_layer_collection</span><span class="p">(</span>
+    <span class="n">layer_collection</span><span class="p">,</span>
+    <span class="n">target_collection</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Recursively find the LayerCollection wrapping *target_collection*.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">layer_collection</span><span class="o">.</span><span class="n">collection</span> <span class="o">==</span> <span class="n">target_collection</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">layer_collection</span>
+    <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="n">layer_collection</span><span class="o">.</span><span class="n">children</span><span class="p">:</span>
+        <span class="n">found</span> <span class="o">=</span> <span class="n">_find_layer_collection</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">target_collection</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">found</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">found</span>
+    <span class="k">return</span> <span class="kc">None</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_resolve_prefixes</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">prefixes_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Resolve extension prefix strings to namespace URIs.&quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.common.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">PRODUCTION_NAMESPACE</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">prefixes_str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">prefix_to_ns</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">attr_name</span><span class="p">,</span> <span class="n">attr_value</span> <span class="ow">in</span> <span class="n">root</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">attr_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;{&quot;</span><span class="p">):</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">attr_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;xmlns:&quot;</span><span class="p">):</span>
+            <span class="n">prefix_to_ns</span><span class="p">[</span><span class="n">attr_name</span><span class="p">[</span><span class="mi">6</span><span class="p">:]]</span> <span class="o">=</span> <span class="n">attr_value</span>
+    <span class="n">known</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;p&quot;</span><span class="p">:</span> <span class="n">PRODUCTION_NAMESPACE</span><span class="p">,</span>
+        <span class="s2">&quot;m&quot;</span><span class="p">:</span> <span class="s2">&quot;http://schemas.microsoft.com/3dmanufacturing/material/2015/02&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;slic3rpe&quot;</span><span class="p">:</span> <span class="s2">&quot;http://schemas.slic3r.org/3mf/2017/06&quot;</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="n">prefix_to_ns</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">known</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">prefix_to_ns</span><span class="p">})</span>
+    <span class="n">resolved</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">prefix</span> <span class="ow">in</span> <span class="n">prefixes_str</span><span class="o">.</span><span class="n">split</span><span class="p">():</span>
+        <span class="n">prefix</span> <span class="o">=</span> <span class="n">prefix</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">prefix</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">prefix</span> <span class="ow">in</span> <span class="n">prefix_to_ns</span><span class="p">:</span>
+            <span class="n">resolved</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">prefix_to_ns</span><span class="p">[</span><span class="n">prefix</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">resolved</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">resolved</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_inspect_materials</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">result</span><span class="p">:</span> <span class="n">InspectResult</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Scan material resources for inspect_3mf without creating Blender data.&quot;&quot;&quot;</span>
+    <span class="n">mat_ns</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;m&quot;</span><span class="p">:</span> <span class="n">MATERIAL_NAMESPACE</span><span class="p">}</span>
+
+    <span class="c1"># basematerials</span>
+    <span class="k">for</span> <span class="n">bm_node</span> <span class="ow">in</span> <span class="n">root</span><span class="o">.</span><span class="n">iterfind</span><span class="p">(</span>
+        <span class="s2">&quot;./3mf:resources/m:basematerials&quot;</span><span class="p">,</span> <span class="p">{</span><span class="o">**</span><span class="n">MODEL_NAMESPACES</span><span class="p">,</span> <span class="o">**</span><span class="n">mat_ns</span><span class="p">}</span>
+    <span class="p">):</span>
+        <span class="n">mat_id</span> <span class="o">=</span> <span class="n">bm_node</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="n">bases</span> <span class="o">=</span> <span class="n">bm_node</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s2">&quot;m:base&quot;</span><span class="p">,</span> <span class="n">mat_ns</span><span class="p">)</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">materials</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">mat_id</span><span class="p">,</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;basematerials&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">bases</span><span class="p">),</span>
+        <span class="p">})</span>
+
+    <span class="c1"># colorgroups</span>
+    <span class="k">for</span> <span class="n">cg_node</span> <span class="ow">in</span> <span class="n">root</span><span class="o">.</span><span class="n">iterfind</span><span class="p">(</span>
+        <span class="s2">&quot;./3mf:resources/m:colorgroup&quot;</span><span class="p">,</span> <span class="p">{</span><span class="o">**</span><span class="n">MODEL_NAMESPACES</span><span class="p">,</span> <span class="o">**</span><span class="n">mat_ns</span><span class="p">}</span>
+    <span class="p">):</span>
+        <span class="n">cg_id</span> <span class="o">=</span> <span class="n">cg_node</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="n">colors</span> <span class="o">=</span> <span class="n">cg_node</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s2">&quot;m:color&quot;</span><span class="p">,</span> <span class="n">mat_ns</span><span class="p">)</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">materials</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">cg_id</span><span class="p">,</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;colorgroup&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">colors</span><span class="p">),</span>
+        <span class="p">})</span>
+
+    <span class="c1"># texture2dgroups</span>
+    <span class="k">for</span> <span class="n">tg_node</span> <span class="ow">in</span> <span class="n">root</span><span class="o">.</span><span class="n">iterfind</span><span class="p">(</span>
+        <span class="s2">&quot;./3mf:resources/m:texture2dgroup&quot;</span><span class="p">,</span> <span class="p">{</span><span class="o">**</span><span class="n">MODEL_NAMESPACES</span><span class="p">,</span> <span class="o">**</span><span class="n">mat_ns</span><span class="p">}</span>
+    <span class="p">):</span>
+        <span class="n">tg_id</span> <span class="o">=</span> <span class="n">tg_node</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="n">coords</span> <span class="o">=</span> <span class="n">tg_node</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s2">&quot;m:tex2coord&quot;</span><span class="p">,</span> <span class="n">mat_ns</span><span class="p">)</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">materials</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">tg_id</span><span class="p">,</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;texture2dgroup&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">coords</span><span class="p">),</span>
+        <span class="p">})</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_inspect_textures</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">result</span><span class="p">:</span> <span class="n">InspectResult</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Scan texture resources for inspect_3mf.&quot;&quot;&quot;</span>
+    <span class="n">mat_ns</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;m&quot;</span><span class="p">:</span> <span class="n">MATERIAL_NAMESPACE</span><span class="p">}</span>
+    <span class="k">for</span> <span class="n">tex_node</span> <span class="ow">in</span> <span class="n">root</span><span class="o">.</span><span class="n">iterfind</span><span class="p">(</span>
+        <span class="s2">&quot;./3mf:resources/m:texture2d&quot;</span><span class="p">,</span> <span class="p">{</span><span class="o">**</span><span class="n">MODEL_NAMESPACES</span><span class="p">,</span> <span class="o">**</span><span class="n">mat_ns</span><span class="p">}</span>
+    <span class="p">):</span>
+        <span class="n">tex_id</span> <span class="o">=</span> <span class="n">tex_node</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">textures</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">tex_id</span><span class="p">,</span>
+            <span class="s2">&quot;path&quot;</span><span class="p">:</span> <span class="n">tex_node</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;path&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">),</span>
+            <span class="s2">&quot;contenttype&quot;</span><span class="p">:</span> <span class="n">tex_node</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;contenttype&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">),</span>
+        <span class="p">})</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_import_unit_scale</span><span class="p">(</span>
+    <span class="n">context</span><span class="p">:</span> <span class="n">bpy</span><span class="o">.</span><span class="n">types</span><span class="o">.</span><span class="n">Context</span><span class="p">,</span>
+    <span class="n">root</span><span class="p">:</span> <span class="n">xml</span><span class="o">.</span><span class="n">etree</span><span class="o">.</span><span class="n">ElementTree</span><span class="o">.</span><span class="n">Element</span><span class="p">,</span>
+    <span class="n">global_scale</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculate unit scale exactly like the Import3MF operator.&quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.common.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">MODEL_DEFAULT_UNIT</span>
+
+    <span class="n">scale</span> <span class="o">=</span> <span class="n">global_scale</span>
+    <span class="n">blender_unit_to_metre</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">scene</span><span class="o">.</span><span class="n">unit_settings</span><span class="o">.</span><span class="n">scale_length</span>
+    <span class="k">if</span> <span class="n">blender_unit_to_metre</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">blender_unit</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">scene</span><span class="o">.</span><span class="n">unit_settings</span><span class="o">.</span><span class="n">length_unit</span>
+        <span class="n">blender_unit_to_metre</span> <span class="o">=</span> <span class="n">blender_to_metre</span><span class="p">[</span><span class="n">blender_unit</span><span class="p">]</span>
+
+    <span class="n">threemf_unit</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;unit&quot;</span><span class="p">,</span> <span class="n">MODEL_DEFAULT_UNIT</span><span class="p">)</span>
+    <span class="n">threemf_unit_to_metre</span> <span class="o">=</span> <span class="n">threemf_to_metre</span><span class="p">[</span><span class="n">threemf_unit</span><span class="p">]</span>
+    <span class="n">scale</span> <span class="o">*=</span> <span class="n">threemf_unit_to_metre</span> <span class="o">/</span> <span class="n">blender_unit_to_metre</span>
+    <span class="k">return</span> <span class="n">scale</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_activate_extensions_api</span><span class="p">(</span>
+    <span class="n">ctx</span><span class="p">,</span>
+    <span class="n">root</span><span class="p">:</span> <span class="n">xml</span><span class="o">.</span><span class="n">etree</span><span class="o">.</span><span class="n">ElementTree</span><span class="o">.</span><span class="n">Element</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Activate extensions on ctx.extension_manager (no operator needed).&quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">attr_key</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;requiredextensions&quot;</span><span class="p">,</span> <span class="s2">&quot;recommendedextensions&quot;</span><span class="p">):</span>
+        <span class="n">ext_str</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">attr_key</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">ext_str</span><span class="p">:</span>
+            <span class="n">resolved</span> <span class="o">=</span> <span class="n">_resolve_prefixes</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">ext_str</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">ns</span> <span class="ow">in</span> <span class="n">resolved</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">ns</span> <span class="ow">in</span> <span class="n">SUPPORTED_EXTENSIONS</span><span class="p">:</span>
+                    <span class="n">ctx</span><span class="o">.</span><span class="n">extension_manager</span><span class="o">.</span><span class="n">activate</span><span class="p">(</span><span class="n">ns</span><span class="p">)</span>
+                    <span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;API: Activated extension: </span><span class="si">{</span><span class="n">ns</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+
+<span class="c1"># ═══════════════════════════════════════════════════════════════════════════</span>
+<span class="c1"># Building-block re-exports</span>
+<span class="c1"># ═══════════════════════════════════════════════════════════════════════════</span>
+<span class="c1">#</span>
+<span class="c1"># These sub-namespace imports expose the common building blocks so addon</span>
+<span class="c1"># developers and CLI scripts can access them through ``api.*`` without</span>
+<span class="c1"># needing to know the internal package layout.</span>
+<span class="c1">#</span>
+<span class="c1">#   from io_mesh_3mf.api import colors</span>
+<span class="c1">#   r, g, b = colors.hex_to_rgb(&quot;#CC3319&quot;)</span>
+<span class="c1">#</span>
+<span class="c1">#   from io_mesh_3mf.api import types</span>
+<span class="c1">#   obj = types.ResourceObject(vertices=[], triangles=[], ...)</span>
+<span class="c1">#</span>
+<span class="c1">#   from io_mesh_3mf.api import segmentation</span>
+<span class="c1">#   tree = segmentation.decode_segmentation_string(&quot;A3F0&quot;)</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">colors</span>         <span class="c1"># hex_to_rgb, rgb_to_hex, srgb_to_linear, ...  # noqa: E402</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">types</span>          <span class="c1"># ResourceObject, Component, ResourceMaterial, ... # noqa: E402</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">segmentation</span>   <span class="c1"># SegmentationDecoder, SegmentationEncoder, ... # noqa: E402</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">units</span>          <span class="c1"># blender_to_metre, threemf_to_metre, import_unit_scale, ... # noqa: E402</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">extensions</span>     <span class="c1"># ExtensionManager, Extension, MATERIALS_EXTENSION, ... # noqa: E402</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">xml</span> <span class="k">as</span> <span class="n">xml_tools</span>  <span class="c1"># parse_transformation, format_transformation, ... # noqa: E402</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">metadata</span>       <span class="c1"># Metadata, MetadataEntry # noqa: E402</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.export_3mf</span><span class="w"> </span><span class="kn">import</span> <span class="n">components</span>  <span class="c1"># detect_linked_duplicates, ComponentGroup, ... # noqa: E402</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Jack.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

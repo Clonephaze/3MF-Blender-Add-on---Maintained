@@ -1,0 +1,519 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>io_mesh_3mf.common.extensions &mdash; 3MF Format API — v1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #2b2b2b" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            3MF Format for Blender
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../guide.html">Getting Started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide.html#quick-start">Quick Start</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide.html#export-format-reference">Export Format Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide.html#callbacks">Callbacks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide.html#error-handling">Error Handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide.html#cli-usage">CLI Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide.html#notes">Notes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../recipes.html">Recipes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../recipes.html#import-with-material-painting">Import with Material Painting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../recipes.html#import-into-a-specific-collection">Import into a Specific Collection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../recipes.html#export-for-orca-slicer">Export for Orca Slicer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../recipes.html#export-for-prusaslicer-with-mmu-paint">Export for PrusaSlicer with MMU Paint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../recipes.html#custom-orca-project-template">Custom Orca Project Template</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../recipes.html#round-trip-conversion">Round-Trip Conversion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../recipes.html#inspect-without-importing">Inspect Without Importing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../recipes.html#batch-operations">Batch Operations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">Core API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../api.html#version-capabilities">Version &amp; Capabilities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.API_VERSION"><code class="docutils literal notranslate"><span class="pre">API_VERSION</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.API_VERSION_STRING"><code class="docutils literal notranslate"><span class="pre">API_VERSION_STRING</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.API_CAPABILITIES"><code class="docutils literal notranslate"><span class="pre">API_CAPABILITIES</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api.html#result-dataclasses">Result Dataclasses</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.ImportResult"><code class="docutils literal notranslate"><span class="pre">ImportResult</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.ExportResult"><code class="docutils literal notranslate"><span class="pre">ExportResult</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.InspectResult"><code class="docutils literal notranslate"><span class="pre">InspectResult</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api.html#import">Import</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.import_3mf"><code class="docutils literal notranslate"><span class="pre">import_3mf()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api.html#export">Export</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.export_3mf"><code class="docutils literal notranslate"><span class="pre">export_3mf()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api.html#inspect">Inspect</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.inspect_3mf"><code class="docutils literal notranslate"><span class="pre">inspect_3mf()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api.html#batch-operations">Batch Operations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.batch_import"><code class="docutils literal notranslate"><span class="pre">batch_import()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.batch_export"><code class="docutils literal notranslate"><span class="pre">batch_export()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api.html#callback-types">Callback Types</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../discovery.html">API Discovery</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../discovery.html#direct-discovery-from-api">Direct Discovery (from <code class="docutils literal notranslate"><span class="pre">api</span></code>)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../discovery.html#io_mesh_3mf.api.is_available"><code class="docutils literal notranslate"><span class="pre">is_available()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../discovery.html#io_mesh_3mf.api.get_api"><code class="docutils literal notranslate"><span class="pre">get_api()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../discovery.html#io_mesh_3mf.api.has_capability"><code class="docutils literal notranslate"><span class="pre">has_capability()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../discovery.html#io_mesh_3mf.api.check_version"><code class="docutils literal notranslate"><span class="pre">check_version()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../discovery.html#standalone-discovery-helper">Standalone Discovery Helper</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../discovery.html#io_mesh_3mf.threemf_discovery.is_threemf_available"><code class="docutils literal notranslate"><span class="pre">is_threemf_available()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../discovery.html#io_mesh_3mf.threemf_discovery.get_threemf_api"><code class="docutils literal notranslate"><span class="pre">get_threemf_api()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../discovery.html#io_mesh_3mf.threemf_discovery.get_threemf_version"><code class="docutils literal notranslate"><span class="pre">get_threemf_version()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../discovery.html#io_mesh_3mf.threemf_discovery.check_threemf_version"><code class="docutils literal notranslate"><span class="pre">check_threemf_version()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../discovery.html#io_mesh_3mf.threemf_discovery.has_threemf_capability"><code class="docutils literal notranslate"><span class="pre">has_threemf_capability()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../building-blocks.html">Building Blocks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../building-blocks.html#module-io_mesh_3mf.common.colors">Colors</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.colors.srgb_to_linear"><code class="docutils literal notranslate"><span class="pre">srgb_to_linear()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.colors.linear_to_srgb"><code class="docutils literal notranslate"><span class="pre">linear_to_srgb()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.colors.hex_to_rgb"><code class="docutils literal notranslate"><span class="pre">hex_to_rgb()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.colors.hex_to_linear_rgb"><code class="docutils literal notranslate"><span class="pre">hex_to_linear_rgb()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.colors.rgb_to_hex"><code class="docutils literal notranslate"><span class="pre">rgb_to_hex()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.colors.linear_rgb_to_hex"><code class="docutils literal notranslate"><span class="pre">linear_rgb_to_hex()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../building-blocks.html#module-io_mesh_3mf.common.units">Units</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.units.import_unit_scale"><code class="docutils literal notranslate"><span class="pre">import_unit_scale()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.units.export_unit_scale"><code class="docutils literal notranslate"><span class="pre">export_unit_scale()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../building-blocks.html#module-io_mesh_3mf.common.types">Types (Dataclasses)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.ResourceObject"><code class="docutils literal notranslate"><span class="pre">ResourceObject</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.Component"><code class="docutils literal notranslate"><span class="pre">Component</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial"><code class="docutils literal notranslate"><span class="pre">ResourceMaterial</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.ResourceTexture"><code class="docutils literal notranslate"><span class="pre">ResourceTexture</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.ResourceTextureGroup"><code class="docutils literal notranslate"><span class="pre">ResourceTextureGroup</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.ResourceComposite"><code class="docutils literal notranslate"><span class="pre">ResourceComposite</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.ResourceMultiproperties"><code class="docutils literal notranslate"><span class="pre">ResourceMultiproperties</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.ResourcePBRTextureDisplay"><code class="docutils literal notranslate"><span class="pre">ResourcePBRTextureDisplay</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.ResourceColorgroup"><code class="docutils literal notranslate"><span class="pre">ResourceColorgroup</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.ResourcePBRDisplayProps"><code class="docutils literal notranslate"><span class="pre">ResourcePBRDisplayProps</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../building-blocks.html#module-io_mesh_3mf.common.segmentation">Segmentation Codec</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState"><code class="docutils literal notranslate"><span class="pre">TriangleState</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationNode"><code class="docutils literal notranslate"><span class="pre">SegmentationNode</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.SubdividedTriangle"><code class="docutils literal notranslate"><span class="pre">SubdividedTriangle</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationDecoder"><code class="docutils literal notranslate"><span class="pre">SegmentationDecoder</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.TriangleSubdivider"><code class="docutils literal notranslate"><span class="pre">TriangleSubdivider</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationEncoder"><code class="docutils literal notranslate"><span class="pre">SegmentationEncoder</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.decode_segmentation_string"><code class="docutils literal notranslate"><span class="pre">decode_segmentation_string()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.subdivide_triangle_with_segmentation"><code class="docutils literal notranslate"><span class="pre">subdivide_triangle_with_segmentation()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../building-blocks.html#module-io_mesh_3mf.common.extensions">Extensions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.Extension"><code class="docutils literal notranslate"><span class="pre">Extension</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.ExtensionType"><code class="docutils literal notranslate"><span class="pre">ExtensionType</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager"><code class="docutils literal notranslate"><span class="pre">ExtensionManager</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.get_extension_by_namespace"><code class="docutils literal notranslate"><span class="pre">get_extension_by_namespace()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.get_extension_by_prefix"><code class="docutils literal notranslate"><span class="pre">get_extension_by_prefix()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.list_official_extensions"><code class="docutils literal notranslate"><span class="pre">list_official_extensions()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.list_vendor_extensions"><code class="docutils literal notranslate"><span class="pre">list_vendor_extensions()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../building-blocks.html#module-io_mesh_3mf.common.metadata">Metadata</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.metadata.Metadata"><code class="docutils literal notranslate"><span class="pre">Metadata</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.metadata.MetadataEntry"><code class="docutils literal notranslate"><span class="pre">MetadataEntry</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #2b2b2b" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">3MF Format for Blender</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">io_mesh_3mf.common.extensions</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for io_mesh_3mf.common.extensions</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Blender add-on to import and export 3MF files.</span>
+<span class="c1"># Copyright (C) 2025 Jack (modernization for Blender 4.2+)</span>
+<span class="c1"># This add-on is free software; you can redistribute it and/or modify it under the terms of the GNU General Public</span>
+<span class="c1"># License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later</span>
+<span class="c1"># version.</span>
+<span class="c1"># This add-on is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied</span>
+<span class="c1"># warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.</span>
+<span class="c1"># You should have received a copy of the GNU General Public License along with this program; if not, write to the Free</span>
+<span class="c1"># Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Extension registry and management for 3MF extensions.</span>
+
+<span class="sd">This module provides a framework for registering and using 3MF extensions,</span>
+<span class="sd">both official extensions from the 3MF Consortium and vendor-specific extensions.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">List</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+
+
+<div class="viewcode-block" id="ExtensionType">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.ExtensionType">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ExtensionType</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Type of 3MF extension.&quot;&quot;&quot;</span>
+
+    <span class="n">OFFICIAL</span> <span class="o">=</span> <span class="s2">&quot;official&quot;</span>  <span class="c1"># Official 3MF Consortium extension</span>
+    <span class="n">VENDOR</span> <span class="o">=</span> <span class="s2">&quot;vendor&quot;</span>  <span class="c1"># Vendor-specific extension</span></div>
+
+
+
+<div class="viewcode-block" id="Extension">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.Extension">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Extension</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Represents a 3MF extension with its metadata and capabilities.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        namespace: XML namespace URI for this extension</span>
+<span class="sd">        prefix: Preferred XML namespace prefix</span>
+<span class="sd">        name: Human-readable name</span>
+<span class="sd">        extension_type: Whether this is an official or vendor-specific extension</span>
+<span class="sd">        description: Brief description of what this extension provides</span>
+<span class="sd">        required: Whether this extension must be declared in requiredextensions</span>
+<span class="sd">        vendor_attribute: Optional vendor-specific attribute name (e.g., &quot;BambuStudio:3mfVersion&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">extension_type</span><span class="p">:</span> <span class="n">ExtensionType</span>
+    <span class="n">description</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">required</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">vendor_attribute</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+
+<span class="c1"># Official 3MF Consortium Extensions</span>
+<span class="c1"># From: http://schemas.microsoft.com/3dmanufacturing/</span>
+
+<span class="n">MATERIALS_EXTENSION</span> <span class="o">=</span> <span class="n">Extension</span><span class="p">(</span>
+    <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;http://schemas.microsoft.com/3dmanufacturing/material/2015/02&quot;</span><span class="p">,</span>
+    <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;m&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Materials and Properties&quot;</span><span class="p">,</span>
+    <span class="n">extension_type</span><span class="o">=</span><span class="n">ExtensionType</span><span class="o">.</span><span class="n">OFFICIAL</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Defines material properties, colors, and textures for objects&quot;</span><span class="p">,</span>
+    <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">PRODUCTION_EXTENSION</span> <span class="o">=</span> <span class="n">Extension</span><span class="p">(</span>
+    <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;http://schemas.microsoft.com/3dmanufacturing/production/2015/06&quot;</span><span class="p">,</span>
+    <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;p&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Production&quot;</span><span class="p">,</span>
+    <span class="n">extension_type</span><span class="o">=</span><span class="n">ExtensionType</span><span class="o">.</span><span class="n">OFFICIAL</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Manufacturing metadata like UUID, path, and production instructions&quot;</span><span class="p">,</span>
+    <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">SLICE_EXTENSION</span> <span class="o">=</span> <span class="n">Extension</span><span class="p">(</span>
+    <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;http://schemas.microsoft.com/3dmanufacturing/slice/2015/07&quot;</span><span class="p">,</span>
+    <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;s&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Slice&quot;</span><span class="p">,</span>
+    <span class="n">extension_type</span><span class="o">=</span><span class="n">ExtensionType</span><span class="o">.</span><span class="n">OFFICIAL</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Pre-sliced geometry for specific printers&quot;</span><span class="p">,</span>
+    <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">BEAM_LATTICE_EXTENSION</span> <span class="o">=</span> <span class="n">Extension</span><span class="p">(</span>
+    <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;http://schemas.microsoft.com/3dmanufacturing/beamlattice/2017/02&quot;</span><span class="p">,</span>
+    <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;b&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Beam Lattice&quot;</span><span class="p">,</span>
+    <span class="n">extension_type</span><span class="o">=</span><span class="n">ExtensionType</span><span class="o">.</span><span class="n">OFFICIAL</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Efficient representation of lattice structures&quot;</span><span class="p">,</span>
+    <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">VOLUMETRIC_EXTENSION</span> <span class="o">=</span> <span class="n">Extension</span><span class="p">(</span>
+    <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;http://schemas.microsoft.com/3dmanufacturing/volumetric/2017/07&quot;</span><span class="p">,</span>
+    <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;v&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Volumetric&quot;</span><span class="p">,</span>
+    <span class="n">extension_type</span><span class="o">=</span><span class="n">ExtensionType</span><span class="o">.</span><span class="n">OFFICIAL</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Voxel-based 3D models&quot;</span><span class="p">,</span>
+    <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">TRIANGLE_SETS_EXTENSION</span> <span class="o">=</span> <span class="n">Extension</span><span class="p">(</span>
+    <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;http://schemas.microsoft.com/3dmanufacturing/trianglesets/2021/07&quot;</span><span class="p">,</span>
+    <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;t&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Triangle Sets&quot;</span><span class="p">,</span>
+    <span class="n">extension_type</span><span class="o">=</span><span class="n">ExtensionType</span><span class="o">.</span><span class="n">OFFICIAL</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Grouping of triangles for selection workflows and property assignment&quot;</span><span class="p">,</span>
+    <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Vendor-Specific Extensions</span>
+
+<span class="n">ORCA_EXTENSION</span> <span class="o">=</span> <span class="n">Extension</span><span class="p">(</span>
+    <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;http://schemas.bambulab.com/package/2021&quot;</span><span class="p">,</span>
+    <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;BambuStudio&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Orca Slicer / BambuStudio&quot;</span><span class="p">,</span>
+    <span class="n">extension_type</span><span class="o">=</span><span class="n">ExtensionType</span><span class="o">.</span><span class="n">VENDOR</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;BambuLab/Orca Slicer specific features including color zones and project settings&quot;</span><span class="p">,</span>
+    <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">vendor_attribute</span><span class="o">=</span><span class="s2">&quot;BambuStudio:3mfVersion&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Extension Registry</span>
+<span class="c1"># Maps namespace URI to Extension object</span>
+<span class="n">EXTENSION_REGISTRY</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Extension</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">MATERIALS_EXTENSION</span><span class="o">.</span><span class="n">namespace</span><span class="p">:</span> <span class="n">MATERIALS_EXTENSION</span><span class="p">,</span>
+    <span class="n">PRODUCTION_EXTENSION</span><span class="o">.</span><span class="n">namespace</span><span class="p">:</span> <span class="n">PRODUCTION_EXTENSION</span><span class="p">,</span>
+    <span class="n">SLICE_EXTENSION</span><span class="o">.</span><span class="n">namespace</span><span class="p">:</span> <span class="n">SLICE_EXTENSION</span><span class="p">,</span>
+    <span class="n">BEAM_LATTICE_EXTENSION</span><span class="o">.</span><span class="n">namespace</span><span class="p">:</span> <span class="n">BEAM_LATTICE_EXTENSION</span><span class="p">,</span>
+    <span class="n">VOLUMETRIC_EXTENSION</span><span class="o">.</span><span class="n">namespace</span><span class="p">:</span> <span class="n">VOLUMETRIC_EXTENSION</span><span class="p">,</span>
+    <span class="n">TRIANGLE_SETS_EXTENSION</span><span class="o">.</span><span class="n">namespace</span><span class="p">:</span> <span class="n">TRIANGLE_SETS_EXTENSION</span><span class="p">,</span>
+    <span class="n">ORCA_EXTENSION</span><span class="o">.</span><span class="n">namespace</span><span class="p">:</span> <span class="n">ORCA_EXTENSION</span><span class="p">,</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="ExtensionManager">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ExtensionManager</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Manages active extensions for import/export operations.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="ExtensionManager.__init__">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize with no active extensions.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_active_extensions</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="ExtensionManager.activate">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager.activate">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">activate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Activate an extension by its namespace URI.</span>
+
+<span class="sd">        :raises ValueError: If the namespace is not registered.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">namespace</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">EXTENSION_REGISTRY</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown extension namespace: </span><span class="si">{</span><span class="n">namespace</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_active_extensions</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">namespace</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ExtensionManager.deactivate">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager.deactivate">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">deactivate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Deactivate an extension.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_active_extensions</span><span class="o">.</span><span class="n">discard</span><span class="p">(</span><span class="n">namespace</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ExtensionManager.is_active">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager.is_active">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_active</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check if an extension is currently active.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">namespace</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_active_extensions</span></div>
+
+
+<div class="viewcode-block" id="ExtensionManager.clear">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager.clear">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Deactivate all extensions.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_active_extensions</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="ExtensionManager.get_active_extensions">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager.get_active_extensions">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_active_extensions</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Extension</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get list of all active Extension objects.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">EXTENSION_REGISTRY</span><span class="p">[</span><span class="n">ns</span><span class="p">]</span> <span class="k">for</span> <span class="n">ns</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_active_extensions</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="ExtensionManager.get_required_extensions_string">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager.get_required_extensions_string">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_required_extensions_string</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build the ``requiredextensions`` attribute value for the model element.</span>
+
+<span class="sd">        :return: Space-separated string of namespace URIs that require declaration.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">required</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">ext</span><span class="o">.</span><span class="n">namespace</span> <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_active_extensions</span><span class="p">()</span> <span class="k">if</span> <span class="n">ext</span><span class="o">.</span><span class="n">required</span>
+        <span class="p">]</span>
+        <span class="k">return</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">required</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ExtensionManager.get_vendor_attributes">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager.get_vendor_attributes">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_vendor_attributes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get vendor-specific attributes to add to the model element.&quot;&quot;&quot;</span>
+        <span class="n">attrs</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_active_extensions</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">ext</span><span class="o">.</span><span class="n">extension_type</span> <span class="o">==</span> <span class="n">ExtensionType</span><span class="o">.</span><span class="n">VENDOR</span> <span class="ow">and</span> <span class="n">ext</span><span class="o">.</span><span class="n">vendor_attribute</span><span class="p">:</span>
+                <span class="n">attrs</span><span class="p">[</span><span class="n">ext</span><span class="o">.</span><span class="n">vendor_attribute</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
+        <span class="k">return</span> <span class="n">attrs</span></div>
+
+
+<div class="viewcode-block" id="ExtensionManager.register_namespaces">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager.register_namespaces">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">register_namespaces</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">xml_module</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register all active extension namespaces with ElementTree.</span>
+
+<span class="sd">        :param xml_module: The ``xml.etree.ElementTree`` module.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_active_extensions</span><span class="p">():</span>
+            <span class="n">xml_module</span><span class="o">.</span><span class="n">register_namespace</span><span class="p">(</span><span class="n">ext</span><span class="o">.</span><span class="n">prefix</span><span class="p">,</span> <span class="n">ext</span><span class="o">.</span><span class="n">namespace</span><span class="p">)</span></div>
+</div>
+
+
+
+<span class="c1"># Convenience functions</span>
+
+<div class="viewcode-block" id="get_extension_by_namespace">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.get_extension_by_namespace">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_extension_by_namespace</span><span class="p">(</span><span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Extension</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get Extension object by namespace URI.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">EXTENSION_REGISTRY</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">namespace</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_extension_by_prefix">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.get_extension_by_prefix">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_extension_by_prefix</span><span class="p">(</span><span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Extension</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get Extension object by XML prefix.&quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">EXTENSION_REGISTRY</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">ext</span><span class="o">.</span><span class="n">prefix</span> <span class="o">==</span> <span class="n">prefix</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">ext</span>
+    <span class="k">return</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="list_official_extensions">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.list_official_extensions">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">list_official_extensions</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Extension</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get all registered official 3MF Consortium extensions.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="n">ext</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">EXTENSION_REGISTRY</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">ext</span><span class="o">.</span><span class="n">extension_type</span> <span class="o">==</span> <span class="n">ExtensionType</span><span class="o">.</span><span class="n">OFFICIAL</span>
+    <span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="list_vendor_extensions">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.list_vendor_extensions">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">list_vendor_extensions</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Extension</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get all registered vendor-specific extensions.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="n">ext</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">EXTENSION_REGISTRY</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">ext</span><span class="o">.</span><span class="n">extension_type</span> <span class="o">==</span> <span class="n">ExtensionType</span><span class="o">.</span><span class="n">VENDOR</span>
+    <span class="p">]</span></div>
+
+
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;Extension&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;ExtensionType&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;ExtensionManager&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;EXTENSION_REGISTRY&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;MATERIALS_EXTENSION&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;PRODUCTION_EXTENSION&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;SLICE_EXTENSION&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;BEAM_LATTICE_EXTENSION&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;VOLUMETRIC_EXTENSION&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;TRIANGLE_SETS_EXTENSION&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;ORCA_EXTENSION&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;get_extension_by_namespace&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;get_extension_by_prefix&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;list_official_extensions&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;list_vendor_extensions&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Jack.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
