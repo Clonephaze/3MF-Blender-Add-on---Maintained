@@ -1,0 +1,398 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Getting Started &mdash; 3MF Format API — v1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=8d563738"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Recipes" href="recipes.html" />
+    <link rel="prev" title="3MF Format — API Documentation" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #2b2b2b" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            3MF Format for Blender
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Getting Started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#quick-start">Quick Start</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#export-format-reference">Export Format Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#callbacks">Callbacks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#error-handling">Error Handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#cli-usage">CLI Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#notes">Notes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="recipes.html">Recipes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#import-with-material-painting">Import with Material Painting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#import-into-a-specific-collection">Import into a Specific Collection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#export-for-orca-slicer">Export for Orca Slicer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#export-for-prusaslicer-with-mmu-paint">Export for PrusaSlicer with MMU Paint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#custom-orca-project-template">Custom Orca Project Template</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#round-trip-conversion">Round-Trip Conversion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#inspect-without-importing">Inspect Without Importing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#batch-operations">Batch Operations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">Core API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api.html#version-capabilities">Version &amp; Capabilities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.API_VERSION"><code class="docutils literal notranslate"><span class="pre">API_VERSION</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.API_VERSION_STRING"><code class="docutils literal notranslate"><span class="pre">API_VERSION_STRING</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.API_CAPABILITIES"><code class="docutils literal notranslate"><span class="pre">API_CAPABILITIES</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#result-dataclasses">Result Dataclasses</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.ImportResult"><code class="docutils literal notranslate"><span class="pre">ImportResult</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.ExportResult"><code class="docutils literal notranslate"><span class="pre">ExportResult</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.InspectResult"><code class="docutils literal notranslate"><span class="pre">InspectResult</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#import">Import</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.import_3mf"><code class="docutils literal notranslate"><span class="pre">import_3mf()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#export">Export</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.export_3mf"><code class="docutils literal notranslate"><span class="pre">export_3mf()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#inspect">Inspect</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.inspect_3mf"><code class="docutils literal notranslate"><span class="pre">inspect_3mf()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#batch-operations">Batch Operations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.batch_import"><code class="docutils literal notranslate"><span class="pre">batch_import()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.batch_export"><code class="docutils literal notranslate"><span class="pre">batch_export()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#callback-types">Callback Types</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="discovery.html">API Discovery</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="discovery.html#direct-discovery-from-api">Direct Discovery (from <code class="docutils literal notranslate"><span class="pre">api</span></code>)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.api.is_available"><code class="docutils literal notranslate"><span class="pre">is_available()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.api.get_api"><code class="docutils literal notranslate"><span class="pre">get_api()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.api.has_capability"><code class="docutils literal notranslate"><span class="pre">has_capability()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.api.check_version"><code class="docutils literal notranslate"><span class="pre">check_version()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="discovery.html#standalone-discovery-helper">Standalone Discovery Helper</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.threemf_discovery.is_threemf_available"><code class="docutils literal notranslate"><span class="pre">is_threemf_available()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.threemf_discovery.get_threemf_api"><code class="docutils literal notranslate"><span class="pre">get_threemf_api()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.threemf_discovery.get_threemf_version"><code class="docutils literal notranslate"><span class="pre">get_threemf_version()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.threemf_discovery.check_threemf_version"><code class="docutils literal notranslate"><span class="pre">check_threemf_version()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.threemf_discovery.has_threemf_capability"><code class="docutils literal notranslate"><span class="pre">has_threemf_capability()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="building-blocks.html">Building Blocks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="building-blocks.html#module-io_mesh_3mf.common.colors">Colors</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.colors.srgb_to_linear"><code class="docutils literal notranslate"><span class="pre">srgb_to_linear()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.colors.linear_to_srgb"><code class="docutils literal notranslate"><span class="pre">linear_to_srgb()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.colors.hex_to_rgb"><code class="docutils literal notranslate"><span class="pre">hex_to_rgb()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.colors.hex_to_linear_rgb"><code class="docutils literal notranslate"><span class="pre">hex_to_linear_rgb()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.colors.rgb_to_hex"><code class="docutils literal notranslate"><span class="pre">rgb_to_hex()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.colors.linear_rgb_to_hex"><code class="docutils literal notranslate"><span class="pre">linear_rgb_to_hex()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="building-blocks.html#module-io_mesh_3mf.common.units">Units</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.units.import_unit_scale"><code class="docutils literal notranslate"><span class="pre">import_unit_scale()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.units.export_unit_scale"><code class="docutils literal notranslate"><span class="pre">export_unit_scale()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="building-blocks.html#module-io_mesh_3mf.common.types">Types (Dataclasses)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceObject"><code class="docutils literal notranslate"><span class="pre">ResourceObject</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.Component"><code class="docutils literal notranslate"><span class="pre">Component</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial"><code class="docutils literal notranslate"><span class="pre">ResourceMaterial</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceTexture"><code class="docutils literal notranslate"><span class="pre">ResourceTexture</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceTextureGroup"><code class="docutils literal notranslate"><span class="pre">ResourceTextureGroup</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceComposite"><code class="docutils literal notranslate"><span class="pre">ResourceComposite</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceMultiproperties"><code class="docutils literal notranslate"><span class="pre">ResourceMultiproperties</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourcePBRTextureDisplay"><code class="docutils literal notranslate"><span class="pre">ResourcePBRTextureDisplay</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceColorgroup"><code class="docutils literal notranslate"><span class="pre">ResourceColorgroup</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourcePBRDisplayProps"><code class="docutils literal notranslate"><span class="pre">ResourcePBRDisplayProps</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="building-blocks.html#module-io_mesh_3mf.common.segmentation">Segmentation Codec</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState"><code class="docutils literal notranslate"><span class="pre">TriangleState</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationNode"><code class="docutils literal notranslate"><span class="pre">SegmentationNode</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.SubdividedTriangle"><code class="docutils literal notranslate"><span class="pre">SubdividedTriangle</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationDecoder"><code class="docutils literal notranslate"><span class="pre">SegmentationDecoder</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleSubdivider"><code class="docutils literal notranslate"><span class="pre">TriangleSubdivider</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationEncoder"><code class="docutils literal notranslate"><span class="pre">SegmentationEncoder</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.decode_segmentation_string"><code class="docutils literal notranslate"><span class="pre">decode_segmentation_string()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.subdivide_triangle_with_segmentation"><code class="docutils literal notranslate"><span class="pre">subdivide_triangle_with_segmentation()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="building-blocks.html#module-io_mesh_3mf.common.extensions">Extensions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.Extension"><code class="docutils literal notranslate"><span class="pre">Extension</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.ExtensionType"><code class="docutils literal notranslate"><span class="pre">ExtensionType</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager"><code class="docutils literal notranslate"><span class="pre">ExtensionManager</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.get_extension_by_namespace"><code class="docutils literal notranslate"><span class="pre">get_extension_by_namespace()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.get_extension_by_prefix"><code class="docutils literal notranslate"><span class="pre">get_extension_by_prefix()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.list_official_extensions"><code class="docutils literal notranslate"><span class="pre">list_official_extensions()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.list_vendor_extensions"><code class="docutils literal notranslate"><span class="pre">list_vendor_extensions()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="building-blocks.html#module-io_mesh_3mf.common.metadata">Metadata</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.metadata.Metadata"><code class="docutils literal notranslate"><span class="pre">Metadata</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.metadata.MetadataEntry"><code class="docutils literal notranslate"><span class="pre">MetadataEntry</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #2b2b2b" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">3MF Format for Blender</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Getting Started</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="getting-started">
+<h1>Getting Started<a class="headerlink" href="#getting-started" title="Link to this heading"></a></h1>
+<p>The public API in <a class="reference internal" href="api.html#module-io_mesh_3mf.api" title="io_mesh_3mf.api: Programmatic 3MF import, export, and inspection."><code class="xref py py-mod docutils literal notranslate"><span class="pre">io_mesh_3mf.api</span></code></a> provides headless/programmatic access
+to the full 3MF pipeline.  It runs the same code as the Blender operators but
+skips UI-specific behaviour (progress bars, popups, camera zoom), making it
+suitable for:</p>
+<ul class="simple">
+<li><p><strong>CLI automation</strong> — batch processing from Blender’s <code class="docutils literal notranslate"><span class="pre">--python</span></code> mode</p></li>
+<li><p><strong>Addon integration</strong> — other Blender addons importing/exporting 3MF</p></li>
+<li><p><strong>Headless pipelines</strong> — render farms, CI/CD, asset processing</p></li>
+<li><p><strong>Custom workflows</strong> — building on top of the low-level building blocks</p></li>
+</ul>
+<section id="quick-start">
+<h2>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">io_mesh_3mf.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">import_3mf</span><span class="p">,</span> <span class="n">export_3mf</span><span class="p">,</span> <span class="n">inspect_3mf</span>
+
+<span class="c1"># Import a 3MF file</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">import_3mf</span><span class="p">(</span><span class="s2">&quot;/path/to/model.3mf&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">status</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">num_loaded</span><span class="p">)</span>
+
+<span class="c1"># Export selected objects</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">export_3mf</span><span class="p">(</span><span class="s2">&quot;/path/to/output.3mf&quot;</span><span class="p">,</span> <span class="n">use_selection</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">status</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">num_written</span><span class="p">)</span>
+
+<span class="c1"># Inspect without importing (no Blender objects created)</span>
+<span class="n">info</span> <span class="o">=</span> <span class="n">inspect_3mf</span><span class="p">(</span><span class="s2">&quot;/path/to/model.3mf&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">info</span><span class="o">.</span><span class="n">unit</span><span class="p">,</span> <span class="n">info</span><span class="o">.</span><span class="n">num_objects</span><span class="p">,</span> <span class="n">info</span><span class="o">.</span><span class="n">num_triangles_total</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>All functions return lightweight dataclasses — they never raise exceptions for
+normal failures (corrupt files, empty scenes, etc.).  Check <code class="docutils literal notranslate"><span class="pre">result.status</span></code>
+instead.</p>
+</section>
+<section id="export-format-reference">
+<h2>Export Format Reference<a class="headerlink" href="#export-format-reference" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 20.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p><code class="docutils literal notranslate"><span class="pre">use_orca_format</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">mmu_slicer_format</span></code></p></th>
+<th class="head"><p>Output</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&quot;AUTO&quot;</span></code></p></td>
+<td><p>—</p></td>
+<td><p>Chooses best format based on scene content</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&quot;STANDARD&quot;</span></code></p></td>
+<td><p>—</p></td>
+<td><p>Spec-compliant single-model 3MF</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&quot;PAINT&quot;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;ORCA&quot;</span></code></p></td>
+<td><p>Multi-file Orca/Bambu structure with <code class="docutils literal notranslate"><span class="pre">paint_color</span></code> attributes</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&quot;PAINT&quot;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;PRUSA&quot;</span></code></p></td>
+<td><p>Single-file with <code class="docutils literal notranslate"><span class="pre">slic3rpe:mmu_segmentation</span></code> hash strings</p></td>
+</tr>
+</tbody>
+</table>
+<p>In <strong>AUTO</strong> mode the addon inspects your scene and picks the best path:</p>
+<ul class="simple">
+<li><p>Objects with MMU paint textures → Orca exporter with segmentation</p></li>
+<li><p>Objects with material slots → Standard exporter with basematerials/colorgroups</p></li>
+<li><p>Geometry-only objects → Standard exporter, geometry only</p></li>
+<li><p>If <em>project_template</em> or <em>object_settings</em> is provided → Orca exporter</p></li>
+</ul>
+</section>
+<section id="callbacks">
+<h2>Callbacks<a class="headerlink" href="#callbacks" title="Link to this heading"></a></h2>
+<p>All three callback types are optional and work the same way across
+<a class="reference internal" href="api.html#io_mesh_3mf.api.import_3mf" title="io_mesh_3mf.api.import_3mf"><code class="xref py py-func docutils literal notranslate"><span class="pre">import_3mf()</span></code></a>, <a class="reference internal" href="api.html#io_mesh_3mf.api.export_3mf" title="io_mesh_3mf.api.export_3mf"><code class="xref py py-func docutils literal notranslate"><span class="pre">export_3mf()</span></code></a>, and
+the batch helpers.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">on_progress</span><span class="p">(</span><span class="n">percentage</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Called with 0-100 percentage and a status message.&quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">percentage</span><span class="si">:</span><span class="s2">3d</span><span class="si">}</span><span class="s2">%] </span><span class="si">{</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">on_warning</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Called for each warning (non-manifold geometry, missing data, etc.).&quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;WARNING: </span><span class="si">{</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">on_object_created</span><span class="p">(</span><span class="n">blender_object</span><span class="p">,</span> <span class="n">resource_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Called after each Blender object is built during import.&quot;&quot;&quot;</span>
+    <span class="n">blender_object</span><span class="o">.</span><span class="n">color</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># Tint red</span>
+</pre></div>
+</div>
+</section>
+<section id="error-handling">
+<h2>Error Handling<a class="headerlink" href="#error-handling" title="Link to this heading"></a></h2>
+<p>All API functions return result dataclasses instead of raising exceptions.
+Check <code class="docutils literal notranslate"><span class="pre">result.status</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">import_3mf</span><span class="p">(</span><span class="s2">&quot;model.3mf&quot;</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">&quot;FINISHED&quot;</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Success: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">num_loaded</span><span class="si">}</span><span class="s2"> objects&quot;</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">warnings</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Archive-level errors (corrupt ZIP, missing model files) set
+<code class="docutils literal notranslate"><span class="pre">status</span> <span class="pre">=</span> <span class="pre">&quot;CANCELLED&quot;</span></code>.</p></li>
+<li><p>Per-object warnings (non-manifold geometry, missing textures) are collected in
+<code class="docutils literal notranslate"><span class="pre">warnings</span></code> but don’t prevent completion.</p></li>
+<li><p><a class="reference internal" href="api.html#io_mesh_3mf.api.inspect_3mf" title="io_mesh_3mf.api.inspect_3mf"><code class="xref py py-func docutils literal notranslate"><span class="pre">inspect_3mf()</span></code></a> uses <code class="docutils literal notranslate"><span class="pre">status</span> <span class="pre">=</span> <span class="pre">&quot;OK&quot;</span></code> / <code class="docutils literal notranslate"><span class="pre">&quot;ERROR&quot;</span></code>
+with a separate <code class="docutils literal notranslate"><span class="pre">error_message</span></code> field.</p></li>
+</ul>
+</section>
+<section id="cli-usage">
+<h2>CLI Usage<a class="headerlink" href="#cli-usage" title="Link to this heading"></a></h2>
+<p>Run from the command line using Blender’s <code class="docutils literal notranslate"><span class="pre">--python</span></code> flag:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Inspect a file</span>
+blender<span class="w"> </span>--background<span class="w"> </span>--python-expr<span class="w"> </span><span class="s2">&quot;</span>
+<span class="s2">from io_mesh_3mf.api import inspect_3mf</span>
+<span class="s2">info = inspect_3mf(&#39;model.3mf&#39;)</span>
+<span class="s2">print(f&#39;{info.num_objects} objects, {info.num_triangles_total} triangles&#39;)</span>
+<span class="s2">&quot;</span>
+
+<span class="c1"># Batch convert</span>
+blender<span class="w"> </span>--background<span class="w"> </span>--python<span class="w"> </span>my_script.py
+</pre></div>
+</div>
+<p><strong>Example script</strong> (<code class="docutils literal notranslate"><span class="pre">convert_to_orca.py</span></code>):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="sd">&quot;&quot;&quot;Convert a standard 3MF to Orca Slicer format.&quot;&quot;&quot;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">io_mesh_3mf.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">import_3mf</span><span class="p">,</span> <span class="n">export_3mf</span>
+
+<span class="n">input_path</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">&quot;--&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+<span class="n">output_path</span> <span class="o">=</span> <span class="n">input_path</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.3mf&quot;</span><span class="p">,</span> <span class="s2">&quot;_orca.3mf&quot;</span><span class="p">)</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">import_3mf</span><span class="p">(</span><span class="n">input_path</span><span class="p">,</span> <span class="n">import_materials</span><span class="o">=</span><span class="s2">&quot;MATERIALS&quot;</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">&quot;FINISHED&quot;</span><span class="p">:</span>
+    <span class="n">export_result</span> <span class="o">=</span> <span class="n">export_3mf</span><span class="p">(</span>
+        <span class="n">output_path</span><span class="p">,</span>
+        <span class="n">objects</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">objects</span><span class="p">,</span>
+        <span class="n">use_orca_format</span><span class="o">=</span><span class="s2">&quot;AUTO&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Converted: </span><span class="si">{</span><span class="n">export_result</span><span class="o">.</span><span class="n">num_written</span><span class="si">}</span><span class="s2"> objects → </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>blender<span class="w"> </span>--background<span class="w"> </span>--python<span class="w"> </span>convert_to_orca.py<span class="w"> </span>--<span class="w"> </span>input.3mf
+</pre></div>
+</div>
+</section>
+<section id="notes">
+<h2>Notes<a class="headerlink" href="#notes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Blender context required</strong> — <a class="reference internal" href="api.html#io_mesh_3mf.api.import_3mf" title="io_mesh_3mf.api.import_3mf"><code class="xref py py-func docutils literal notranslate"><span class="pre">import_3mf()</span></code></a> and
+<a class="reference internal" href="api.html#io_mesh_3mf.api.export_3mf" title="io_mesh_3mf.api.export_3mf"><code class="xref py py-func docutils literal notranslate"><span class="pre">export_3mf()</span></code></a> need <code class="docutils literal notranslate"><span class="pre">bpy.context</span></code>.  They work in
+<code class="docutils literal notranslate"><span class="pre">--background</span></code> mode but not outside Blender entirely.</p></li>
+<li><p><strong>inspect_3mf is lightweight</strong> — it only opens the ZIP and parses XML.
+No Blender objects, materials, or images are created.</p></li>
+<li><p><strong>Thread safety</strong> — Blender’s Python API is not thread-safe.  Don’t call
+these functions from background threads.</p></li>
+<li><p><strong>Batch isolation</strong> — <a class="reference internal" href="api.html#io_mesh_3mf.api.batch_import" title="io_mesh_3mf.api.batch_import"><code class="xref py py-func docutils literal notranslate"><span class="pre">batch_import()</span></code></a> and
+<a class="reference internal" href="api.html#io_mesh_3mf.api.batch_export" title="io_mesh_3mf.api.batch_export"><code class="xref py py-func docutils literal notranslate"><span class="pre">batch_export()</span></code></a> catch per-file exceptions so one
+failure doesn’t stop the batch.</p></li>
+<li><p><strong>API vs addon version</strong> — <code class="docutils literal notranslate"><span class="pre">API_VERSION</span></code> tracks the API contract stability.
+It increments independently of the addon release version.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="3MF Format — API Documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="recipes.html" class="btn btn-neutral float-right" title="Recipes" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Jack.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

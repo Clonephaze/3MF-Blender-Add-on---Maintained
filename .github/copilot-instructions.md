@@ -186,10 +186,10 @@ These are stored on `mesh.data` (the Mesh datablock, not the Object):
 
 ### Standard Export (`StandardExporter`)
 
-Spec-compliant single `3D/3dmodel.model` file. Three material modes:
+Spec-compliant single `3D/3dmodel.model` file. The `use_orca_format` setting controls dispatch:
 
-- **STANDARD** — geometry only, no materials
-- **BASEMATERIAL** — one solid color per material slot via `<basematerials>`
+- **AUTO** — detects materials and paint data, chooses the best exporter
+- **STANDARD** — geometry with basematerials/colorgroups/textures when present
 - **PAINT** — UV-painted regions exported as hash segmentation strings
 
 ### Orca Export (`OrcaExporter`)
@@ -286,7 +286,7 @@ result = import_3mf("model.3mf", import_materials="PAINT")
 print(result.status, result.num_loaded, result.objects)
 
 # Export
-result = export_3mf("output.3mf", use_orca_format="BASEMATERIAL")
+result = export_3mf("output.3mf", use_orca_format="AUTO")
 print(result.status, result.num_written)
 
 # Batch operations

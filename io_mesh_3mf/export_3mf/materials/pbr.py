@@ -28,6 +28,7 @@ import bpy_extras.node_shader_utils
 
 from ...common.constants import MATERIAL_NAMESPACE
 from ...common import debug
+from ...common.colors import linear_to_srgb
 
 
 def extract_pbr_from_material(
@@ -315,9 +316,9 @@ def write_pbr_display_properties(
             glossiness = pbr.get("glossiness", 0.5)
 
             # Convert linear specular color to sRGB hex
-            sr = min(255, max(0, int(specular_color[0] * 255)))
-            sg = min(255, max(0, int(specular_color[1] * 255)))
-            sb = min(255, max(0, int(specular_color[2] * 255)))
+            sr = min(255, max(0, int(linear_to_srgb(specular_color[0]) * 255)))
+            sg = min(255, max(0, int(linear_to_srgb(specular_color[1]) * 255)))
+            sb = min(255, max(0, int(linear_to_srgb(specular_color[2]) * 255)))
             specular_hex = "#%02X%02X%02X" % (sr, sg, sb)
 
             xml.etree.ElementTree.SubElement(

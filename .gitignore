@@ -4,3 +4,4 @@ releases
 /.github/prompts
 *.pyc
 *.zip
+docs/_build/

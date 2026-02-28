@@ -241,9 +241,15 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         description="How to export material and color data to 3MF",
         items=[
             (
+                "AUTO",
+                "Auto",
+                "Automatically detect materials and MMU paint data, "
+                "choosing the best exporter",
+            ),
+            (
                 "STANDARD",
                 "Standard 3MF",
-                "Export geometry with material colors when present (spec-compliant)",
+                "Always export spec-compliant 3MF with proper component instancing",
             ),
             (
                 "PAINT",
@@ -251,7 +257,7 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
                 "Export UV-painted regions as hash segmentation (experimental, may be slow)",
             ),
         ],
-        default="STANDARD",
+        default="AUTO",
     )
 
     default_subdivision_depth: bpy.props.IntProperty(
@@ -316,7 +322,7 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         col = layout.column(align=True)
         col.label(text="Material Export Mode:", icon="COLORSET_01_VEC")
         col.prop(self, "default_multi_material_export", text="")
-        if self.default_multi_material_export == "PAINT":
+        if self.default_multi_material_export in ("PAINT", "AUTO"):
             col.prop(self, "default_subdivision_depth")
         col.separator()
         col.prop(self, "default_export_hidden", icon="HIDE_OFF")
@@ -429,6 +435,15 @@ def register() -> None:
     register_paint()
     register_panels()
 
+    # Register API in bpy.app.driver_namespace for addon discovery.
+    # The api module self-registers on import, but we explicitly call it here
+    # to ensure it's available after addon enable (not just first import).
+    try:
+        from . import api
+        api._register_api()
+    except Exception:
+        pass  # Non-critical — API still works via direct import
+
 
 def _remove_menu_entries() -> None:
     """Remove our import/export menu entries, tolerating stale references.
@@ -452,6 +467,13 @@ def _remove_menu_entries() -> None:
 
 
 def unregister() -> None:
+    # Unregister API from bpy.app.driver_namespace.
+    try:
+        from . import api
+        api._unregister_api()
+    except Exception:
+        pass
+
     unregister_panels()
     unregister_paint()
 

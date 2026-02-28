@@ -95,7 +95,9 @@ class OrcaExporter(BaseExporter):
         paint_colors_collected = False
         if ctx.options.use_orca_format == "PAINT":
             mesh_objs_for_paint = collect_mesh_objects(
-                blender_objects, export_hidden=ctx.options.export_hidden
+                blender_objects,
+                export_hidden=ctx.options.export_hidden,
+                skip_disabled=ctx.options.skip_disabled,
             )
             for blender_object in mesh_objs_for_paint:
                 original_object = blender_object
@@ -145,9 +147,10 @@ class OrcaExporter(BaseExporter):
         # Generate build UUID
         build_uuid = str(uuid.uuid4())
 
-        # Collect mesh objects recursively (walks into nested empties)
         mesh_objects = collect_mesh_objects(
-            blender_objects, export_hidden=ctx.options.export_hidden
+            blender_objects,
+            export_hidden=ctx.options.export_hidden,
+            skip_disabled=ctx.options.skip_disabled,
         )
 
         if not mesh_objects:
@@ -172,9 +175,9 @@ class OrcaExporter(BaseExporter):
             mesh_id = object_counter * 2 - 1
 
             # Generate UUIDs
-            wrapper_uuid = f"0000000{object_counter}-61cb-4c03-9d28-80fed5dfa1dc"
-            mesh_uuid = f"000{object_counter}0000-81cb-4c03-9d28-80fed5dfa1dc"
-            component_uuid = f"000{object_counter}0000-b206-40ff-9872-83e8017abed1"
+            wrapper_uuid = f"{object_counter:08x}-61cb-4c03-9d28-80fed5dfa1dc"
+            mesh_uuid = f"{object_counter:04x}0000-81cb-4c03-9d28-80fed5dfa1dc"
+            component_uuid = f"{object_counter:04x}0000-b206-40ff-9872-83e8017abed1"
 
             # Create safe filename
             safe_name = re.sub(r"[^\w\-.]", "_", blender_object.name)
@@ -320,14 +323,15 @@ class OrcaExporter(BaseExporter):
 
         # Vertices
         vertices_elem = xml.etree.ElementTree.SubElement(mesh_elem, "vertices")
+        decimals = ctx.options.coordinate_precision
         for vertex in mesh.vertices:
             xml.etree.ElementTree.SubElement(
                 vertices_elem,
                 "vertex",
                 attrib={
-                    "x": str(vertex.co.x),
-                    "y": str(vertex.co.y),
-                    "z": str(vertex.co.z),
+                    "x": f"{vertex.co.x:.{decimals}}",
+                    "y": f"{vertex.co.y:.{decimals}}",
+                    "z": f"{vertex.co.z:.{decimals}}",
                 },
             )
 

@@ -311,6 +311,63 @@ def _get_filament_colors_from_settings(context):
 
 
 # ---------------------------------------------------------------------------
+#  Internal helpers
+# ---------------------------------------------------------------------------
+
+def _cleanup_per_mat_state(per_mat_state):
+    """Remove all temporary bake nodes and restore original wiring for every material.
+
+    Called after a successful bake (Step 8) or on error (Step 7) to
+    ensure each material's node tree is returned to its pre-bake state.
+    """
+    for state in per_mat_state:
+        if state is None:
+            continue
+        mat = state["mat"]
+        nodes = mat.node_tree.nodes
+        links = mat.node_tree.links
+
+        # Remove temp UV Map nodes
+        for uv_node in state.get("temp_uv_nodes", []):
+            try:
+                nodes.remove(uv_node)
+            except Exception:
+                pass
+
+        # Restore original Material Output → Surface wiring
+        if state.get("emit_node"):
+            if state.get("original_surface_socket"):
+                output_node = None
+                for n in nodes:
+                    if n.type == "OUTPUT_MATERIAL" and n.is_active_output:
+                        output_node = n
+                        break
+                if output_node:
+                    links.new(
+                        state["original_surface_socket"],
+                        output_node.inputs["Surface"],
+                    )
+            try:
+                nodes.remove(state["emit_node"])
+            except Exception:
+                pass
+
+        # Remove temp RGB node (if created for solid-color materials)
+        if state.get("rgb_node"):
+            try:
+                nodes.remove(state["rgb_node"])
+            except Exception:
+                pass
+
+        # Remove the bake target Image Texture node
+        if state.get("bake_node"):
+            try:
+                nodes.remove(state["bake_node"])
+            except Exception:
+                pass
+
+
+# ---------------------------------------------------------------------------
 #  Operators
 # ---------------------------------------------------------------------------
 
@@ -420,20 +477,168 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
             image_name, width=tex_size, height=tex_size, alpha=True
         )
 
-        # --- Step 5: Add an Image Texture node to the material for bake target ---
-        # Blender's bake writes to the active Image Texture node
-        mat = original_materials[0]
-        if not mat.use_nodes:
-            mat.use_nodes = True
+        # --- Step 5: Prepare ALL materials for baking ---
+        # Blender's bake uses per-face material assignments. Each material
+        # needs a bake-target Image Texture node (set as the active node)
+        # so pixels from *all* material slots are captured.
+        #
+        # We also rewire each material's Base Color → Emission → Material
+        # Output for an EMIT bake, which is much faster than DIFFUSE because
+        # it skips all lighting calculations.
+        #
+        # Track per-material state so we can clean up afterwards.
+        _per_mat_state = []  # list of dicts, one per material slot
+        bake_type = "EMIT"
+        bake_pass_filter = set()
+        all_emit_ok = True  # Will any material need DIFFUSE fallback?
 
-        nodes = mat.node_tree.nodes
-        bake_node = nodes.new("ShaderNodeTexImage")
-        bake_node.image = image
-        bake_node.name = "_MMU_Bake_Target"
-        bake_node.label = "MMU Bake Target"
-        bake_node.location = (-600, -300)
-        # Must be the selected/active node for bake
-        nodes.active = bake_node
+        for slot_idx, mat in enumerate(original_materials):
+            if mat is None:
+                _per_mat_state.append(None)
+                continue
+
+            if not mat.use_nodes:
+                mat.use_nodes = True
+
+            state = {
+                "mat": mat,
+                "bake_node": None,
+                "emit_node": None,
+                "rgb_node": None,
+                "original_surface_socket": None,
+                "temp_uv_nodes": [],
+            }
+
+            nodes = mat.node_tree.nodes
+            links = mat.node_tree.links
+
+            # Add bake target image node (must be active for bake to write to it)
+            bake_node = nodes.new("ShaderNodeTexImage")
+            bake_node.image = image
+            bake_node.name = "_MMU_Bake_Target"
+            bake_node.label = "MMU Bake Target"
+            bake_node.location = (-600, -300)
+            nodes.active = bake_node
+            state["bake_node"] = bake_node
+
+            # Find Principled BSDF and Material Output
+            principled = None
+            output_node = None
+            for node in nodes:
+                if node.type == "BSDF_PRINCIPLED" and principled is None:
+                    principled = node
+                if node.type == "OUTPUT_MATERIAL" and node.is_active_output:
+                    output_node = node
+
+            if principled and output_node:
+                # Remember what was wired into Material Output → Surface
+                for link in links:
+                    if (
+                        link.to_node == output_node
+                        and link.to_socket.name == "Surface"
+                    ):
+                        state["original_surface_socket"] = link.from_socket
+                        break
+
+                # Find what drives Base Color
+                base_color_source = None
+                for link in links:
+                    if link.to_node == principled and link.to_socket.name == "Base Color":
+                        base_color_source = link.from_socket
+                        break
+
+                # Create Emission node
+                emit_node = nodes.new("ShaderNodeEmission")
+                emit_node.name = "_MMU_Temp_Emission"
+                emit_node.location = (
+                    principled.location.x,
+                    principled.location.y - 200,
+                )
+                state["emit_node"] = emit_node
+
+                if base_color_source:
+                    # Base Color has an input link (texture, noise, etc.)
+                    links.new(base_color_source, emit_node.inputs["Color"])
+                else:
+                    # Solid color only — extract the default value and feed it
+                    # through an RGB node so Emission still captures it.
+                    default_color = principled.inputs["Base Color"].default_value
+                    rgb_node = nodes.new("ShaderNodeRGB")
+                    rgb_node.name = "_MMU_Temp_RGB"
+                    rgb_node.outputs[0].default_value = (
+                        default_color[0], default_color[1],
+                        default_color[2], 1.0,
+                    )
+                    rgb_node.location = (
+                        emit_node.location.x - 200,
+                        emit_node.location.y,
+                    )
+                    state["rgb_node"] = rgb_node
+                    links.new(rgb_node.outputs[0], emit_node.inputs["Color"])
+
+                links.new(
+                    emit_node.outputs["Emission"],
+                    output_node.inputs["Surface"],
+                )
+                debug(f"Bake to MMU: slot {slot_idx} '{mat.name}' wired for EMIT bake")
+            else:
+                # No Principled BSDF — fall back to DIFFUSE for this material.
+                all_emit_ok = False
+                debug(
+                    f"Bake to MMU: slot {slot_idx} '{mat.name}' has no Principled BSDF, "
+                    "falling back to DIFFUSE bake"
+                )
+
+            # Pin Image Texture UVs to the original UV layer so textures
+            # sample with correct coordinates after the MMU_Paint UV was
+            # set as active.
+            if prev_uv_name and mesh.uv_layers.get(prev_uv_name):
+                for node in list(nodes):
+                    if node.type != "TEX_IMAGE" or node == bake_node:
+                        continue
+                    uv_input = node.inputs.get("Vector")
+                    if uv_input and not uv_input.is_linked:
+                        uv_node = nodes.new("ShaderNodeUVMap")
+                        uv_node.uv_map = prev_uv_name
+                        uv_node.name = "_MMU_Temp_UV"
+                        uv_node.location = (
+                            node.location.x - 200,
+                            node.location.y - 100,
+                        )
+                        links.new(uv_node.outputs["UV"], uv_input)
+                        state["temp_uv_nodes"].append(uv_node)
+                        debug(f"Bake to MMU: pinned '{node.name}' UV to '{prev_uv_name}'")
+
+            _per_mat_state.append(state)
+
+        # If any material couldn't use EMIT, fall back to DIFFUSE COLOR
+        if not all_emit_ok:
+            bake_type = "DIFFUSE"
+            bake_pass_filter = {"COLOR"}
+            # Undo Emission rewiring for materials that had it
+            for state in _per_mat_state:
+                if state is None:
+                    continue
+                mat = state["mat"]
+                nodes = mat.node_tree.nodes
+                links = mat.node_tree.links
+                if state["emit_node"]:
+                    if state["original_surface_socket"]:
+                        output_node = [
+                            n for n in nodes
+                            if n.type == "OUTPUT_MATERIAL" and n.is_active_output
+                        ][0]
+                        links.new(
+                            state["original_surface_socket"],
+                            output_node.inputs["Surface"],
+                        )
+                    nodes.remove(state["emit_node"])
+                    state["emit_node"] = None
+                if state["rgb_node"]:
+                    nodes.remove(state["rgb_node"])
+                    state["rgb_node"] = None
+        else:
+            debug(f"Bake to MMU: all {len(original_materials)} materials use EMIT bake")
 
         # --- Step 6: Switch to Cycles for baking ---
         original_engine = context.scene.render.engine
@@ -467,85 +672,6 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
         except Exception:
             pass  # Fall back to whatever was configured
 
-        # --- Step 6c: Rewire to Emission for faster bake ---
-        # EMIT bake evaluates only the shader color — skips all lighting,
-        # bounces, and BSDF calculations.  Perfect for color-only bakes.
-        emit_node = None
-        original_surface_socket = None
-        bake_type = "DIFFUSE"
-        bake_pass_filter = {"COLOR"}
-
-        links = mat.node_tree.links
-
-        # Find the Principled BSDF and Material Output nodes
-        principled = None
-        output_node = None
-        for node in nodes:
-            if node.type == "BSDF_PRINCIPLED" and principled is None:
-                principled = node
-            if node.type == "OUTPUT_MATERIAL" and node.is_active_output:
-                output_node = node
-
-        if principled and output_node:
-            # Find what drives Base Color
-            base_color_source = None
-            for link in links:
-                if link.to_node == principled and link.to_socket.name == "Base Color":
-                    base_color_source = link.from_socket
-                    break
-
-            if base_color_source:
-                # Remember what was wired into Material Output → Surface
-                for link in links:
-                    if (
-                        link.to_node == output_node
-                        and link.to_socket.name == "Surface"
-                    ):
-                        original_surface_socket = link.from_socket
-                        break
-
-                # Create a temporary Emission shader wired from the same color source
-                emit_node = nodes.new("ShaderNodeEmission")
-                emit_node.name = "_MMU_Temp_Emission"
-                emit_node.location = (
-                    principled.location.x,
-                    principled.location.y - 200,
-                )
-
-                links.new(base_color_source, emit_node.inputs["Color"])
-                links.new(
-                    emit_node.outputs["Emission"],
-                    output_node.inputs["Surface"],
-                )
-
-                bake_type = "EMIT"
-                bake_pass_filter = set()  # EMIT bake has no pass_filter
-                debug("Bake to MMU: using EMIT bake (skipping lighting)")
-
-        # --- Step 6d: Pin Image Texture UVs to the original UV layer ---
-        # After _ensure_uv_unwrap() the active UV is MMU_Paint.  Image
-        # Texture nodes without an explicit UV input fall back to the
-        # active layer — which is now wrong.  Wire a temporary UV Map
-        # node pointing at the original UV layer so the bake samples
-        # the source texture with the correct coordinates.
-        _temp_uv_nodes = []
-        if prev_uv_name and mesh.uv_layers.get(prev_uv_name):
-            for node in list(nodes):
-                if node.type != "TEX_IMAGE" or node == bake_node:
-                    continue
-                uv_input = node.inputs.get("Vector")
-                if uv_input and not uv_input.is_linked:
-                    uv_node = nodes.new("ShaderNodeUVMap")
-                    uv_node.uv_map = prev_uv_name
-                    uv_node.name = "_MMU_Temp_UV"
-                    uv_node.location = (
-                        node.location.x - 200,
-                        node.location.y - 100,
-                    )
-                    links.new(uv_node.outputs["UV"], uv_input)
-                    _temp_uv_nodes.append(uv_node)
-                    debug(f"Bake to MMU: pinned '{node.name}' UV to '{prev_uv_name}'")
-
         # Ensure we're in Object mode for baking
         prev_mode = obj.mode
         if prev_mode != "OBJECT":
@@ -571,17 +697,8 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
         except RuntimeError as e:
             error(f"Bake failed: {e}")
             self.report({"ERROR"}, f"Bake failed: {e}")
-            # Clean up temp nodes and settings
-            for uv_node in _temp_uv_nodes:
-                nodes.remove(uv_node)
-            if emit_node:
-                if original_surface_socket:
-                    links.new(
-                        original_surface_socket,
-                        output_node.inputs["Surface"],
-                    )
-                nodes.remove(emit_node)
-            nodes.remove(bake_node)
+            # Clean up temp nodes and settings from ALL materials
+            _cleanup_per_mat_state(_per_mat_state)
             cycles.samples = original_samples
             cycles.device = original_device
             context.scene.render.engine = original_engine
@@ -593,18 +710,8 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
             return {"CANCELLED"}
 
         # --- Step 8: Restore render engine and Cycles settings ---
-        # Tear down temporary UV Map nodes used to pin texture sampling
-        for uv_node in _temp_uv_nodes:
-            nodes.remove(uv_node)
-
-        # Tear down the temporary Emission wiring
-        if emit_node:
-            if original_surface_socket:
-                links.new(
-                    original_surface_socket,
-                    output_node.inputs["Surface"],
-                )
-            nodes.remove(emit_node)
+        # Tear down all temporary nodes from ALL materials
+        _cleanup_per_mat_state(_per_mat_state)
 
         cycles.samples = original_samples
         cycles.device = original_device
@@ -625,8 +732,8 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
         image.pack()
 
         # --- Step 10: Replace material with MMU paint material ---
-        # Remove the bake target node from the original material
-        nodes.remove(bake_node)
+        # Bake target nodes were already removed by _cleanup_per_mat_state()
+        # in Step 8.  Create a new single MMU paint material.
 
         # Create new MMU paint material
         mmu_mat = bpy.data.materials.new(name=image_name)

@@ -192,10 +192,10 @@ class ExportMaterialTests(Blender3mfTestCase):
         bmesh.update_edit_mesh(cube.data)
         bpy.ops.object.mode_set(mode='OBJECT')
 
-        # Export in STANDARD mode (the default)
+        # Export in AUTO mode (the default)
         result = bpy.ops.export_mesh.threemf(
             filepath=str(self.temp_file),
-            use_orca_format='STANDARD',
+            use_orca_format='AUTO',
         )
 
         self.assertIn('FINISHED', result)
@@ -258,11 +258,12 @@ class ExportMaterialTests(Blender3mfTestCase):
                 "Orca export should include project_settings.config"
             )
 
-    def test_export_single_material_uses_standard_format(self):
-        """Single-material objects should use standard 3MF format, not Orca.
+    def test_export_single_material_uses_orca_for_slicer_compat(self):
+        """Single-material objects auto-promote to Orca format for slicer compatibility.
 
-        When an object has only one material slot, basematerials is fine and
-        the simpler standard format should be used.
+        The exporter uses OrcaExporter whenever materials are present because
+        Orca/BambuStudio ignore core-spec <basematerials> and only read
+        colorgroup/paint_color attributes.
         """
         bpy.ops.mesh.primitive_cube_add(location=(0, 0, 0))
         cube = bpy.context.object
@@ -272,7 +273,7 @@ class ExportMaterialTests(Blender3mfTestCase):
 
         result = bpy.ops.export_mesh.threemf(
             filepath=str(self.temp_file),
-            use_orca_format='STANDARD',
+            use_orca_format='AUTO',
         )
 
         self.assertIn('FINISHED', result)
@@ -280,14 +281,15 @@ class ExportMaterialTests(Blender3mfTestCase):
         with zipfile.ZipFile(self.temp_file, 'r') as archive:
             files = archive.namelist()
 
-            # Should NOT have Orca multi-file structure
+            # Materials detected → OrcaExporter is used for slicer compatibility,
+            # so individual object files appear under 3D/Objects/.
             object_files = [f for f in files if f.startswith('3D/Objects/')]
-            self.assertEqual(
-                len(object_files), 0,
-                "Single-material export should use standard format, not Orca multi-file"
+            self.assertGreaterEqual(
+                len(object_files), 1,
+                "Material present: Orca multi-file structure expected for slicer compat"
             )
 
-            # Should have the standard 3D/3dmodel.model
+            # The main model file should still exist
             self.assertIn('3D/3dmodel.model', files)
 
     def test_export_mixed_none_materials(self):

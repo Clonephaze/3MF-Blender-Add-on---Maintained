@@ -46,6 +46,97 @@ __all__ = ["Export3MF", "EXPORT_MT_threemf_presets", "EXPORT_OT_threemf_preset"]
 
 
 # ---------------------------------------------------------------------------
+# Scene detection helpers
+# ---------------------------------------------------------------------------
+
+def _scene_has_paint_textures() -> bool:
+    """Check if any mesh in the current scene has MMU paint texture data."""
+    for obj in bpy.data.objects:
+        if obj.type != "MESH" or obj.data is None:
+            continue
+        if obj.data.get("3mf_is_paint_texture"):
+            return True
+    return False
+
+
+def _select_exporter(ctx, context, mesh_objects, has_materials):
+    """Choose the right exporter based on mode, scene data, and user options.
+
+    :param ctx: The ExportContext.
+    :param context: The Blender context.
+    :param mesh_objects: List of mesh objects being exported.
+    :param has_materials: Whether any mesh has material slots.
+    :return: An exporter instance (StandardExporter, OrcaExporter, or PrusaExporter).
+    """
+    mode = ctx.options.use_orca_format
+    slicer = ctx.options.mmu_slicer_format
+
+    # --- Explicit PAINT mode ---
+    if mode == "PAINT":
+        if slicer == "ORCA":
+            return OrcaExporter(ctx)
+        elif slicer == "PRUSA":
+            if ctx.project_template_path or ctx.object_settings:
+                warn(
+                    "project_template and object_settings are Orca-specific "
+                    "features and will be ignored for PrusaSlicer export"
+                )
+            return PrusaExporter(ctx)
+        return StandardExporter(ctx)
+
+    # --- Explicit STANDARD mode — always spec-compliant ---
+    if mode == "STANDARD":
+        debug("Standard mode: using spec-compliant StandardExporter")
+        return StandardExporter(ctx)
+
+    # --- AUTO mode — detect and dispatch ---
+    # Orca-specific API features force OrcaExporter
+    if ctx.project_template_path or ctx.object_settings:
+        return OrcaExporter(ctx)
+
+    # Check for MMU paint textures — route to slicer exporter
+    has_paint = any(
+        obj.data.get("3mf_is_paint_texture")
+        for obj in mesh_objects
+        if obj.type == "MESH" and obj.data is not None
+    )
+    if has_paint:
+        debug("AUTO: MMU paint textures detected — promoting to PAINT mode")
+        ctx.options.use_orca_format = "PAINT"
+        if slicer == "ORCA":
+            return OrcaExporter(ctx)
+        elif slicer == "PRUSA":
+            return PrusaExporter(ctx)
+        return OrcaExporter(ctx)
+
+    if has_materials:
+        # Passthrough data from prior import → StandardExporter for round-trip
+        scene = context.scene
+        has_passthrough = bool(
+            scene.get("3mf_colorgroups")
+            or scene.get("3mf_compositematerials")
+            or scene.get("3mf_multiproperties")
+            or scene.get("3mf_textures")
+            or scene.get("3mf_texture_groups")
+            or scene.get("3mf_pbr_display_props")
+            or scene.get("3mf_pbr_texture_displays")
+        )
+        if has_passthrough:
+            debug(
+                "AUTO: passthrough Materials Extension data detected, "
+                "using StandardExporter for round-trip fidelity"
+            )
+            return StandardExporter(ctx)
+
+        # Material slots present — use Orca for slicer compatibility
+        debug("AUTO: materials detected, using OrcaExporter for slicer compatibility")
+        return OrcaExporter(ctx)
+
+    # No materials, no paint — plain geometry
+    return StandardExporter(ctx)
+
+
+# ---------------------------------------------------------------------------
 # Export Presets
 # ---------------------------------------------------------------------------
 
@@ -76,6 +167,7 @@ class EXPORT_OT_threemf_preset(AddPresetBase, bpy.types.Operator):
     preset_values = [
         "op.use_selection",
         "op.export_hidden",
+        "op.skip_disabled",
         "op.global_scale",
         "op.use_mesh_modifiers",
         "op.coordinate_precision",
@@ -90,8 +182,13 @@ class EXPORT_OT_threemf_preset(AddPresetBase, bpy.types.Operator):
     ]
 
 
+# Cache for dynamic enum to prevent Blender GC issues.
+_thumbnail_image_cache: list = []
+
+
 def _thumbnail_image_items(self, context):
     """Dynamic enum callback listing images in the current .blend file."""
+    global _thumbnail_image_cache
     items = []
     for img in bpy.data.images:
         # Skip internal renders, viewers, and zero-pixel images.
@@ -102,7 +199,8 @@ def _thumbnail_image_items(self, context):
     items.append(
         ("__CUSTOM_PATH__", "Custom File Path", "Enter a file path manually", "FILEBROWSER", len(items))
     )
-    return items
+    _thumbnail_image_cache = items
+    return _thumbnail_image_cache
 
 
 # Cache for dynamic enum to prevent Blender GC issues.
@@ -172,9 +270,17 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         default=False,
     )
     export_hidden: bpy.props.BoolProperty(
-        name="Export hidden objects",
-        description="Export objects hidden in the viewport",
+        name="Include Hidden",
+        description="Export objects hidden in the viewport (eye icon, collection visibility)",
         default=False,
+    )
+    skip_disabled: bpy.props.BoolProperty(
+        name="Skip Disabled",
+        description=(
+            "Skip objects disabled for rendering (camera icon) "
+            "and objects in excluded collections"
+        ),
+        default=True,
     )
     global_scale: bpy.props.FloatProperty(
         name="Scale", default=1.0, soft_min=0.001, soft_max=1000.0, min=1e-6, max=1e6
@@ -206,9 +312,18 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         description="How to export material and color data",
         items=[
             (
+                "AUTO",
+                "Auto",
+                "Automatically detect materials and MMU paint data. "
+                "Uses slicer-compatible export when colors are present, "
+                "standard spec-compliant export otherwise",
+            ),
+            (
                 "STANDARD",
                 "Standard 3MF",
-                "Export geometry with material colors when present (spec-compliant)",
+                "Always export spec-compliant 3MF with basematerials, textures, "
+                "and proper component instancing. Use this when you want "
+                "clean geometry without slicer-specific encoding",
             ),
             (
                 "PAINT",
@@ -217,7 +332,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                 " (experimental, may be slow)",
             ),
         ],
-        default="STANDARD",
+        default="AUTO",
     )
 
     use_components: bpy.props.BoolProperty(
@@ -351,11 +466,26 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                 body.prop(self, "mmu_slicer_format", text="Slicer")
                 body.prop(self, "slicer_profile", text="Profile")
                 body.prop(self, "subdivision_depth")
+            elif self.use_orca_format == "AUTO":
+                # Detect what's in the scene and show appropriate controls
+                has_paint = _scene_has_paint_textures()
+                if has_paint:
+                    tip = body.column(align=True)
+                    tip.scale_y = 0.7
+                    tip.label(text="MMU paint data detected.", icon="INFO")
+                    body.prop(self, "mmu_slicer_format", text="Slicer")
+                    body.prop(self, "slicer_profile", text="Profile")
+                    body.prop(self, "subdivision_depth")
+                else:
+                    tip = body.column(align=True)
+                    tip.scale_y = 0.7
+                    tip.label(text="Assign materials to faces in Edit Mode.", icon="INFO")
+                    tip.label(text="Each color becomes a filament slot in the slicer.")
             elif self.use_orca_format == "STANDARD":
                 tip = body.column(align=True)
                 tip.scale_y = 0.7
-                tip.label(text="Assign materials to faces in Edit Mode.", icon="INFO")
-                tip.label(text="Each color becomes a filament slot in the slicer.")
+                tip.label(text="Spec-compliant export with proper components.", icon="INFO")
+                tip.label(text="Materials exported as basematerials/textures.")
 
         # --- Geometry ---
         header, body = layout.panel("EXPORT_3MF_geometry", default_closed=False)
@@ -364,6 +494,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             col = body.column(align=True)
             col.prop(self, "use_selection")
             col.prop(self, "export_hidden")
+            col.prop(self, "skip_disabled")
             col.prop(self, "use_mesh_modifiers")
             col.prop(self, "use_components")
             col.separator()
@@ -402,6 +533,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         options = ExportOptions(
             use_selection=self.use_selection,
             export_hidden=self.export_hidden,
+            skip_disabled=self.skip_disabled,
             global_scale=self.global_scale,
             use_mesh_modifiers=self.use_mesh_modifiers,
             coordinate_precision=self.coordinate_precision,
@@ -463,7 +595,9 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
 
             # Check for non-manifold geometry before export
             mesh_objects = collect_mesh_objects(
-                blender_objects, export_hidden=ctx.options.export_hidden
+                blender_objects,
+                export_hidden=ctx.options.export_hidden,
+                skip_disabled=ctx.options.skip_disabled,
             )
             if mesh_objects:
                 non_manifold_objects = check_non_manifold_geometry(
@@ -498,53 +632,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                 )
 
             # Dispatch to format-specific exporter
-            if ctx.options.use_orca_format == "PAINT":
-                if ctx.options.mmu_slicer_format == "ORCA":
-                    exporter = OrcaExporter(ctx)
-                elif ctx.options.mmu_slicer_format == "PRUSA":
-                    if ctx.project_template_path or ctx.object_settings:
-                        warn(
-                            "project_template and object_settings are Orca-specific "
-                            "features and will be ignored for PrusaSlicer export"
-                        )
-                    exporter = PrusaExporter(ctx)
-                else:
-                    exporter = StandardExporter(ctx)
-            elif ctx.project_template_path or ctx.object_settings:
-                # Orca-specific API features requested — use OrcaExporter
-                # regardless of material mode so project/object settings are written
-                exporter = OrcaExporter(ctx)
-            elif has_materials:
-                # Check if passthrough Materials Extension data exists from a
-                # prior 3MF import.  If so, use StandardExporter to preserve
-                # round-trip fidelity (colorgroups, textures, multiproperties,
-                # etc.) instead of converting to Orca paint_color attributes.
-                scene = context.scene
-                has_passthrough = bool(
-                    scene.get("3mf_colorgroups")
-                    or scene.get("3mf_compositematerials")
-                    or scene.get("3mf_multiproperties")
-                    or scene.get("3mf_textures")
-                    or scene.get("3mf_texture_groups")
-                    or scene.get("3mf_pbr_display_props")
-                    or scene.get("3mf_pbr_texture_displays")
-                )
-                if has_passthrough:
-                    debug(
-                        "Materials with passthrough data detected, "
-                        "using Standard exporter for round-trip fidelity"
-                    )
-                    exporter = StandardExporter(ctx)
-                else:
-                    # Material assignments detected — use OrcaExporter so slicers
-                    # receive colorgroup/paint_color attributes they understand.
-                    # Orca/BambuStudio ignore core-spec <basematerials>, so even
-                    # single-colour objects need the Orca path.
-                    debug("Materials detected, using Orca exporter for slicer compatibility")
-                    exporter = OrcaExporter(ctx)
-            else:
-                # Standard 3MF export — geometry, materials, and texture export
-                exporter = StandardExporter(ctx)
+            exporter = _select_exporter(ctx, context, mesh_objects, has_materials)
 
             return exporter.execute(context, archive, blender_objects, global_scale)
         finally:

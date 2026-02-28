@@ -1,0 +1,707 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>io_mesh_3mf.common.segmentation &mdash; 3MF Format API — v1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #2b2b2b" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            3MF Format for Blender
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../guide.html">Getting Started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide.html#quick-start">Quick Start</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide.html#export-format-reference">Export Format Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide.html#callbacks">Callbacks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide.html#error-handling">Error Handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide.html#cli-usage">CLI Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide.html#notes">Notes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../recipes.html">Recipes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../recipes.html#import-with-material-painting">Import with Material Painting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../recipes.html#import-into-a-specific-collection">Import into a Specific Collection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../recipes.html#export-for-orca-slicer">Export for Orca Slicer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../recipes.html#export-for-prusaslicer-with-mmu-paint">Export for PrusaSlicer with MMU Paint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../recipes.html#custom-orca-project-template">Custom Orca Project Template</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../recipes.html#round-trip-conversion">Round-Trip Conversion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../recipes.html#inspect-without-importing">Inspect Without Importing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../recipes.html#batch-operations">Batch Operations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">Core API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../api.html#version-capabilities">Version &amp; Capabilities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.API_VERSION"><code class="docutils literal notranslate"><span class="pre">API_VERSION</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.API_VERSION_STRING"><code class="docutils literal notranslate"><span class="pre">API_VERSION_STRING</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.API_CAPABILITIES"><code class="docutils literal notranslate"><span class="pre">API_CAPABILITIES</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api.html#result-dataclasses">Result Dataclasses</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.ImportResult"><code class="docutils literal notranslate"><span class="pre">ImportResult</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.ExportResult"><code class="docutils literal notranslate"><span class="pre">ExportResult</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.InspectResult"><code class="docutils literal notranslate"><span class="pre">InspectResult</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api.html#import">Import</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.import_3mf"><code class="docutils literal notranslate"><span class="pre">import_3mf()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api.html#export">Export</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.export_3mf"><code class="docutils literal notranslate"><span class="pre">export_3mf()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api.html#inspect">Inspect</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.inspect_3mf"><code class="docutils literal notranslate"><span class="pre">inspect_3mf()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api.html#batch-operations">Batch Operations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.batch_import"><code class="docutils literal notranslate"><span class="pre">batch_import()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api.html#io_mesh_3mf.api.batch_export"><code class="docutils literal notranslate"><span class="pre">batch_export()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api.html#callback-types">Callback Types</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../discovery.html">API Discovery</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../discovery.html#direct-discovery-from-api">Direct Discovery (from <code class="docutils literal notranslate"><span class="pre">api</span></code>)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../discovery.html#io_mesh_3mf.api.is_available"><code class="docutils literal notranslate"><span class="pre">is_available()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../discovery.html#io_mesh_3mf.api.get_api"><code class="docutils literal notranslate"><span class="pre">get_api()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../discovery.html#io_mesh_3mf.api.has_capability"><code class="docutils literal notranslate"><span class="pre">has_capability()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../discovery.html#io_mesh_3mf.api.check_version"><code class="docutils literal notranslate"><span class="pre">check_version()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../discovery.html#standalone-discovery-helper">Standalone Discovery Helper</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../discovery.html#io_mesh_3mf.threemf_discovery.is_threemf_available"><code class="docutils literal notranslate"><span class="pre">is_threemf_available()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../discovery.html#io_mesh_3mf.threemf_discovery.get_threemf_api"><code class="docutils literal notranslate"><span class="pre">get_threemf_api()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../discovery.html#io_mesh_3mf.threemf_discovery.get_threemf_version"><code class="docutils literal notranslate"><span class="pre">get_threemf_version()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../discovery.html#io_mesh_3mf.threemf_discovery.check_threemf_version"><code class="docutils literal notranslate"><span class="pre">check_threemf_version()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../discovery.html#io_mesh_3mf.threemf_discovery.has_threemf_capability"><code class="docutils literal notranslate"><span class="pre">has_threemf_capability()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../building-blocks.html">Building Blocks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../building-blocks.html#module-io_mesh_3mf.common.colors">Colors</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.colors.srgb_to_linear"><code class="docutils literal notranslate"><span class="pre">srgb_to_linear()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.colors.linear_to_srgb"><code class="docutils literal notranslate"><span class="pre">linear_to_srgb()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.colors.hex_to_rgb"><code class="docutils literal notranslate"><span class="pre">hex_to_rgb()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.colors.hex_to_linear_rgb"><code class="docutils literal notranslate"><span class="pre">hex_to_linear_rgb()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.colors.rgb_to_hex"><code class="docutils literal notranslate"><span class="pre">rgb_to_hex()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.colors.linear_rgb_to_hex"><code class="docutils literal notranslate"><span class="pre">linear_rgb_to_hex()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../building-blocks.html#module-io_mesh_3mf.common.units">Units</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.units.import_unit_scale"><code class="docutils literal notranslate"><span class="pre">import_unit_scale()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.units.export_unit_scale"><code class="docutils literal notranslate"><span class="pre">export_unit_scale()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../building-blocks.html#module-io_mesh_3mf.common.types">Types (Dataclasses)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.ResourceObject"><code class="docutils literal notranslate"><span class="pre">ResourceObject</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.Component"><code class="docutils literal notranslate"><span class="pre">Component</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial"><code class="docutils literal notranslate"><span class="pre">ResourceMaterial</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.ResourceTexture"><code class="docutils literal notranslate"><span class="pre">ResourceTexture</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.ResourceTextureGroup"><code class="docutils literal notranslate"><span class="pre">ResourceTextureGroup</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.ResourceComposite"><code class="docutils literal notranslate"><span class="pre">ResourceComposite</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.ResourceMultiproperties"><code class="docutils literal notranslate"><span class="pre">ResourceMultiproperties</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.ResourcePBRTextureDisplay"><code class="docutils literal notranslate"><span class="pre">ResourcePBRTextureDisplay</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.ResourceColorgroup"><code class="docutils literal notranslate"><span class="pre">ResourceColorgroup</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.types.ResourcePBRDisplayProps"><code class="docutils literal notranslate"><span class="pre">ResourcePBRDisplayProps</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../building-blocks.html#module-io_mesh_3mf.common.segmentation">Segmentation Codec</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState"><code class="docutils literal notranslate"><span class="pre">TriangleState</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationNode"><code class="docutils literal notranslate"><span class="pre">SegmentationNode</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.SubdividedTriangle"><code class="docutils literal notranslate"><span class="pre">SubdividedTriangle</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationDecoder"><code class="docutils literal notranslate"><span class="pre">SegmentationDecoder</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.TriangleSubdivider"><code class="docutils literal notranslate"><span class="pre">TriangleSubdivider</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationEncoder"><code class="docutils literal notranslate"><span class="pre">SegmentationEncoder</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.decode_segmentation_string"><code class="docutils literal notranslate"><span class="pre">decode_segmentation_string()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.subdivide_triangle_with_segmentation"><code class="docutils literal notranslate"><span class="pre">subdivide_triangle_with_segmentation()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../building-blocks.html#module-io_mesh_3mf.common.extensions">Extensions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.Extension"><code class="docutils literal notranslate"><span class="pre">Extension</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.ExtensionType"><code class="docutils literal notranslate"><span class="pre">ExtensionType</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager"><code class="docutils literal notranslate"><span class="pre">ExtensionManager</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.get_extension_by_namespace"><code class="docutils literal notranslate"><span class="pre">get_extension_by_namespace()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.get_extension_by_prefix"><code class="docutils literal notranslate"><span class="pre">get_extension_by_prefix()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.list_official_extensions"><code class="docutils literal notranslate"><span class="pre">list_official_extensions()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.extensions.list_vendor_extensions"><code class="docutils literal notranslate"><span class="pre">list_vendor_extensions()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../building-blocks.html#module-io_mesh_3mf.common.metadata">Metadata</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.metadata.Metadata"><code class="docutils literal notranslate"><span class="pre">Metadata</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../building-blocks.html#io_mesh_3mf.common.metadata.MetadataEntry"><code class="docutils literal notranslate"><span class="pre">MetadataEntry</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #2b2b2b" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">3MF Format for Blender</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">io_mesh_3mf.common.segmentation</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for io_mesh_3mf.common.segmentation</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Blender add-on to import and export 3MF files.</span>
+<span class="c1"># Copyright (C) 2025 Jack (modernization for Blender 4.2+)</span>
+<span class="c1"># This add-on is free software; you can redistribute it and/or modify it under the terms of the GNU General Public</span>
+<span class="c1"># License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later</span>
+<span class="c1"># version.</span>
+<span class="c1"># This add-on is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied</span>
+<span class="c1"># warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.</span>
+<span class="c1"># You should have received a copy of the GNU General Public License along with this program; if not, write to the Free</span>
+<span class="c1"># Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Hash-based MMU segmentation string decoder/encoder for 3D printing slicers.</span>
+
+<span class="sd">This module implements parsing and encoding of multi-material segmentation using</span>
+<span class="sd">hex-encoded binary trees. Used by PrusaSlicer (slic3rpe:mmu_segmentation attribute)</span>
+<span class="sd">and Orca Slicer (paint_color attribute). The hash format is slicer-agnostic.</span>
+
+<span class="sd">The format encodes a recursive subdivision tree with material/color assignments per region.</span>
+
+<span class="sd">Format Reference (from PrusaSlicer TriangleSelector.cpp):</span>
+
+<span class="sd">- Each nibble (4 bits) encodes: ``xxyy``</span>
+
+<span class="sd">  - ``yy`` = number of split sides (0=leaf, 1-3=subdivided)</span>
+<span class="sd">  - ``xx`` = special_side (if split) OR state (if leaf with state &lt; 3)</span>
+
+<span class="sd">- If leaf AND ``xx == 0b11``: next nibble contains ``(state - 3)``</span>
+<span class="sd">- Tree is traversed depth-first, children in reverse order</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">IntEnum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.logging</span><span class="w"> </span><span class="kn">import</span> <span class="n">debug</span><span class="p">,</span> <span class="n">warn</span>
+
+
+<div class="viewcode-block" id="TriangleState">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TriangleState</span><span class="p">(</span><span class="n">IntEnum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Triangle paint state - maps to extruder numbers.</span>
+
+<span class="sd">    State 0 = object&#39;s default extruder (resolved from metadata during import)</span>
+<span class="sd">    State N (N &gt; 0) = Extruder N directly (1-based extruder index)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">DEFAULT</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">EXTRUDER_1</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">EXTRUDER_2</span> <span class="o">=</span> <span class="mi">2</span>
+    <span class="n">EXTRUDER_3</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="n">EXTRUDER_4</span> <span class="o">=</span> <span class="mi">4</span>
+    <span class="n">EXTRUDER_5</span> <span class="o">=</span> <span class="mi">5</span>
+    <span class="n">EXTRUDER_6</span> <span class="o">=</span> <span class="mi">6</span>
+    <span class="n">EXTRUDER_7</span> <span class="o">=</span> <span class="mi">7</span>
+    <span class="n">EXTRUDER_8</span> <span class="o">=</span> <span class="mi">8</span>
+    <span class="n">EXTRUDER_9</span> <span class="o">=</span> <span class="mi">9</span>
+    <span class="n">EXTRUDER_10</span> <span class="o">=</span> <span class="mi">10</span>
+    <span class="n">EXTRUDER_11</span> <span class="o">=</span> <span class="mi">11</span>
+    <span class="n">EXTRUDER_12</span> <span class="o">=</span> <span class="mi">12</span>
+    <span class="n">EXTRUDER_13</span> <span class="o">=</span> <span class="mi">13</span>
+    <span class="n">EXTRUDER_14</span> <span class="o">=</span> <span class="mi">14</span>
+    <span class="n">EXTRUDER_15</span> <span class="o">=</span> <span class="mi">15</span></div>
+
+
+
+<div class="viewcode-block" id="SegmentationNode">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationNode">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">SegmentationNode</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A node in the triangle subdivision tree.</span>
+
+<span class="sd">    Either a leaf node with a state (material), or an internal node with children.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">state</span><span class="p">:</span> <span class="n">TriangleState</span> <span class="o">=</span> <span class="n">TriangleState</span><span class="o">.</span><span class="n">DEFAULT</span>
+
+    <span class="n">split_sides</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">special_side</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="n">children</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">SegmentationNode</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_leaf</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check if this is a leaf node (no subdivision).&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">split_sides</span> <span class="o">==</span> <span class="mi">0</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">num_children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Number of child triangles if subdivided.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="mi">0</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_leaf</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">split_sides</span> <span class="o">+</span> <span class="mi">1</span></div>
+
+
+
+<div class="viewcode-block" id="SubdividedTriangle">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.SubdividedTriangle">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">SubdividedTriangle</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A triangle resulting from segmentation subdivision.</span>
+
+<span class="sd">    Contains vertex indices (into the expanded vertex list) and the material state.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">v0</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">v1</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">v2</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">state</span><span class="p">:</span> <span class="n">TriangleState</span>
+
+    <span class="n">source_triangle_index</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span></div>
+
+
+
+<div class="viewcode-block" id="SegmentationDecoder">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationDecoder">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SegmentationDecoder</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Decodes PrusaSlicer segmentation strings into subdivision trees.</span>
+
+<span class="sd">    The hex string is stored in REVERSED order in the 3MF file, so we reverse</span>
+<span class="sd">    it before parsing. Each nibble (hex character) encodes tree structure info.</span>
+
+<span class="sd">    Usage::</span>
+
+<span class="sd">        decoder = SegmentationDecoder()</span>
+<span class="sd">        tree = decoder.decode(&quot;00000444344043040...&quot;)</span>
+
+<span class="sd">        # Or decode and subdivide a triangle:</span>
+<span class="sd">        triangles = decoder.subdivide_triangle(</span>
+<span class="sd">            vertices=[(0,0,0), (1,0,0), (0.5,1,0)],</span>
+<span class="sd">            segmentation_string=&quot;0004...&quot;</span>
+<span class="sd">        )</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_hex_string</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_nibble_index</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_read_nibble</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Read next nibble (4 bits) from the hex string.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_nibble_index</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_hex_string</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Segmentation string truncated at nibble </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_nibble_index</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_hex_string</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">nibble</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_hex_string</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_nibble_index</span><span class="p">],</span> <span class="mi">16</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Invalid hex character &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_hex_string</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_nibble_index</span><span class="p">]</span><span class="si">}</span><span class="s2">&#39; at position </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_nibble_index</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_nibble_index</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="n">nibble</span>
+
+<div class="viewcode-block" id="SegmentationDecoder.decode">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationDecoder.decode">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">decode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hex_string</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SegmentationNode</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Decode a segmentation hex string into a tree structure.</span>
+
+<span class="sd">        PrusaSlicer stores the hex string in REVERSED order, so we reverse it</span>
+<span class="sd">        before parsing to read the tree root-first.</span>
+
+<span class="sd">        :param hex_string: The slic3rpe:mmu_segmentation attribute value</span>
+<span class="sd">        :return: Root node of the subdivision tree, or None if empty/invalid</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">hex_string</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="c1"># The on-disk order is reversed; decode expects root-first order.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_hex_string</span> <span class="o">=</span> <span class="n">hex_string</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_nibble_index</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_hex_string</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">node</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_decode_node</span><span class="p">()</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_nibble_index</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_hex_string</span><span class="p">):</span>
+                <span class="n">debug</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Warning: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_hex_string</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">_nibble_index</span><span class="si">}</span><span class="s2"> unused nibbles in segmentation string&quot;</span>
+                <span class="p">)</span>
+            <span class="k">return</span> <span class="n">node</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">warn</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error decoding segmentation string (length </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">hex_string</span><span class="p">)</span><span class="si">}</span><span class="s2">): </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_decode_node</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SegmentationNode</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Recursively decode a single node from the bitstream.&quot;&quot;&quot;</span>
+        <span class="n">code</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_nibble</span><span class="p">()</span>
+
+        <span class="n">split_sides</span> <span class="o">=</span> <span class="n">code</span> <span class="o">&amp;</span> <span class="mb">0b11</span>
+        <span class="n">special_side</span> <span class="o">=</span> <span class="p">(</span><span class="n">code</span> <span class="o">&gt;&gt;</span> <span class="mi">2</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mb">0b11</span>
+
+        <span class="k">if</span> <span class="n">split_sides</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">special_side</span> <span class="o">==</span> <span class="mb">0b11</span><span class="p">:</span>
+                <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_nibble</span><span class="p">()</span> <span class="o">+</span> <span class="mi">3</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">state</span> <span class="o">=</span> <span class="n">special_side</span>
+
+            <span class="k">return</span> <span class="n">SegmentationNode</span><span class="p">(</span><span class="n">state</span><span class="o">=</span><span class="n">TriangleState</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="mi">15</span><span class="p">)))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">num_children</span> <span class="o">=</span> <span class="n">split_sides</span> <span class="o">+</span> <span class="mi">1</span>
+
+            <span class="c1"># Children are stored in the slicer order; decoder keeps that order</span>
+            <span class="c1"># and the encoder reverses at the end to match the file format.</span>
+            <span class="n">children</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_children</span><span class="p">):</span>
+                <span class="n">children</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_decode_node</span><span class="p">())</span>
+
+            <span class="k">return</span> <span class="n">SegmentationNode</span><span class="p">(</span>
+                <span class="n">split_sides</span><span class="o">=</span><span class="n">split_sides</span><span class="p">,</span> <span class="n">special_side</span><span class="o">=</span><span class="n">special_side</span><span class="p">,</span> <span class="n">children</span><span class="o">=</span><span class="n">children</span>
+            <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="TriangleSubdivider">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.TriangleSubdivider">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TriangleSubdivider</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Subdivides triangles based on segmentation trees.</span>
+
+<span class="sd">    This class takes the decoded segmentation tree and the original triangle</span>
+<span class="sd">    vertices, then produces a list of leaf triangles with their states.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_vertices</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_vertex_map</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_result_triangles</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">SubdividedTriangle</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+<div class="viewcode-block" id="TriangleSubdivider.subdivide">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.TriangleSubdivider.subdivide">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">subdivide</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">v0</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
+        <span class="n">v1</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
+        <span class="n">v2</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
+        <span class="n">tree</span><span class="p">:</span> <span class="n">SegmentationNode</span><span class="p">,</span>
+        <span class="n">source_triangle_index</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]],</span> <span class="n">List</span><span class="p">[</span><span class="n">SubdividedTriangle</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Subdivide a triangle according to the segmentation tree.</span>
+
+<span class="sd">        :param v0, v1, v2: Original triangle vertices</span>
+<span class="sd">        :param tree: Decoded segmentation tree</span>
+<span class="sd">        :param source_triangle_index: Index of original triangle (for roundtrip tracking)</span>
+<span class="sd">        :return: Tuple of (all vertices, list of leaf triangles)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_vertices</span> <span class="o">=</span> <span class="p">[</span><span class="n">v0</span><span class="p">,</span> <span class="n">v1</span><span class="p">,</span> <span class="n">v2</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_vertex_map</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_result_triangles</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_subdivide_node</span><span class="p">(</span><span class="n">tree</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">source_triangle_index</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_vertices</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_result_triangles</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_midpoint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx1</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">idx2</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get or create vertex at midpoint of edge (idx1, idx2).&quot;&quot;&quot;</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">idx1</span><span class="p">,</span> <span class="n">idx2</span><span class="p">),</span> <span class="nb">max</span><span class="p">(</span><span class="n">idx1</span><span class="p">,</span> <span class="n">idx2</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_vertex_map</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_vertex_map</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+
+        <span class="n">v1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_vertices</span><span class="p">[</span><span class="n">idx1</span><span class="p">]</span>
+        <span class="n">v2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_vertices</span><span class="p">[</span><span class="n">idx2</span><span class="p">]</span>
+        <span class="n">midpoint</span> <span class="o">=</span> <span class="p">((</span><span class="n">v1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">v2</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">/</span> <span class="mf">2.0</span><span class="p">,</span> <span class="p">(</span><span class="n">v1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">v2</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="mf">2.0</span><span class="p">,</span> <span class="p">(</span><span class="n">v1</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="n">v2</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">/</span> <span class="mf">2.0</span><span class="p">)</span>
+
+        <span class="n">new_idx</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_vertices</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_vertices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">midpoint</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_vertex_map</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_idx</span>
+
+        <span class="k">return</span> <span class="n">new_idx</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_subdivide_node</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">node</span><span class="p">:</span> <span class="n">SegmentationNode</span><span class="p">,</span>
+        <span class="n">i0</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">i1</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">i2</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">source_triangle_index</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Recursively subdivide based on a node.</span>
+
+<span class="sd">        :param node: Current tree node</span>
+<span class="sd">        :param i0, i1, i2: Vertex indices of current triangle</span>
+<span class="sd">        :param source_triangle_index: Original triangle index for tracking</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">is_leaf</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_result_triangles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">SubdividedTriangle</span><span class="p">(</span>
+                    <span class="n">v0</span><span class="o">=</span><span class="n">i0</span><span class="p">,</span>
+                    <span class="n">v1</span><span class="o">=</span><span class="n">i1</span><span class="p">,</span>
+                    <span class="n">v2</span><span class="o">=</span><span class="n">i2</span><span class="p">,</span>
+                    <span class="n">state</span><span class="o">=</span><span class="n">node</span><span class="o">.</span><span class="n">state</span><span class="p">,</span>
+                    <span class="n">source_triangle_index</span><span class="o">=</span><span class="n">source_triangle_index</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="n">split_sides</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">split_sides</span>
+        <span class="n">special</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">special_side</span>
+
+        <span class="c1"># special_side rotates which edge is treated as the first split edge.</span>
+        <span class="c1"># This matches slicer behavior when encoding non-3-way splits.</span>
+        <span class="n">verts</span> <span class="o">=</span> <span class="p">[</span><span class="n">i0</span><span class="p">,</span> <span class="n">i1</span><span class="p">,</span> <span class="n">i2</span><span class="p">]</span>
+        <span class="n">rotated</span> <span class="o">=</span> <span class="p">[</span><span class="n">verts</span><span class="p">[(</span><span class="n">special</span> <span class="o">+</span> <span class="n">j</span><span class="p">)</span> <span class="o">%</span> <span class="mi">3</span><span class="p">]</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">)]</span>
+        <span class="n">r0</span><span class="p">,</span> <span class="n">r1</span><span class="p">,</span> <span class="n">r2</span> <span class="o">=</span> <span class="n">rotated</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">rotated</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">rotated</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+
+        <span class="c1"># Children are encoded in forward order but stored reversed in the file.</span>
+        <span class="c1"># Reverse here so subdivision order matches the original slicer output.</span>
+        <span class="n">children</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">children</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">split_sides</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">m</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_midpoint</span><span class="p">(</span><span class="n">r1</span><span class="p">,</span> <span class="n">r2</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_subdivide_node</span><span class="p">(</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">r0</span><span class="p">,</span> <span class="n">r1</span><span class="p">,</span> <span class="n">m</span><span class="p">,</span> <span class="n">source_triangle_index</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_subdivide_node</span><span class="p">(</span><span class="n">children</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">m</span><span class="p">,</span> <span class="n">r2</span><span class="p">,</span> <span class="n">r0</span><span class="p">,</span> <span class="n">source_triangle_index</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">split_sides</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">m01</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_midpoint</span><span class="p">(</span><span class="n">r0</span><span class="p">,</span> <span class="n">r1</span><span class="p">)</span>
+            <span class="n">m20</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_midpoint</span><span class="p">(</span><span class="n">r2</span><span class="p">,</span> <span class="n">r0</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_subdivide_node</span><span class="p">(</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">r0</span><span class="p">,</span> <span class="n">m01</span><span class="p">,</span> <span class="n">m20</span><span class="p">,</span> <span class="n">source_triangle_index</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_subdivide_node</span><span class="p">(</span><span class="n">children</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">m01</span><span class="p">,</span> <span class="n">r1</span><span class="p">,</span> <span class="n">m20</span><span class="p">,</span> <span class="n">source_triangle_index</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_subdivide_node</span><span class="p">(</span><span class="n">children</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">r1</span><span class="p">,</span> <span class="n">r2</span><span class="p">,</span> <span class="n">m20</span><span class="p">,</span> <span class="n">source_triangle_index</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">split_sides</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">m01</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_midpoint</span><span class="p">(</span><span class="n">r0</span><span class="p">,</span> <span class="n">r1</span><span class="p">)</span>
+            <span class="n">m12</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_midpoint</span><span class="p">(</span><span class="n">r1</span><span class="p">,</span> <span class="n">r2</span><span class="p">)</span>
+            <span class="n">m20</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_midpoint</span><span class="p">(</span><span class="n">r2</span><span class="p">,</span> <span class="n">r0</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_subdivide_node</span><span class="p">(</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">r0</span><span class="p">,</span> <span class="n">m01</span><span class="p">,</span> <span class="n">m20</span><span class="p">,</span> <span class="n">source_triangle_index</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_subdivide_node</span><span class="p">(</span><span class="n">children</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">m01</span><span class="p">,</span> <span class="n">r1</span><span class="p">,</span> <span class="n">m12</span><span class="p">,</span> <span class="n">source_triangle_index</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_subdivide_node</span><span class="p">(</span><span class="n">children</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">m12</span><span class="p">,</span> <span class="n">r2</span><span class="p">,</span> <span class="n">m20</span><span class="p">,</span> <span class="n">source_triangle_index</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_subdivide_node</span><span class="p">(</span><span class="n">children</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="n">m01</span><span class="p">,</span> <span class="n">m12</span><span class="p">,</span> <span class="n">m20</span><span class="p">,</span> <span class="n">source_triangle_index</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="SegmentationEncoder">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationEncoder">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SegmentationEncoder</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Encodes subdivision trees back to PrusaSlicer hex strings.</span>
+
+<span class="sd">    For roundtrip preservation, we can store the original string and avoid</span>
+<span class="sd">    re-encoding entirely. But this class allows generating new strings from</span>
+<span class="sd">    modified subdivision data.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_nibbles</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+<div class="viewcode-block" id="SegmentationEncoder.encode">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationEncoder.encode">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">encode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tree</span><span class="p">:</span> <span class="n">SegmentationNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Encode a segmentation tree to a hex string.</span>
+
+<span class="sd">        Matches PrusaSlicer&#39;s serialization format exactly.</span>
+<span class="sd">        The output is reversed to match the stored format in 3MF files.</span>
+
+<span class="sd">        :param tree: Root node of the subdivision tree</span>
+<span class="sd">        :return: Hex string suitable for slic3rpe:mmu_segmentation attribute</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_nibbles</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_encode_node</span><span class="p">(</span><span class="n">tree</span><span class="p">)</span>
+
+        <span class="c1"># Reverse at the end to match slic3rpe:mmu_segmentation storage order.</span>
+        <span class="n">hex_str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">format</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="s2">&quot;X&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_nibbles</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">hex_str</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_encode_node</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">:</span> <span class="n">SegmentationNode</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Recursively encode a node to nibbles.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">is_leaf</span><span class="p">:</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">state</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">state</span> <span class="o">&gt;=</span> <span class="mi">3</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_nibbles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mb">0b1100</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_nibbles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">state</span> <span class="o">-</span> <span class="mi">3</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_nibbles</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">state</span> <span class="o">&lt;&lt;</span> <span class="mi">2</span><span class="p">)</span> <span class="o">|</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">code</span> <span class="o">=</span> <span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">special_side</span> <span class="o">&lt;&lt;</span> <span class="mi">2</span><span class="p">)</span> <span class="o">|</span> <span class="n">node</span><span class="o">.</span><span class="n">split_sides</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_nibbles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
+
+            <span class="c1"># Encode in forward order; reversal happens on the final hex string.</span>
+            <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">children</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_encode_node</span><span class="p">(</span><span class="n">child</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="decode_segmentation_string">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.decode_segmentation_string">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">decode_segmentation_string</span><span class="p">(</span><span class="n">hex_string</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SegmentationNode</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convenience function to decode a segmentation string.</span>
+
+<span class="sd">    :param hex_string: The slic3rpe:mmu_segmentation attribute value</span>
+<span class="sd">    :return: Root node of the subdivision tree</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">decoder</span> <span class="o">=</span> <span class="n">SegmentationDecoder</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">decoder</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">hex_string</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="subdivide_triangle_with_segmentation">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.segmentation.subdivide_triangle_with_segmentation">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">subdivide_triangle_with_segmentation</span><span class="p">(</span>
+    <span class="n">vertices</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]],</span>
+    <span class="n">v0_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">v1_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">v2_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">hex_string</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">source_triangle_index</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]],</span> <span class="n">List</span><span class="p">[</span><span class="n">SubdividedTriangle</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Decode segmentation string and subdivide a triangle accordingly.</span>
+
+<span class="sd">    :param vertices: List of all vertices (will be extended with new midpoints)</span>
+<span class="sd">    :param v0_idx, v1_idx, v2_idx: Indices into vertices for the triangle</span>
+<span class="sd">    :param hex_string: The slic3rpe:mmu_segmentation attribute value</span>
+<span class="sd">    :param source_triangle_index: Original triangle index for roundtrip tracking</span>
+<span class="sd">    :return: Tuple of (updated vertices list, list of resulting triangles)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">tree</span> <span class="o">=</span> <span class="n">decode_segmentation_string</span><span class="p">(</span><span class="n">hex_string</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">tree</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># No segmentation string means the triangle stays intact.</span>
+        <span class="k">return</span> <span class="n">vertices</span><span class="p">,</span> <span class="p">[</span>
+            <span class="n">SubdividedTriangle</span><span class="p">(</span>
+                <span class="n">v0</span><span class="o">=</span><span class="n">v0_idx</span><span class="p">,</span>
+                <span class="n">v1</span><span class="o">=</span><span class="n">v1_idx</span><span class="p">,</span>
+                <span class="n">v2</span><span class="o">=</span><span class="n">v2_idx</span><span class="p">,</span>
+                <span class="n">state</span><span class="o">=</span><span class="n">TriangleState</span><span class="o">.</span><span class="n">DEFAULT</span><span class="p">,</span>
+                <span class="n">source_triangle_index</span><span class="o">=</span><span class="n">source_triangle_index</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">]</span>
+
+    <span class="n">v0</span> <span class="o">=</span> <span class="n">vertices</span><span class="p">[</span><span class="n">v0_idx</span><span class="p">]</span>
+    <span class="n">v1</span> <span class="o">=</span> <span class="n">vertices</span><span class="p">[</span><span class="n">v1_idx</span><span class="p">]</span>
+    <span class="n">v2</span> <span class="o">=</span> <span class="n">vertices</span><span class="p">[</span><span class="n">v2_idx</span><span class="p">]</span>
+
+    <span class="n">subdivider</span> <span class="o">=</span> <span class="n">TriangleSubdivider</span><span class="p">()</span>
+    <span class="n">new_verts</span><span class="p">,</span> <span class="n">sub_tris</span> <span class="o">=</span> <span class="n">subdivider</span><span class="o">.</span><span class="n">subdivide</span><span class="p">(</span><span class="n">v0</span><span class="p">,</span> <span class="n">v1</span><span class="p">,</span> <span class="n">v2</span><span class="p">,</span> <span class="n">tree</span><span class="p">,</span> <span class="n">source_triangle_index</span><span class="p">)</span>
+
+    <span class="n">base_idx</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">vertices</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">new_verts</span><span class="p">[</span><span class="mi">3</span><span class="p">:]:</span>
+        <span class="n">vertices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">remap_idx</span><span class="p">(</span><span class="n">local_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">local_idx</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">v0_idx</span>
+        <span class="k">elif</span> <span class="n">local_idx</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">v1_idx</span>
+        <span class="k">elif</span> <span class="n">local_idx</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">v2_idx</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">base_idx</span> <span class="o">+</span> <span class="p">(</span><span class="n">local_idx</span> <span class="o">-</span> <span class="mi">3</span><span class="p">)</span>
+
+    <span class="n">result_tris</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">tri</span> <span class="ow">in</span> <span class="n">sub_tris</span><span class="p">:</span>
+        <span class="n">result_tris</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="n">SubdividedTriangle</span><span class="p">(</span>
+                <span class="n">v0</span><span class="o">=</span><span class="n">remap_idx</span><span class="p">(</span><span class="n">tri</span><span class="o">.</span><span class="n">v0</span><span class="p">),</span>
+                <span class="n">v1</span><span class="o">=</span><span class="n">remap_idx</span><span class="p">(</span><span class="n">tri</span><span class="o">.</span><span class="n">v1</span><span class="p">),</span>
+                <span class="n">v2</span><span class="o">=</span><span class="n">remap_idx</span><span class="p">(</span><span class="n">tri</span><span class="o">.</span><span class="n">v2</span><span class="p">),</span>
+                <span class="n">state</span><span class="o">=</span><span class="n">tri</span><span class="o">.</span><span class="n">state</span><span class="p">,</span>
+                <span class="n">source_triangle_index</span><span class="o">=</span><span class="n">tri</span><span class="o">.</span><span class="n">source_triangle_index</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">result_tris</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Jack.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

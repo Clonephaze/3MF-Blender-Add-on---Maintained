@@ -1,3 +1,49 @@
+2.2.2 — Export Dispatch Fix, Skip Disabled Objects & Bake Multi-Slot
+====
+
+Bug Fixes
+----
+* **AUTO mode paint export fixed** — Exporting with Auto mode correctly detected MMU paint textures and showed "MMU paint data detected" in the dialog, but the output file contained no paint data. The internal mode flag wasn't promoted to PAINT before handing off to the slicer exporter, so paint color collection and segmentation were both skipped.
+* **Bake-to-MMU multi-slot fix** — Bake-to-MMU only prepared the first material slot for baking. Objects with 2+ material slots would get correct colors for slot 0 but incorrect or missing colors for the rest.
+* **API dispatch mirrored** — `api.export_3mf()` in AUTO mode had the same missing paint-detection logic as the operator. Now matches the operator behavior.
+
+Features
+----
+* **Three-way export mode** — `Material Export Mode` replaces the old two-state toggle with Auto (detect and dispatch), Standard 3MF (always spec-compliant with basematerials/textures/components), and Paint Segmentation (explicit hash segmentation for multi-material printing).
+* **Skip disabled objects** — New export option (default on). Objects with the render-disable camera icon are excluded from export, alongside the existing viewport/collection visibility check.
+* **API versioning & discovery** — Other addons can discover and feature-check the 3MF API at runtime via `bpy.app.driver_namespace["io_mesh_3mf"]`. Includes version tuple, capability flags, and a standalone `threemf_discovery.py` helper module.
+
+Technical
+----
+* `_select_exporter()` extracted as a standalone function for testable dispatch logic.
+* `ExportOptions` gains `skip_disabled: bool` and `use_orca_format` default changed to `"AUTO"`.
+* `collect_mesh_objects()` gains `skip_disabled` parameter.
+* `api.py` registers `API_VERSION = (1, 0, 0)` and 12 capability flags in `driver_namespace`.
+
+---
+
+2.2.1 — Seam & Support Paint Layers, Grouped Assembly Export
+====
+
+Features
+----
+* **Seam & support paint round-trip** — Full import/export of `paint_seam` and `paint_supports` per-triangle attributes (Orca Slicer / BambuStudio). Uses the same hex segmentation codec as color paint with a 2-state palette: enforce (state 1) and block (state 2). Each layer gets a dedicated UV texture and image. Auxiliary data preserved through import → edit → export cycles.
+* **MMU Paint layer switcher** — Layer selector (Color / Seam / Support) with per-layer Initialize buttons and Enforce/Block brush mode toggles.
+* **Grouped assembly export** — Orca exporter detects parent EMPTYs and writes grouped assemblies with a single wrapper/build item. Bed-offset logic adjusted for grouped exports.
+* **Single-material Orca export** — Material detection changed from "multi-material only" to "any material present," so single-color objects now get per-triangle `pid`/`p1` attributes that slicers can read.
+
+Bug Fixes
+----
+* **Dominant color per part** — Fixed incorrect extruder assignments in multi-object Orca exports by picking the correct per-part dominant color from the vertex color mapping.
+
+Technical
+----
+* Segmentation rendering extended to accept custom UV layer names, image names, and default color overrides.
+* `ResourceObject` stores `paint_seam` / `paint_supports` for round-trip preservation.
+* Cura MMU data research added to ROADMAP (low priority).
+
+---
+
 2.2.0 — Metadata Panel, Slicer Profiles, Triangle Sets & More
 ====
 

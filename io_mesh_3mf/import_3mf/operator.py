@@ -50,10 +50,7 @@ from . import builder as builder_mod
 from .scene import apply_grid_layout
 from .slicer import (
     detect_vendor,
-    read_orca_filament_colors,
-    read_prusa_slic3r_colors,
-    read_blender_addon_colors,
-    read_prusa_object_extruders,
+    read_all_slicer_colors,
 )
 from .materials import (
     read_materials as _read_materials_impl,
@@ -441,11 +438,8 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         ctx.orca_filament_colors = {}
         ctx.object_default_extruders = {}
 
-        # Read filament colours (priority order).
-        read_orca_filament_colors(ctx, path)
-        read_prusa_slic3r_colors(ctx, path)
-        read_blender_addon_colors(ctx, path)
-        read_prusa_object_extruders(ctx, path)
+        # Read filament colours (single archive open, priority order).
+        read_all_slicer_colors(ctx, path)
 
         self._progress_update(25, "Reading materials and objects...")
 

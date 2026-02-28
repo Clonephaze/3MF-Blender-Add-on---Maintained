@@ -1,0 +1,883 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Index &mdash; 3MF Format API — v1.0.0</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=8d563738"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="#" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #2b2b2b" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            3MF Format for Blender
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="guide.html">Getting Started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="guide.html#quick-start">Quick Start</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guide.html#export-format-reference">Export Format Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guide.html#callbacks">Callbacks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guide.html#error-handling">Error Handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guide.html#cli-usage">CLI Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guide.html#notes">Notes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="recipes.html">Recipes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#import-with-material-painting">Import with Material Painting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#import-into-a-specific-collection">Import into a Specific Collection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#export-for-orca-slicer">Export for Orca Slicer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#export-for-prusaslicer-with-mmu-paint">Export for PrusaSlicer with MMU Paint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#custom-orca-project-template">Custom Orca Project Template</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#round-trip-conversion">Round-Trip Conversion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#inspect-without-importing">Inspect Without Importing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#batch-operations">Batch Operations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">Core API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api.html#version-capabilities">Version &amp; Capabilities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.API_VERSION"><code class="docutils literal notranslate"><span class="pre">API_VERSION</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.API_VERSION_STRING"><code class="docutils literal notranslate"><span class="pre">API_VERSION_STRING</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.API_CAPABILITIES"><code class="docutils literal notranslate"><span class="pre">API_CAPABILITIES</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#result-dataclasses">Result Dataclasses</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.ImportResult"><code class="docutils literal notranslate"><span class="pre">ImportResult</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.ExportResult"><code class="docutils literal notranslate"><span class="pre">ExportResult</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.InspectResult"><code class="docutils literal notranslate"><span class="pre">InspectResult</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#import">Import</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.import_3mf"><code class="docutils literal notranslate"><span class="pre">import_3mf()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#export">Export</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.export_3mf"><code class="docutils literal notranslate"><span class="pre">export_3mf()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#inspect">Inspect</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.inspect_3mf"><code class="docutils literal notranslate"><span class="pre">inspect_3mf()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#batch-operations">Batch Operations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.batch_import"><code class="docutils literal notranslate"><span class="pre">batch_import()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#io_mesh_3mf.api.batch_export"><code class="docutils literal notranslate"><span class="pre">batch_export()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#callback-types">Callback Types</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="discovery.html">API Discovery</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="discovery.html#direct-discovery-from-api">Direct Discovery (from <code class="docutils literal notranslate"><span class="pre">api</span></code>)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.api.is_available"><code class="docutils literal notranslate"><span class="pre">is_available()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.api.get_api"><code class="docutils literal notranslate"><span class="pre">get_api()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.api.has_capability"><code class="docutils literal notranslate"><span class="pre">has_capability()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.api.check_version"><code class="docutils literal notranslate"><span class="pre">check_version()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="discovery.html#standalone-discovery-helper">Standalone Discovery Helper</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.threemf_discovery.is_threemf_available"><code class="docutils literal notranslate"><span class="pre">is_threemf_available()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.threemf_discovery.get_threemf_api"><code class="docutils literal notranslate"><span class="pre">get_threemf_api()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.threemf_discovery.get_threemf_version"><code class="docutils literal notranslate"><span class="pre">get_threemf_version()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.threemf_discovery.check_threemf_version"><code class="docutils literal notranslate"><span class="pre">check_threemf_version()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="discovery.html#io_mesh_3mf.threemf_discovery.has_threemf_capability"><code class="docutils literal notranslate"><span class="pre">has_threemf_capability()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="building-blocks.html">Building Blocks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="building-blocks.html#module-io_mesh_3mf.common.colors">Colors</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.colors.srgb_to_linear"><code class="docutils literal notranslate"><span class="pre">srgb_to_linear()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.colors.linear_to_srgb"><code class="docutils literal notranslate"><span class="pre">linear_to_srgb()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.colors.hex_to_rgb"><code class="docutils literal notranslate"><span class="pre">hex_to_rgb()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.colors.hex_to_linear_rgb"><code class="docutils literal notranslate"><span class="pre">hex_to_linear_rgb()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.colors.rgb_to_hex"><code class="docutils literal notranslate"><span class="pre">rgb_to_hex()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.colors.linear_rgb_to_hex"><code class="docutils literal notranslate"><span class="pre">linear_rgb_to_hex()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="building-blocks.html#module-io_mesh_3mf.common.units">Units</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.units.import_unit_scale"><code class="docutils literal notranslate"><span class="pre">import_unit_scale()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.units.export_unit_scale"><code class="docutils literal notranslate"><span class="pre">export_unit_scale()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="building-blocks.html#module-io_mesh_3mf.common.types">Types (Dataclasses)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceObject"><code class="docutils literal notranslate"><span class="pre">ResourceObject</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.Component"><code class="docutils literal notranslate"><span class="pre">Component</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial"><code class="docutils literal notranslate"><span class="pre">ResourceMaterial</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceTexture"><code class="docutils literal notranslate"><span class="pre">ResourceTexture</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceTextureGroup"><code class="docutils literal notranslate"><span class="pre">ResourceTextureGroup</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceComposite"><code class="docutils literal notranslate"><span class="pre">ResourceComposite</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceMultiproperties"><code class="docutils literal notranslate"><span class="pre">ResourceMultiproperties</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourcePBRTextureDisplay"><code class="docutils literal notranslate"><span class="pre">ResourcePBRTextureDisplay</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourceColorgroup"><code class="docutils literal notranslate"><span class="pre">ResourceColorgroup</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.types.ResourcePBRDisplayProps"><code class="docutils literal notranslate"><span class="pre">ResourcePBRDisplayProps</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="building-blocks.html#module-io_mesh_3mf.common.segmentation">Segmentation Codec</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState"><code class="docutils literal notranslate"><span class="pre">TriangleState</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationNode"><code class="docutils literal notranslate"><span class="pre">SegmentationNode</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.SubdividedTriangle"><code class="docutils literal notranslate"><span class="pre">SubdividedTriangle</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationDecoder"><code class="docutils literal notranslate"><span class="pre">SegmentationDecoder</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleSubdivider"><code class="docutils literal notranslate"><span class="pre">TriangleSubdivider</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationEncoder"><code class="docutils literal notranslate"><span class="pre">SegmentationEncoder</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.decode_segmentation_string"><code class="docutils literal notranslate"><span class="pre">decode_segmentation_string()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.segmentation.subdivide_triangle_with_segmentation"><code class="docutils literal notranslate"><span class="pre">subdivide_triangle_with_segmentation()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="building-blocks.html#module-io_mesh_3mf.common.extensions">Extensions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.Extension"><code class="docutils literal notranslate"><span class="pre">Extension</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.ExtensionType"><code class="docutils literal notranslate"><span class="pre">ExtensionType</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager"><code class="docutils literal notranslate"><span class="pre">ExtensionManager</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.get_extension_by_namespace"><code class="docutils literal notranslate"><span class="pre">get_extension_by_namespace()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.get_extension_by_prefix"><code class="docutils literal notranslate"><span class="pre">get_extension_by_prefix()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.list_official_extensions"><code class="docutils literal notranslate"><span class="pre">list_official_extensions()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.extensions.list_vendor_extensions"><code class="docutils literal notranslate"><span class="pre">list_vendor_extensions()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="building-blocks.html#module-io_mesh_3mf.common.metadata">Metadata</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.metadata.Metadata"><code class="docutils literal notranslate"><span class="pre">Metadata</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="building-blocks.html#io_mesh_3mf.common.metadata.MetadataEntry"><code class="docutils literal notranslate"><span class="pre">MetadataEntry</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #2b2b2b" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">3MF Format for Blender</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Index</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+
+<h1 id="index">Index</h1>
+
+<div class="genindex-jumpbox">
+ <a href="#_"><strong>_</strong></a>
+ | <a href="#A"><strong>A</strong></a>
+ | <a href="#B"><strong>B</strong></a>
+ | <a href="#C"><strong>C</strong></a>
+ | <a href="#D"><strong>D</strong></a>
+ | <a href="#E"><strong>E</strong></a>
+ | <a href="#F"><strong>F</strong></a>
+ | <a href="#G"><strong>G</strong></a>
+ | <a href="#H"><strong>H</strong></a>
+ | <a href="#I"><strong>I</strong></a>
+ | <a href="#L"><strong>L</strong></a>
+ | <a href="#M"><strong>M</strong></a>
+ | <a href="#N"><strong>N</strong></a>
+ | <a href="#O"><strong>O</strong></a>
+ | <a href="#P"><strong>P</strong></a>
+ | <a href="#R"><strong>R</strong></a>
+ | <a href="#S"><strong>S</strong></a>
+ | <a href="#T"><strong>T</strong></a>
+ | <a href="#U"><strong>U</strong></a>
+ | <a href="#V"><strong>V</strong></a>
+ | <a href="#W"><strong>W</strong></a>
+ 
+</div>
+<h2 id="_">_</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager.__init__">__init__() (ExtensionManager method)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="A">A</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager.activate">activate() (ExtensionManager method)</a>
+</li>
+      <li><a href="api.html#io_mesh_3mf.api.API_CAPABILITIES">API_CAPABILITIES (in module io_mesh_3mf.api)</a>
+</li>
+      <li><a href="api.html#io_mesh_3mf.api.API_VERSION">API_VERSION (in module io_mesh_3mf.api)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#io_mesh_3mf.api.API_VERSION_STRING">API_VERSION_STRING (in module io_mesh_3mf.api)</a>
+</li>
+      <li><a href="api.html#io_mesh_3mf.api.InspectResult.archive_files">archive_files (InspectResult attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial.attenuation">attenuation (ResourceMaterial attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="B">B</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial.basecolor_texid">basecolor_texid (ResourceMaterial attribute)</a>
+
+      <ul>
+        <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourcePBRTextureDisplay.basecolor_texid">(ResourcePBRTextureDisplay attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api.html#io_mesh_3mf.api.batch_export">batch_export() (in module io_mesh_3mf.api)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#io_mesh_3mf.api.batch_import">batch_import() (in module io_mesh_3mf.api)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceTexture.blender_image">blender_image (ResourceTexture attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMultiproperties.blendmethods">blendmethods (ResourceMultiproperties attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="C">C</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="discovery.html#io_mesh_3mf.threemf_discovery.check_threemf_version">check_threemf_version() (in module io_mesh_3mf.threemf_discovery)</a>
+</li>
+      <li><a href="discovery.html#io_mesh_3mf.api.check_version">check_version() (in module io_mesh_3mf.api)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationNode.children">children (SegmentationNode attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager.clear">clear() (ExtensionManager method)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial.color">color (ResourceMaterial attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceColorgroup.colors">colors (ResourceColorgroup attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.Component">Component (class in io_mesh_3mf.common.types)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceObject.components">components (ResourceObject attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceComposite.composites">composites (ResourceComposite attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceTexture.contenttype">contenttype (ResourceTexture attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="D">D</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.metadata.MetadataEntry.datatype">datatype (MetadataEntry attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager.deactivate">deactivate() (ExtensionManager method)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationDecoder.decode">decode() (SegmentationDecoder method)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.decode_segmentation_string">decode_segmentation_string() (in module io_mesh_3mf.common.segmentation)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState.DEFAULT">DEFAULT (TriangleState attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceObject.default_extruder">default_extruder (ResourceObject attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.Extension.description">description (Extension attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceColorgroup.displaypropertiesid">displaypropertiesid (ResourceColorgroup attribute)</a>
+
+      <ul>
+        <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceComposite.displaypropertiesid">(ResourceComposite attribute)</a>
+</li>
+        <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceTextureGroup.displaypropertiesid">(ResourceTextureGroup attribute)</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
+<h2 id="E">E</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationEncoder.encode">encode() (SegmentationEncoder method)</a>
+</li>
+      <li><a href="api.html#io_mesh_3mf.api.InspectResult.error_message">error_message (InspectResult attribute)</a>
+</li>
+      <li><a href="api.html#io_mesh_3mf.api.export_3mf">export_3mf() (in module io_mesh_3mf.api)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.units.export_unit_scale">export_unit_scale() (in module io_mesh_3mf.common.units)</a>
+</li>
+      <li><a href="api.html#io_mesh_3mf.api.ExportResult">ExportResult (class in io_mesh_3mf.api)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.Extension">Extension (class in io_mesh_3mf.common.extensions)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.Extension.extension_type">extension_type (Extension attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager">ExtensionManager (class in io_mesh_3mf.common.extensions)</a>
+</li>
+      <li><a href="api.html#io_mesh_3mf.api.InspectResult.extensions_used">extensions_used (InspectResult attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.ExtensionType">ExtensionType (class in io_mesh_3mf.common.extensions)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial.extra_texture_ids">extra_texture_ids (ResourceMaterial attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState.EXTRUDER_1">EXTRUDER_1 (TriangleState attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState.EXTRUDER_10">EXTRUDER_10 (TriangleState attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState.EXTRUDER_11">EXTRUDER_11 (TriangleState attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState.EXTRUDER_12">EXTRUDER_12 (TriangleState attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState.EXTRUDER_13">EXTRUDER_13 (TriangleState attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState.EXTRUDER_14">EXTRUDER_14 (TriangleState attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState.EXTRUDER_15">EXTRUDER_15 (TriangleState attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState.EXTRUDER_2">EXTRUDER_2 (TriangleState attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState.EXTRUDER_3">EXTRUDER_3 (TriangleState attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState.EXTRUDER_4">EXTRUDER_4 (TriangleState attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState.EXTRUDER_5">EXTRUDER_5 (TriangleState attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState.EXTRUDER_6">EXTRUDER_6 (TriangleState attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState.EXTRUDER_7">EXTRUDER_7 (TriangleState attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState.EXTRUDER_8">EXTRUDER_8 (TriangleState attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState.EXTRUDER_9">EXTRUDER_9 (TriangleState attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="F">F</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourcePBRTextureDisplay.factors">factors (ResourcePBRTextureDisplay attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#io_mesh_3mf.api.ExportResult.filepath">filepath (ExportResult attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceTexture.filter">filter (ResourceTexture attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="G">G</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager.get_active_extensions">get_active_extensions() (ExtensionManager method)</a>
+</li>
+      <li><a href="discovery.html#io_mesh_3mf.api.get_api">get_api() (in module io_mesh_3mf.api)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.get_extension_by_namespace">get_extension_by_namespace() (in module io_mesh_3mf.common.extensions)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.get_extension_by_prefix">get_extension_by_prefix() (in module io_mesh_3mf.common.extensions)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager.get_required_extensions_string">get_required_extensions_string() (ExtensionManager method)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="discovery.html#io_mesh_3mf.threemf_discovery.get_threemf_api">get_threemf_api() (in module io_mesh_3mf.threemf_discovery)</a>
+</li>
+      <li><a href="discovery.html#io_mesh_3mf.threemf_discovery.get_threemf_version">get_threemf_version() (in module io_mesh_3mf.threemf_discovery)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager.get_vendor_attributes">get_vendor_attributes() (ExtensionManager method)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial.glossiness">glossiness (ResourceMaterial attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial.glossiness_texid">glossiness_texid (ResourceMaterial attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="H">H</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="discovery.html#io_mesh_3mf.api.has_capability">has_capability() (in module io_mesh_3mf.api)</a>
+</li>
+      <li><a href="discovery.html#io_mesh_3mf.threemf_discovery.has_threemf_capability">has_threemf_capability() (in module io_mesh_3mf.threemf_discovery)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.colors.hex_to_linear_rgb">hex_to_linear_rgb() (in module io_mesh_3mf.common.colors)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.colors.hex_to_rgb">hex_to_rgb() (in module io_mesh_3mf.common.colors)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="I">I</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#io_mesh_3mf.api.import_3mf">import_3mf() (in module io_mesh_3mf.api)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.units.import_unit_scale">import_unit_scale() (in module io_mesh_3mf.common.units)</a>
+</li>
+      <li><a href="api.html#io_mesh_3mf.api.ImportResult">ImportResult (class in io_mesh_3mf.api)</a>
+</li>
+      <li><a href="api.html#io_mesh_3mf.api.inspect_3mf">inspect_3mf() (in module io_mesh_3mf.api)</a>
+</li>
+      <li><a href="api.html#io_mesh_3mf.api.InspectResult">InspectResult (class in io_mesh_3mf.api)</a>
+</li>
+      <li>
+    io_mesh_3mf.api
+
+      <ul>
+        <li><a href="api.html#module-io_mesh_3mf.api">module</a>
+</li>
+      </ul></li>
+      <li>
+    io_mesh_3mf.common.colors
+
+      <ul>
+        <li><a href="building-blocks.html#module-io_mesh_3mf.common.colors">module</a>
+</li>
+      </ul></li>
+      <li>
+    io_mesh_3mf.common.extensions
+
+      <ul>
+        <li><a href="building-blocks.html#module-io_mesh_3mf.common.extensions">module</a>
+</li>
+      </ul></li>
+      <li>
+    io_mesh_3mf.common.metadata
+
+      <ul>
+        <li><a href="building-blocks.html#module-io_mesh_3mf.common.metadata">module</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li>
+    io_mesh_3mf.common.segmentation
+
+      <ul>
+        <li><a href="building-blocks.html#module-io_mesh_3mf.common.segmentation">module</a>
+</li>
+      </ul></li>
+      <li>
+    io_mesh_3mf.common.types
+
+      <ul>
+        <li><a href="building-blocks.html#module-io_mesh_3mf.common.types">module</a>
+</li>
+      </ul></li>
+      <li>
+    io_mesh_3mf.common.units
+
+      <ul>
+        <li><a href="building-blocks.html#module-io_mesh_3mf.common.units">module</a>
+</li>
+      </ul></li>
+      <li>
+    io_mesh_3mf.threemf_discovery
+
+      <ul>
+        <li><a href="discovery.html#module-io_mesh_3mf.threemf_discovery">module</a>
+</li>
+      </ul></li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial.ior">ior (ResourceMaterial attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager.is_active">is_active() (ExtensionManager method)</a>
+</li>
+      <li><a href="discovery.html#io_mesh_3mf.api.is_available">is_available() (in module io_mesh_3mf.api)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationNode.is_leaf">is_leaf (SegmentationNode property)</a>
+</li>
+      <li><a href="discovery.html#io_mesh_3mf.threemf_discovery.is_threemf_available">is_threemf_available() (in module io_mesh_3mf.threemf_discovery)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="L">L</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.colors.linear_rgb_to_hex">linear_rgb_to_hex() (in module io_mesh_3mf.common.colors)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.colors.linear_to_srgb">linear_to_srgb() (in module io_mesh_3mf.common.colors)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.list_official_extensions">list_official_extensions() (in module io_mesh_3mf.common.extensions)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.list_vendor_extensions">list_vendor_extensions() (in module io_mesh_3mf.common.extensions)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="M">M</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#io_mesh_3mf.api.InspectResult.materials">materials (InspectResult attribute)</a>
+
+      <ul>
+        <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceObject.materials">(ResourceObject attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceComposite.matid">matid (ResourceComposite attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceComposite.matindices">matindices (ResourceComposite attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.metadata.Metadata">Metadata (class in io_mesh_3mf.common.metadata)</a>
+</li>
+      <li><a href="api.html#io_mesh_3mf.api.InspectResult.metadata">metadata (InspectResult attribute)</a>
+
+      <ul>
+        <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceObject.metadata">(ResourceObject attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.metadata.MetadataEntry">MetadataEntry (class in io_mesh_3mf.common.metadata)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial.metallic">metallic (ResourceMaterial attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial.metallic_texid">metallic_texid (ResourceMaterial attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li>
+    module
+
+      <ul>
+        <li><a href="api.html#module-io_mesh_3mf.api">io_mesh_3mf.api</a>
+</li>
+        <li><a href="building-blocks.html#module-io_mesh_3mf.common.colors">io_mesh_3mf.common.colors</a>
+</li>
+        <li><a href="building-blocks.html#module-io_mesh_3mf.common.extensions">io_mesh_3mf.common.extensions</a>
+</li>
+        <li><a href="building-blocks.html#module-io_mesh_3mf.common.metadata">io_mesh_3mf.common.metadata</a>
+</li>
+        <li><a href="building-blocks.html#module-io_mesh_3mf.common.segmentation">io_mesh_3mf.common.segmentation</a>
+</li>
+        <li><a href="building-blocks.html#module-io_mesh_3mf.common.types">io_mesh_3mf.common.types</a>
+</li>
+        <li><a href="building-blocks.html#module-io_mesh_3mf.common.units">io_mesh_3mf.common.units</a>
+</li>
+        <li><a href="discovery.html#module-io_mesh_3mf.threemf_discovery">io_mesh_3mf.threemf_discovery</a>
+</li>
+      </ul></li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMultiproperties.multis">multis (ResourceMultiproperties attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="N">N</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.Extension.name">name (Extension attribute)</a>
+
+      <ul>
+        <li><a href="building-blocks.html#io_mesh_3mf.common.metadata.MetadataEntry.name">(MetadataEntry attribute)</a>
+</li>
+        <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial.name">(ResourceMaterial attribute)</a>
+</li>
+        <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourcePBRTextureDisplay.name">(ResourcePBRTextureDisplay attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.Extension.namespace">namespace (Extension attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationNode.num_children">num_children (SegmentationNode property)</a>
+</li>
+      <li><a href="api.html#io_mesh_3mf.api.ImportResult.num_loaded">num_loaded (ImportResult attribute)</a>
+</li>
+      <li><a href="api.html#io_mesh_3mf.api.InspectResult.num_objects">num_objects (InspectResult attribute)</a>
+</li>
+      <li><a href="api.html#io_mesh_3mf.api.InspectResult.num_triangles_total">num_triangles_total (InspectResult attribute)</a>
+</li>
+      <li><a href="api.html#io_mesh_3mf.api.InspectResult.num_vertices_total">num_vertices_total (InspectResult attribute)</a>
+</li>
+      <li><a href="api.html#io_mesh_3mf.api.ExportResult.num_written">num_written (ExportResult attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="O">O</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#io_mesh_3mf.api.ImportResult.objects">objects (ImportResult attribute)</a>
+
+      <ul>
+        <li><a href="api.html#io_mesh_3mf.api.InspectResult.objects">(InspectResult attribute)</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
+<h2 id="P">P</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.Component.path">path (Component attribute)</a>
+
+      <ul>
+        <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceTexture.path">(ResourceTexture attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMultiproperties.pids">pids (ResourceMultiproperties attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.Extension.prefix">prefix (Extension attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.metadata.MetadataEntry.preserve">preserve (MetadataEntry attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourcePBRTextureDisplay.primary_texid">primary_texid (ResourcePBRTextureDisplay attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourcePBRDisplayProps.properties">properties (ResourcePBRDisplayProps attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="R">R</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.ExtensionManager.register_namespaces">register_namespaces() (ExtensionManager method)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.Extension.required">required (Extension attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.Component.resource_object">resource_object (Component attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceColorgroup">ResourceColorgroup (class in io_mesh_3mf.common.types)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceComposite">ResourceComposite (class in io_mesh_3mf.common.types)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial">ResourceMaterial (class in io_mesh_3mf.common.types)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMultiproperties">ResourceMultiproperties (class in io_mesh_3mf.common.types)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceObject">ResourceObject (class in io_mesh_3mf.common.types)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourcePBRDisplayProps">ResourcePBRDisplayProps (class in io_mesh_3mf.common.types)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourcePBRTextureDisplay">ResourcePBRTextureDisplay (class in io_mesh_3mf.common.types)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceTexture">ResourceTexture (class in io_mesh_3mf.common.types)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceTextureGroup">ResourceTextureGroup (class in io_mesh_3mf.common.types)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.metadata.Metadata.retrieve">retrieve() (Metadata method)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.colors.rgb_to_hex">rgb_to_hex() (in module io_mesh_3mf.common.colors)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial.roughness">roughness (ResourceMaterial attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial.roughness_texid">roughness_texid (ResourceMaterial attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="S">S</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceObject.seam_strings">seam_strings (ResourceObject attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourcePBRTextureDisplay.secondary_texid">secondary_texid (ResourcePBRTextureDisplay attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceObject.segmentation_strings">segmentation_strings (ResourceObject attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationDecoder">SegmentationDecoder (class in io_mesh_3mf.common.segmentation)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationEncoder">SegmentationEncoder (class in io_mesh_3mf.common.segmentation)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationNode">SegmentationNode (class in io_mesh_3mf.common.segmentation)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.SubdividedTriangle.source_triangle_index">source_triangle_index (SubdividedTriangle attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationNode.special_side">special_side (SegmentationNode attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial.specular_color">specular_color (ResourceMaterial attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial.specular_texid">specular_texid (ResourceMaterial attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationNode.split_sides">split_sides (SegmentationNode attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.colors.srgb_to_linear">srgb_to_linear() (in module io_mesh_3mf.common.colors)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.SegmentationNode.state">state (SegmentationNode attribute)</a>
+
+      <ul>
+        <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.SubdividedTriangle.state">(SubdividedTriangle attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="api.html#io_mesh_3mf.api.ExportResult.status">status (ExportResult attribute)</a>
+
+      <ul>
+        <li><a href="api.html#io_mesh_3mf.api.ImportResult.status">(ImportResult attribute)</a>
+</li>
+        <li><a href="api.html#io_mesh_3mf.api.InspectResult.status">(InspectResult attribute)</a>
+</li>
+      </ul></li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.metadata.Metadata.store">store() (Metadata method)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleSubdivider.subdivide">subdivide() (TriangleSubdivider method)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.subdivide_triangle_with_segmentation">subdivide_triangle_with_segmentation() (in module io_mesh_3mf.common.segmentation)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.SubdividedTriangle">SubdividedTriangle (class in io_mesh_3mf.common.segmentation)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceObject.support_strings">support_strings (ResourceObject attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="T">T</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceTextureGroup.tex2coords">tex2coords (ResourceTextureGroup attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceTextureGroup.texid">texid (ResourceTextureGroup attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial.texture_id">texture_id (ResourceMaterial attribute)</a>
+</li>
+      <li><a href="api.html#io_mesh_3mf.api.InspectResult.textures">textures (InspectResult attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceTexture.tilestyleu">tilestyleu (ResourceTexture attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceTexture.tilestylev">tilestylev (ResourceTexture attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.Component.transformation">transformation (Component attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceMaterial.transmission">transmission (ResourceMaterial attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceObject.triangle_sets">triangle_sets (ResourceObject attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceObject.triangle_uvs">triangle_uvs (ResourceObject attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceObject.triangles">triangles (ResourceObject attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleState">TriangleState (class in io_mesh_3mf.common.segmentation)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.TriangleSubdivider">TriangleSubdivider (class in io_mesh_3mf.common.segmentation)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourcePBRDisplayProps.type">type (ResourcePBRDisplayProps attribute)</a>
+
+      <ul>
+        <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourcePBRTextureDisplay.type">(ResourcePBRTextureDisplay attribute)</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
+<h2 id="U">U</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#io_mesh_3mf.api.InspectResult.unit">unit (InspectResult attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="V">V</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.SubdividedTriangle.v0">v0 (SubdividedTriangle attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.SubdividedTriangle.v1">v1 (SubdividedTriangle attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.segmentation.SubdividedTriangle.v2">v2 (SubdividedTriangle attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.metadata.MetadataEntry.value">value (MetadataEntry attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.metadata.Metadata.values">values() (Metadata method)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.extensions.Extension.vendor_attribute">vendor_attribute (Extension attribute)</a>
+</li>
+      <li><a href="api.html#io_mesh_3mf.api.InspectResult.vendor_format">vendor_format (InspectResult attribute)</a>
+</li>
+      <li><a href="building-blocks.html#io_mesh_3mf.common.types.ResourceObject.vertices">vertices (ResourceObject attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="W">W</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#io_mesh_3mf.api.ExportResult.warnings">warnings (ExportResult attribute)</a>
+
+      <ul>
+        <li><a href="api.html#io_mesh_3mf.api.ImportResult.warnings">(ImportResult attribute)</a>
+</li>
+        <li><a href="api.html#io_mesh_3mf.api.InspectResult.warnings">(InspectResult attribute)</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Jack.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

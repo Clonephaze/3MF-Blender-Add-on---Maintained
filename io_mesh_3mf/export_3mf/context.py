@@ -40,10 +40,11 @@ class ExportOptions:
 
     use_selection: bool = False
     export_hidden: bool = False
+    skip_disabled: bool = True
     global_scale: float = 1.0
     use_mesh_modifiers: bool = True
     coordinate_precision: int = 9
-    use_orca_format: str = "STANDARD"  # "STANDARD" | "PAINT"
+    use_orca_format: str = "AUTO"  # "AUTO" | "STANDARD" | "PAINT"
     use_components: bool = True
     mmu_slicer_format: str = "ORCA"  # "ORCA" | "PRUSA"
     subdivision_depth: int = 7  # 4-10, controls paint segmentation detail

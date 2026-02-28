@@ -10,14 +10,12 @@ Features and improvements organized by priority. Complexity ratings help with pl
 
 | Symbol | Meaning |
 |--------|---------|
-| ✅ | Done |
 | 📋 | Planned |
 | 💭 | Needs Research |
 
 **Complexity:** `🟢 Easy` `🟡 Medium` `🔴 Hard`
 
 ---
-
 
 ## 🖨️ Slicer Compatibility
 
@@ -32,15 +30,18 @@ Features and improvements organized by priority. Complexity ratings help with pl
 
 | Status | Feature | Complexity | Description |
 |--------|---------|------------|-------------|
-| 📋 | User Guide | 🟡 | Usage documentation (Needs Improvement) |
-| 📋 | API Documentation | 🟡 | Public API reference (Needs Improvement) |
+| 📋 | User Guide | 🟡 | Usage documentation (needs improvement — tutorial-style docs for common workflows) |
+| 📋 | API Documentation | 🟡 | Public API reference (needs improvement — auto-generated docs) |
+| 📋 | Performance Benchmarks | 🟡 | Establish benchmarks for large-file import/export (100k+ triangles, many objects) to catch regressions |
 
 ---
 
-### Research Needed
-*Requires investigation*
+### Research Notes
 
-- [ ] Cura MMU Data: Research how to read/write MMU data from Cura and represent it in Blender and export it back to 3MF. This is a low priority item, cura seems little used in the MMU community, but it would be a nice addition for users who rely on Cura for slicing. Cura stores MMU data in a png texture file using the blue hue. It supports 8 colors, and maps those colors to the first 8 values of blue. so 1/255 blue corresponds to material index 1, 2/255 to index 2, etc. It reads this data for color zones, but another file for actual color data. No seam or support data seems to be stored in the texture file. Cura doesn't seem to have seam data at all. All I've found so far. 
+#### Cura MMU Data
+Cura stores MMU data in a PNG texture file using the blue hue channel. It supports 8 colors, mapping them to the first 8 values of blue: 1/255 blue = material index 1, 2/255 = index 2, etc. 
+It reads this for color zones, but uses another file for actual color data. No seam or support data seems to be stored in the texture file. Cura doesn't appear to have seam painting at all.
+
 ---
 
 ## 🤝 Contributing
@@ -48,7 +49,8 @@ Features and improvements organized by priority. Complexity ratings help with pl
 Help wanted:
 1. **Testing** — Try different slicers, report issues
 2. **Research** — Document undocumented slicer formats
-3. **Code** — Pick something from the roadmap and PR it
+3. **Bug fixes** — If there's an open issue you think you can tackle, comment to claim it and we can discuss the approach
+4. **Code** — Pick something from the roadmap and PR it
 
 ---
 

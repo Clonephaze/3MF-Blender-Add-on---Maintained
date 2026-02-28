@@ -27,7 +27,7 @@ For Blender versions **2.80–3.6**, see the [original releases](https://github.
 - Material and color support using modern Blender material APIs
 - Embedded viewport thumbnails in exported 3MF files
 - Correct handling of units and build structure
-- **Public API** for programmatic/headless workflows (see [API.md](API.md))
+- **Public API** for programmatic/headless workflows ([documentation](docs/site/index.html))
 - Multiple 3MF spec-compliant extensions:
   - Core Materials (basematerials)
   - Production Extension (multi-object builds, color zones)
@@ -129,14 +129,14 @@ result = import_3mf("model.3mf", import_materials="PAINT")
 print(result.status, result.num_loaded)
 
 # Export specific objects
-result = export_3mf("output.3mf", objects=my_objects, use_orca_format="BASEMATERIAL")
+result = export_3mf("output.3mf", objects=my_objects, use_orca_format="AUTO")
 
 # Batch operations
 from io_mesh_3mf.api import batch_import
 results = batch_import(["a.3mf", "b.3mf"], target_collection="Imports")
 ```
 
-Full documentation: **[API.md](API.md)**
+Full documentation: **[API Docs](docs/site/index.html)** | Rebuild with ``docs/build.ps1`` after API changes
 
 ---
 
