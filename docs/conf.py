@@ -161,12 +161,19 @@ intersphinx_mapping = {
 # HTML output
 # ---------------------------------------------------------------------------
 
-html_theme = "sphinx_rtd_theme"
+html_theme = "furo"
 html_theme_options = {
-    "navigation_depth": 3,
-    "collapse_navigation": False,
-    "sticky_navigation": True,
-    "style_nav_header_background": "#2b2b2b",
+    "light_css_variables": {
+        "color-brand-primary": "#6d5cae",
+        "color-brand-content": "#6d5cae",
+    },
+    "dark_css_variables": {
+        "color-brand-primary": "#9bb8d3",
+        "color-brand-content": "#9bb8d3",
+    },
+    "sidebar_hide_name": False,
+    "navigation_with_keys": True,
+    "top_of_page_buttons": [],
 }
 
 html_title = f"3MF Format API — v{release}"

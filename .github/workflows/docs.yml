@@ -27,7 +27,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Sphinx
-        run: pip install sphinx sphinx-rtd-theme numpy
+        run: pip install sphinx furo numpy
 
       - name: Build HTML
         run: sphinx-build -b html -d docs/_build/doctrees docs docs/_build/html -W --keep-going
