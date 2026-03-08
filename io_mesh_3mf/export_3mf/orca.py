@@ -162,7 +162,7 @@ class OrcaExporter(BaseExporter):
         # Each Empty with children becomes a separate assembly in Orca
         mesh_to_group: dict[str, bpy.types.Object] = {}
         group_empties: list[bpy.types.Object] = []
-        
+
         for obj in blender_objects:
             if obj.type == "EMPTY" and obj.children:
                 group_empties.append(obj)
@@ -170,9 +170,9 @@ class OrcaExporter(BaseExporter):
                 for child in obj.children:
                     if child.type == "MESH":
                         mesh_to_group[child.name] = obj
-        
+
         debug(f"Detected {len(group_empties)} group(s) from parent Empties")
-        
+
         # Write individual object model files
         object_data = []
 
@@ -231,15 +231,15 @@ class OrcaExporter(BaseExporter):
         # Build groups list - each Empty becomes a separate assembly
         groups: list[dict] = []
         next_wrapper_id = len(object_data) * 2 + 1
-        
+
         for group_empty in group_empties:
             group_name = str(group_empty.name)
             # Get the members of this group
             group_members = [od for od in object_data if od["group_name"] == group_name]
-            
+
             if not group_members:
                 continue
-                
+
             groups.append({
                 "wrapper_id": next_wrapper_id,
                 "uuid": str(uuid.uuid4()),
@@ -248,20 +248,20 @@ class OrcaExporter(BaseExporter):
                 "empty": group_empty,
             })
             next_wrapper_id += 1
-        
+
         # Ungrouped objects (meshes not parented to any selected Empty)
         ungrouped = [od for od in object_data if od["group_name"] is None]
-        
+
         debug(f"Export structure: {len(groups)} groups, {len(ungrouped)} ungrouped objects")
 
         # Apply bed center offset to transformations (built-in template only)
         bed_offset_x, bed_offset_y = self._get_bed_center_offset()
-        
+
         if groups:
             # Multi-group mode: bed offset applied to each group's build item
             for grp in groups:
                 grp["bed_offset"] = (bed_offset_x, bed_offset_y)
-        
+
         # Ungrouped objects get offset applied directly
         if (bed_offset_x != 0.0 or bed_offset_y != 0.0) and ungrouped:
             for od in ungrouped:
@@ -531,7 +531,7 @@ class OrcaExporter(BaseExporter):
 
         Supports multiple groups (each becomes a separate assembly/plate item)
         plus ungrouped objects as individual items.
-        
+
         :param groups: List of group dicts with wrapper_id, uuid, name, members, bed_offset
         :param ungrouped: List of object_data dicts for objects not in any group
         """
@@ -621,7 +621,7 @@ class OrcaExporter(BaseExporter):
                         "transform": comp_transform,
                     },
                 )
-        
+
         # Write ungrouped objects - each gets its own wrapper
         for obj in ungrouped:
             wrapper = xml.etree.ElementTree.SubElement(
@@ -652,7 +652,7 @@ class OrcaExporter(BaseExporter):
         )
 
         item_idx = 0
-        
+
         # Build items for groups
         for grp in groups:
             bed_x, bed_y = grp.get("bed_offset", (0.0, 0.0))
@@ -674,7 +674,7 @@ class OrcaExporter(BaseExporter):
                 },
             )
             item_idx += 1
-        
+
         # Build items for ungrouped objects
         for obj in ungrouped:
             item_uuid = f"0000000{item_idx + 2}-b1ec-4553-aec9-835e5b724bb4"
@@ -1006,17 +1006,17 @@ class OrcaExporter(BaseExporter):
             xml.etree.ElementTree.SubElement(
                 object_elem, "metadata", key="name", value=grp["name"]
             )
-            
+
             # Determine dominant extruder for entire group by aggregating part colors
             group_dominant_extruder = "1"
             group_color_counts: dict[str, int] = {}
-            
+
             for member in grp["members"]:
                 obj_name = member["name"]
                 blender_object = blender_obj_by_name.get(obj_name)
                 if blender_object is None:
                     continue
-                
+
                 # Determine per-part extruder from dominant face colour
                 extruder_value = "1"
                 if ctx.vertex_colors:
@@ -1042,13 +1042,13 @@ class OrcaExporter(BaseExporter):
                 xml.etree.ElementTree.SubElement(
                     part_elem, "metadata", key="extruder", value=extruder_value
                 )
-            
+
             # Set group-level extruder to most common color among its parts
             if group_color_counts and ctx.vertex_colors:
                 most_common_color = max(group_color_counts, key=group_color_counts.get)
                 if most_common_color in ctx.vertex_colors:
                     group_dominant_extruder = str(ctx.vertex_colors[most_common_color])
-            
+
             xml.etree.ElementTree.SubElement(
                 object_elem, "metadata", key="extruder", value=group_dominant_extruder
             )
@@ -1057,7 +1057,7 @@ class OrcaExporter(BaseExporter):
         for od in ungrouped:
             obj_name = od["name"]
             blender_object = blender_obj_by_name.get(obj_name)
-            
+
             wrapper_id = od["wrapper_id"]
             mesh_id = od["mesh_id"]
 
@@ -1134,7 +1134,7 @@ class OrcaExporter(BaseExporter):
                 instance_elem, "metadata", key="identify_id",
                 value=str(grp["wrapper_id"]),
             )
-        
+
         # Model instances for ungrouped objects
         for od in ungrouped:
             instance_elem = xml.etree.ElementTree.SubElement(
@@ -1176,7 +1176,7 @@ class OrcaExporter(BaseExporter):
                 transform=group_transform,
                 offset="0 0 0",
             )
-        
+
         # Assemble items for ungrouped objects
         for od in ungrouped:
             transform_str = format_transformation(od["transformation"])
