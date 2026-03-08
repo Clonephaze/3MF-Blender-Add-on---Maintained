@@ -111,7 +111,7 @@ from .common.units import (
 #: - MAJOR: Breaking changes to existing functions/signatures
 #: - MINOR: New features, backward-compatible
 #: - PATCH: Bug fixes only
-API_VERSION = (1, 0, 0)
+API_VERSION = (1, 0, 1)
 
 #: Human-readable version string
 API_VERSION_STRING = ".".join(str(v) for v in API_VERSION)

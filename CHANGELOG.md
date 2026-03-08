@@ -1,3 +1,30 @@
+2.3.0 — Region-Aware Quantization, Vertex Color Fast Path & API Discovery
+====
+
+Features
+----
+* **Region-based quantization** — New quantization method segments the baked texture into edge-aware regions before snapping to filament colours. Handles shadows and gradients far more accurately than per-pixel matching.
+* **Vertex color fast path** — Materials driven by Color Attribute / Vertex Color nodes skip Cycles entirely. Vectorised per-face filament assignment handles 350K+ faces in milliseconds.
+* **UV island awareness** — Region segmentation respects UV island boundaries, preventing colour bleed across unrelated mesh parts.
+* **UV bleed (dilation)** — 4-pixel bleed border around every UV island prevents visible seams on the 3D model.
+* **Adaptive bake dialog** — Bake dialog detects vertex colour sources and shows a streamlined panel, hiding irrelevant quantization settings.
+* **Multi-group assembly export** — Parent Empties with mesh children export as separate plate items in Orca Slicer with per-group extruder tracking.
+* **API discovery & registry** — Layered addon discovery with `driver_namespace` preference, `addon_utils` auto-resolve, and direct-import fallback. Expanded capability flags and standalone `threemf_discovery.py` helper with caching.
+
+Bug Fixes
+----
+* **Limited Dissolve skipped for vertex colours** — Fast path no longer runs Limited Dissolve before UV unwrap, which was slow on high-poly meshes and destructive to vertex colour data.
+* **Depsgraph handler cleanup** — Safely checks handler existence before removal during unregistration.
+
+Technical
+----
+* New region pipeline: `_flood_fill_segmentation`, `_build_palette_regions`, `_merge_small_regions`, `_rebuild_region_palette`, `_compute_gradient_magnitude`.
+* Vertex colour utilities: `_detect_vertex_color_source`, `_compute_face_filaments`, `_rasterize_face_colors`.
+* Neighbourhood brightness context in `_hue_aware_distance` for achromatic pixel matching.
+* Quantization settings moved from sidebar N-panel to the bake operator's popup dialog.
+
+---
+
 2.2.2 — Export Dispatch Fix, Skip Disabled Objects & Bake Multi-Slot
 ====
 
