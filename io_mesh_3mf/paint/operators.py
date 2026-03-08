@@ -840,7 +840,6 @@ class MMU_OT_init_auxiliary_paint(bpy.types.Operator):
     def execute(self, context):
         from .helpers import (
             _layer_colors, _layer_uv_name, _layer_flag_key, _layer_colors_key,
-            LAYER_BACKGROUND,
         )
 
         bpy.ops.ed.undo_push(message=f"Before {self.layer_type.title()} Paint Init")
@@ -969,7 +968,6 @@ def _switch_to_layer(context, layer_type):
     """Internal helper to activate a paint layer's UV, image, and brush color."""
     from .helpers import (
         _layer_uv_name, _layer_colors, _get_layer_image,
-        COLOR_UV_LAYER,
     )
 
     obj = context.active_object

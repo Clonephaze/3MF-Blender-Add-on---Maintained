@@ -108,6 +108,68 @@ class MMUPaintSettings(bpy.types.PropertyGroup):
         default=12,
     )
 
+    # Quantization method - controls how baked pixels are mapped to filament colors
+    quantize_method: bpy.props.EnumProperty(
+        name="Quantization Method",
+        description="How to map baked colors to filament palette",
+        items=[
+            ("REGION", "Region-Based (Recommended)",
+             "Segments texture into connected regions, then assigns each region "
+             "to a single filament. Handles shadows/highlights correctly"),
+            ("PIXEL", "Per-Pixel",
+             "Matches each pixel independently to the nearest filament color. "
+             "May incorrectly assign shadows to wrong colors"),
+        ],
+        default="REGION",
+    )
+    region_similarity: bpy.props.FloatProperty(
+        name="Region Similarity",
+        description=(
+            "Color similarity threshold for region segmentation. "
+            "Lower = more regions (finer detail). Higher = fewer regions (more merging). "
+            "Default 0.20 works well for most textures"
+        ),
+        min=0.05,
+        max=0.5,
+        default=0.20,
+        precision=2,
+    )
+    min_region_size: bpy.props.IntProperty(
+        name="Min Region Size",
+        description=(
+            "Regions smaller than this many pixels get merged into their "
+            "largest neighbor. Eliminates banding artifacts from gradient "
+            "transitions. Higher = more aggressive cleanup"
+        ),
+        min=0,
+        max=2000,
+        default=200,
+    )
+
+    # Legacy spatial smoothing (deprecated, kept for compatibility)
+    use_spatial_smoothing: bpy.props.BoolProperty(
+        name="UV Spatial Smoothing (Deprecated)",
+        description=(
+            "DEPRECATED: Use Region-Based quantization instead. "
+            "This UV-space filter can cause artifacts at island boundaries"
+        ),
+        default=False,
+    )
+    smoothing_kernel_size: bpy.props.IntProperty(
+        name="Kernel Size",
+        description="Legacy smoothing kernel size",
+        min=3,
+        max=11,
+        default=5,
+    )
+    smoothing_passes: bpy.props.IntProperty(
+        name="Passes",
+        description="Legacy smoothing passes",
+        min=1,
+        max=10,
+        default=3,
+    )
+
     # Active paint layer for layer switching
     active_paint_layer: bpy.props.EnumProperty(
         name="Paint Layer",

@@ -102,7 +102,8 @@ def register():
 
 def unregister():
     bake.unregister()
-    bpy.app.handlers.depsgraph_update_post.remove(_on_depsgraph_update)
+    if _on_depsgraph_update in bpy.app.handlers.depsgraph_update_post:
+        bpy.app.handlers.depsgraph_update_post.remove(_on_depsgraph_update)
     del bpy.types.Scene.mmu_paint
     for cls in reversed(_paint_classes):
         bpy.utils.unregister_class(cls)

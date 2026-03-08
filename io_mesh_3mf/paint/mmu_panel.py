@@ -136,12 +136,6 @@ class VIEW3D_PT_mmu_paint(bpy.types.Panel):
                 row.operator("mmu.reset_init_filaments", icon="FILE_REFRESH")
                 row.operator("mmu.initialize_painting", icon="PLAY", text="Initialize")
 
-                # UV method setting
-                uv_box = box.box()
-                uv_box.prop(settings, "uv_method")
-                if settings.uv_method == "LIGHTMAP":
-                    uv_box.prop(settings, "lightmap_divisions")
-
                 # Bake to MMU — for procedural/complex materials
                 obj = context.active_object
                 has_mats = obj and obj.data.materials and obj.data.materials[0]
