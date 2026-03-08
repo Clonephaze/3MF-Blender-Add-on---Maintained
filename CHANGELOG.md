@@ -9,6 +9,7 @@ Bug Fixes
 
 Features
 ----
+* **Multi-group assembly export** — Multiple parent Empties now export as separate plate items in Orca Slicer. Each Empty with mesh children becomes an independent assembly that can be positioned separately in the slicer. Colors/extruders are tracked per-group, with each group using its dominant part color.
 * **Three-way export mode** — `Material Export Mode` replaces the old two-state toggle with Auto (detect and dispatch), Standard 3MF (always spec-compliant with basematerials/textures/components), and Paint Segmentation (explicit hash segmentation for multi-material printing).
 * **Skip disabled objects** — New export option (default on). Objects with the render-disable camera icon are excluded from export, alongside the existing viewport/collection visibility check.
 * **API versioning & discovery** — Other addons can discover and feature-check the 3MF API at runtime via `bpy.app.driver_namespace["io_mesh_3mf"]`. Includes version tuple, capability flags, and a standalone `threemf_discovery.py` helper module.

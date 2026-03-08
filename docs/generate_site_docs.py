@@ -923,7 +923,20 @@ def generate_discovery(funcs: List[FuncInfo]) -> str:
 
         # API Discovery
 
-        Other Blender addons can discover and feature-check the 3MF API without hard-importing it. The addon registers itself in `bpy.app.driver_namespace["io_mesh_3mf"]` on startup.
+        Other Blender addons can detect and use the 3MF API at runtime.  Three strategies are available, from simplest to most robust.
+
+        ## Direct Import (recommended)
+
+        If you know the addon is installed, a plain `try`/`except` is the simplest approach:
+
+        ```python
+        try:
+            from io_mesh_3mf.api import import_3mf, export_3mf
+        except ImportError:
+            import_3mf = export_3mf = None
+        ```
+
+        This is Python-idiomatic and survives Blender restarts.
 
         ## Discovery Functions
     """))
@@ -959,19 +972,19 @@ def generate_discovery(funcs: List[FuncInfo]) -> str:
     sections.append(textwrap.dedent("""\
         ## Standalone Discovery Helper
 
-        For addons that want **zero runtime dependency** on the 3MF addon, copy `io_mesh_3mf/threemf_discovery.py` into your addon. It provides the same discovery functions without importing `io_mesh_3mf` directly.
+        For addons that want **zero runtime dependency** on the 3MF addon, copy `io_mesh_3mf/threemf_discovery.py` into your addon. It resolves the addon's import path automatically via `addon_utils`, caches the result, and works regardless of extension repo prefix or addon load order.
 
         ```python
-        # In your addon — no dependency on io_mesh_3mf
-        from .threemf_discovery import is_available, get_api, has_capability
+        # In your addon — no dependency on io_mesh_3mf at import time
+        from .threemf_discovery import get_threemf_api
 
-        if is_available():
-            api = get_api()
-            if has_capability("paint_mode"):
+        api = get_threemf_api()
+        if api is not None:
+            if api.has_capability("paint_mode"):
                 result = api.export_3mf("output.3mf", use_orca_format="PAINT")
         ```
 
-        The standalone module re-exports `import_3mf`, `export_3mf`, and `inspect_3mf` as convenience wrappers that return `None` if the 3MF addon isn't installed.
+        The standalone module also provides `import_3mf`, `export_3mf`, and `inspect_3mf` as convenience wrappers that return `None` if the 3MF addon isn't installed.
     """))
 
     return "\n".join(sections)

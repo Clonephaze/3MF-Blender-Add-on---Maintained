@@ -89,22 +89,23 @@ from .common.units import (
 # API Version & Registry
 # ═══════════════════════════════════════════════════════════════════════════
 #
-# This module self-registers in bpy.app.driver_namespace so other addons can
-# discover and use the 3MF API without parsing addon directories.
+# Discovery strategies (from simplest to most robust):
 #
-# Usage from another addon:
+# 1. Direct import — if you can import this module, the API is available:
 #
-#     import bpy
-#     threemf_api = bpy.app.driver_namespace.get("io_mesh_3mf")
-#     if threemf_api is not None:
-#         result = threemf_api.import_3mf("/path/to/model.3mf")
+#        try:
+#            from io_mesh_3mf.api import import_3mf, export_3mf
+#        except ImportError:
+#            import_3mf = export_3mf = None
 #
-# Or using the provided discovery helper (see API.md):
+# 2. Driver-namespace lookup — works after register() has been called:
 #
-#     from io_mesh_3mf.api import get_api, is_available
-#     if is_available():
-#         api = get_api()
-#         result = api.import_3mf("/path/to/model.3mf")
+#        threemf_api = bpy.app.driver_namespace.get("io_mesh_3mf")
+#
+# 3. Standalone helper — copy threemf_discovery.py into your addon:
+#
+#        from .threemf_discovery import get_threemf_api
+#        api = get_threemf_api()  # None if not installed
 
 #: API version following semantic versioning (MAJOR.MINOR.PATCH).
 #: - MAJOR: Breaking changes to existing functions/signatures
@@ -130,28 +131,51 @@ API_CAPABILITIES = frozenset({
     "project_template",    # Custom Orca project template
     "object_settings",     # Per-object Orca settings
     "building_blocks",     # colors, types, segmentation sub-namespaces
+    "global_scale",        # Scale multiplier parameter (import & export)
+    "compression",         # Configurable ZIP compression level (export)
+    "thumbnail",           # Thumbnail generation (export)
+    "use_components",      # Component instancing for linked duplicates (export)
+    "auto_smooth",         # Auto smooth-by-angle on import
+    "subdivision_depth",   # Paint segmentation subdivision depth control
 })
 
 #: Registry key in bpy.app.driver_namespace
 _REGISTRY_KEY = "io_mesh_3mf"
 
+# Tracks whether unregister() explicitly disabled the API for this session.
+# Prevents is_available() from re-registering after the addon is disabled.
+_explicitly_disabled = False
+
 
 def _register_api() -> None:
     """Register this API module in bpy.app.driver_namespace for discovery."""
+    global _explicitly_disabled
     import sys
+    _explicitly_disabled = False
     bpy.app.driver_namespace[_REGISTRY_KEY] = sys.modules[__name__]
     debug(f"Registered 3MF API v{API_VERSION_STRING} in driver_namespace")
 
 
 def _unregister_api() -> None:
     """Remove the API from bpy.app.driver_namespace."""
+    global _explicitly_disabled
+    _explicitly_disabled = True
     bpy.app.driver_namespace.pop(_REGISTRY_KEY, None)
 
 
 def is_available() -> bool:
-    """Check if the 3MF API is registered and available.
+    """Check if the 3MF API is loaded and available.
 
-    :return: True if the API is registered in bpy.app.driver_namespace.
+    If you can import this function, the underlying code is available.
+    This call ensures the module is registered in
+    ``bpy.app.driver_namespace`` so that :func:`get_api` and the
+    standalone discovery helper (:mod:`~io_mesh_3mf.threemf_discovery`)
+    can find it.
+
+    Returns ``False`` only when the addon has been explicitly disabled
+    via ``unregister()`` in the current session.
+
+    :return: True if the API is ready to use.
 
     Example::
 
@@ -159,13 +183,31 @@ def is_available() -> bool:
         if is_available():
             print("3MF API is ready")
     """
+    # Fast path — already registered.
+    if _REGISTRY_KEY in bpy.app.driver_namespace:
+        return True
+    # Addon was explicitly disabled this session (unregister called).
+    if _explicitly_disabled:
+        return False
+    # driver_namespace was lost (e.g. Blender restart cleared it, or
+    # module-level auto-register ran before Blender was ready).  Re-register
+    # — safe because if we're executing this code the module IS loaded.
+    try:
+        _register_api()
+    except Exception:
+        return False
     return _REGISTRY_KEY in bpy.app.driver_namespace
 
 
 def get_api():
-    """Get the registered 3MF API module.
+    """Get the 3MF API module.
 
-    :return: The io_mesh_3mf.api module, or None if not registered.
+    Ensures the module is registered in ``bpy.app.driver_namespace``
+    first (handles Blender restart / load-order edge cases), then
+    returns it.
+
+    :return: The ``io_mesh_3mf.api`` module, or ``None`` if the addon
+             is disabled.
     :rtype: module | None
 
     Example::
@@ -175,7 +217,9 @@ def get_api():
         if api:
             result = api.import_3mf("/model.3mf")
     """
-    return bpy.app.driver_namespace.get(_REGISTRY_KEY)
+    if is_available():
+        return bpy.app.driver_namespace.get(_REGISTRY_KEY)
+    return None
 
 
 def has_capability(capability: str) -> bool:

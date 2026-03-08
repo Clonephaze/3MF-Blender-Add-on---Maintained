@@ -18,6 +18,8 @@ from io_mesh_3mf.api import (
     has_capability,
     check_version,
     _REGISTRY_KEY,
+    _register_api,
+    _unregister_api,
 )
 
 
@@ -60,6 +62,14 @@ class APICapabilitiesTests(unittest.TestCase):
         formats = {"orca_format", "prusa_format", "paint_mode"}
         self.assertTrue(formats.issubset(API_CAPABILITIES))
 
+    def test_parameter_capabilities_present(self):
+        """Parameter-level capabilities should be defined."""
+        params = {
+            "global_scale", "compression", "thumbnail",
+            "use_components", "auto_smooth", "subdivision_depth",
+        }
+        self.assertTrue(params.issubset(API_CAPABILITIES))
+
     def test_has_capability_returns_bool(self):
         """has_capability should return boolean."""
         self.assertIsInstance(has_capability("import"), bool)
@@ -70,6 +80,7 @@ class APICapabilitiesTests(unittest.TestCase):
         self.assertTrue(has_capability("import"))
         self.assertTrue(has_capability("export"))
         self.assertTrue(has_capability("inspect"))
+        self.assertTrue(has_capability("global_scale"))
 
     def test_has_capability_false_for_unknown(self):
         """has_capability should return False for unknown capabilities."""
@@ -80,6 +91,10 @@ class APICapabilitiesTests(unittest.TestCase):
 class APIRegistryTests(unittest.TestCase):
     """Tests for API registry in bpy.app.driver_namespace."""
 
+    def tearDown(self):
+        # Always re-register after tests that may unregister.
+        _register_api()
+
     def test_registry_key_is_string(self):
         """Registry key should be a string."""
         self.assertIsInstance(_REGISTRY_KEY, str)
@@ -89,20 +104,51 @@ class APIRegistryTests(unittest.TestCase):
         """is_available should return boolean."""
         self.assertIsInstance(is_available(), bool)
 
+    def test_is_available_true_after_import(self):
+        """is_available should be True since we imported the module."""
+        self.assertTrue(is_available())
+
+    def test_is_available_recovers_from_missing_key(self):
+        """is_available should re-register if driver_namespace key is gone."""
+        # Simulate Blender restart clearing driver_namespace.
+        bpy.app.driver_namespace.pop(_REGISTRY_KEY, None)
+        # Should recover automatically.
+        self.assertTrue(is_available())
+        self.assertIn(_REGISTRY_KEY, bpy.app.driver_namespace)
+
+    def test_is_available_false_after_unregister(self):
+        """is_available should return False after explicit unregister."""
+        _unregister_api()
+        self.assertFalse(is_available())
+
+    def test_re_register_after_unregister(self):
+        """_register_api should make is_available True again."""
+        _unregister_api()
+        self.assertFalse(is_available())
+        _register_api()
+        self.assertTrue(is_available())
+
     def test_get_api_returns_module_or_none(self):
         """get_api should return the api module or None."""
         result = get_api()
-        # During tests, the addon should be registered
-        if is_available():
-            self.assertIsNotNone(result)
-            # Should have the expected functions
-            self.assertTrue(hasattr(result, "import_3mf"))
-            self.assertTrue(hasattr(result, "export_3mf"))
-            self.assertTrue(hasattr(result, "inspect_3mf"))
+        self.assertIsNotNone(result)
+        self.assertTrue(hasattr(result, "import_3mf"))
+        self.assertTrue(hasattr(result, "export_3mf"))
+        self.assertTrue(hasattr(result, "inspect_3mf"))
+
+    def test_get_api_recovers_from_missing_key(self):
+        """get_api should recover if driver_namespace was cleared."""
+        bpy.app.driver_namespace.pop(_REGISTRY_KEY, None)
+        result = get_api()
+        self.assertIsNotNone(result)
+
+    def test_get_api_none_after_unregister(self):
+        """get_api should return None after explicit unregister."""
+        _unregister_api()
+        self.assertIsNone(get_api())
 
     def test_registry_contains_api_module(self):
         """After import, API should be in driver_namespace."""
-        # The api module auto-registers on import
         self.assertIn(_REGISTRY_KEY, bpy.app.driver_namespace)
 
 
@@ -159,7 +205,6 @@ class DiscoveryHelperModuleTests(unittest.TestCase):
 
         result = threemf_discovery.is_threemf_available()
         self.assertIsInstance(result, bool)
-        # Should be True since we just imported the api module
         self.assertTrue(result)
 
     def test_discovery_helper_get_api(self):
@@ -178,6 +223,60 @@ class DiscoveryHelperModuleTests(unittest.TestCase):
         self.assertIsNotNone(version)
         self.assertIsInstance(version, tuple)
         self.assertEqual(len(version), 3)
+
+    def test_discovery_helper_has_capability(self):
+        """Discovery helper has_threemf_capability should check capabilities."""
+        from io_mesh_3mf import threemf_discovery
+
+        self.assertTrue(threemf_discovery.has_threemf_capability("import"))
+        self.assertTrue(threemf_discovery.has_threemf_capability("global_scale"))
+        self.assertFalse(threemf_discovery.has_threemf_capability("nonexistent"))
+
+    def test_discovery_recovers_from_cleared_namespace(self):
+        """Discovery helper should find the API even if driver_namespace was cleared."""
+        from io_mesh_3mf import threemf_discovery
+
+        # Clear cache and driver_namespace to simulate restart.
+        threemf_discovery._cached_api = None
+        bpy.app.driver_namespace.pop(_REGISTRY_KEY, None)
+
+        # Should still find the API via import fallback.
+        api = threemf_discovery.get_threemf_api()
+        self.assertIsNotNone(api)
+        self.assertTrue(hasattr(api, "import_3mf"))
+
+        # And is_threemf_available should agree.
+        self.assertTrue(threemf_discovery.is_threemf_available())
+
+    def test_discovery_returns_none_after_disable(self):
+        """Discovery helper should return None after the addon is disabled."""
+        from io_mesh_3mf import threemf_discovery
+
+        # Ensure the API is discovered first.
+        api = threemf_discovery.get_threemf_api()
+        self.assertIsNotNone(api)
+
+        # Now simulate the addon being disabled.
+        _unregister_api()
+        try:
+            result = threemf_discovery.get_threemf_api()
+            self.assertIsNone(result)
+            self.assertFalse(threemf_discovery.is_threemf_available())
+        finally:
+            # Always re-register for subsequent tests.
+            _register_api()
+
+    def test_discovery_does_not_re_register_disabled(self):
+        """Discovery helper must not re-register an explicitly disabled addon."""
+        from io_mesh_3mf import threemf_discovery
+
+        _unregister_api()
+        try:
+            # Discovery should respect the disabled state.
+            threemf_discovery.get_threemf_api()
+            self.assertNotIn(_REGISTRY_KEY, bpy.app.driver_namespace)
+        finally:
+            _register_api()
 
 
 if __name__ == "__main__":
