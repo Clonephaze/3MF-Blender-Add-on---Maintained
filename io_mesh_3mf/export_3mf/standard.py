@@ -100,12 +100,33 @@ class BaseExporter:
             return name
         return f"{{{MODEL_NAMESPACE}}}{name}"
 
+    @staticmethod
+    def _find_paint_texture(original_object: bpy.types.Object):
+        """Return the paint texture image for *original_object*, or ``None``.
+
+        Checks the ``3mf_is_paint_texture`` flag before scanning material
+        nodes so non-paint objects are skipped cheaply.
+        """
+        mesh_data = original_object.data
+        if not (
+            "3mf_is_paint_texture" in mesh_data
+            and mesh_data["3mf_is_paint_texture"]
+        ):
+            return None
+        for mat_slot in original_object.material_slots:
+            if mat_slot.material and mat_slot.material.use_nodes:
+                for node in mat_slot.material.node_tree.nodes:
+                    if node.type == "TEX_IMAGE" and node.image:
+                        return node.image
+        return None
+
     def _extract_auxiliary_segmentation(
         self,
         original_object: bpy.types.Object,
         eval_object: bpy.types.Object,
         mesh: bpy.types.Mesh,
         layer_type: str,
+        subdivided_mesh=None,
     ) -> dict:
         """Extract seam or support segmentation strings from a paint texture.
 
@@ -179,6 +200,7 @@ class BaseExporter:
                 extruder_colors,
                 default_extruder=3,
                 max_depth=self.ctx.options.subdivision_depth,
+                mesh=subdivided_mesh,
             )
             debug(
                 f"  Generated {len(seg_strings)} {layer_type} segmentation strings"
@@ -538,6 +560,21 @@ class StandardExporter(BaseExporter):
             return new_resource_id, mesh_transformation
 
         mesh.calc_loop_triangles()
+
+        # Adaptive pre-subdivision for PAINT mode: split large faces so each
+        # triangle can be encoded at full segmentation depth without blocky
+        # artefacts.  Only touches the temporary to_mesh() copy.
+        if ctx.options.use_orca_format == "PAINT" and mesh.uv_layers.active:
+            paint_img = self._find_paint_texture(original_object)
+            if paint_img:
+                from .segmentation import subdivide_mesh_for_segmentation
+                subdivide_mesh_for_segmentation(
+                    mesh,
+                    ctx.options.subdivision_depth,
+                    paint_img.size[0],
+                    paint_img.size[1],
+                )
+
         debug(
             f"  Got mesh: {len(mesh.vertices)} vertices, {len(mesh.loop_triangles)} triangles"
         )
@@ -668,10 +705,12 @@ class StandardExporter(BaseExporter):
                     original_object, blender_object, mesh
                 )
                 seam_strings = self._extract_auxiliary_segmentation(
-                    original_object, blender_object, mesh, "SEAM"
+                    original_object, blender_object, mesh, "SEAM",
+                    subdivided_mesh=mesh,
                 )
                 support_strings = self._extract_auxiliary_segmentation(
-                    original_object, blender_object, mesh, "SUPPORT"
+                    original_object, blender_object, mesh, "SUPPORT",
+                    subdivided_mesh=mesh,
                 )
 
             debug(
@@ -819,6 +858,7 @@ class StandardExporter(BaseExporter):
                 default_extruder,
                 progress_callback=seg_progress,
                 max_depth=self.ctx.options.subdivision_depth,
+                mesh=mesh,
             )
             debug(
                 f"  Generated {len(segmentation_strings)} segmentation strings from texture"

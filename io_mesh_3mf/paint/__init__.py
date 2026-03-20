@@ -15,6 +15,8 @@ Submodules:
 - ``helpers``           — Shared utilities (palette, brush config, mesh queries)
 - ``properties``        — Blender PropertyGroups (filament items, paint settings)
 - ``color_detection``   — Color extraction from materials/textures/vertex colors
+- ``quantize``          — Pixel-level and region-based quantization pipeline
+- ``vertex_colors``     — Vertex color detection, rasterization, face assignment
 - ``operators``         — All MMU_OT_* operators
 - ``mmu_panel``         — VIEW3D_PT_mmu_paint panel + UILists + depsgraph handler
 - ``bake``              — Bake-to-MMU operators and Shader Editor panel
@@ -22,6 +24,8 @@ Submodules:
 
 from . import helpers       # noqa: F401
 from . import properties    # noqa: F401
+from . import quantize      # noqa: F401
+from . import vertex_colors # noqa: F401
 from . import operators     # noqa: F401
 from . import mmu_panel     # noqa: F401
 from . import bake          # noqa: F401

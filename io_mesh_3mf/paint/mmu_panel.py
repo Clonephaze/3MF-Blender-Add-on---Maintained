@@ -144,6 +144,10 @@ class VIEW3D_PT_mmu_paint(bpy.types.Panel):
                     layout.separator()
                     bake_box = layout.box()
                     bake_box.label(text="From Existing Material", icon="RENDER_STILL")
+
+                    # Skip dissolve checkbox
+                    bake_box.prop(settings, "skip_dissolve")
+
                     if has_mats:
                         bake_row = bake_box.row()
                         bake_row.scale_y = 1.2
@@ -154,8 +158,12 @@ class VIEW3D_PT_mmu_paint(bpy.types.Panel):
                     )
                     info = bake_box.column(align=True)
                     info.scale_y = 0.7
-                    info.label(text="Bake a procedural material to")
-                    info.label(text="discrete filament colors for export")
+                    if settings.skip_dissolve:
+                        info.label(text="Bake to filament colors,")
+                        info.label(text="preserving mesh topology")
+                    else:
+                        info.label(text="Bake a procedural material to")
+                        info.label(text="discrete filament colors for export")
 
         else:
             # ============================
@@ -284,6 +292,12 @@ class VIEW3D_PT_mmu_paint(bpy.types.Panel):
             layout.separator()
             quant_box = layout.box()
             quant_box.label(text="Cleanup", icon="BRUSH_DATA")
+            quant_box.prop(settings, "quantize_method")
+            if settings.quantize_method == "REGION":
+                col = quant_box.column(align=True)
+                col.prop(settings, "region_similarity")
+                col.prop(settings, "min_region_size")
+            quant_box.separator()
             quant_box.operator("mmu.quantize_texture", icon="SNAP_ON")
             info = quant_box.column(align=True)
             info.scale_y = 0.7

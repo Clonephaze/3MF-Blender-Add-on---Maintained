@@ -15,9 +15,14 @@ Extracts dominant colors from material node trees, image textures, and
 vertex color attributes.  Used by ``MMU_OT_detect_material_colors`` to
 auto-populate the filament palette from existing materials.
 
-All detection paths funnel through HSV-based histogram binning
-(:func:`_bin_pixels_hsv`) and diversity-weighted selection
-(:func:`_select_diverse_colors`) for perceptually distinct palettes.
+Image textures use **k-means clustering in OKLab** (perceptually uniform
+color space) with oversampling and diversity selection.  This correctly
+handles artistic/photographic images where the same hue appears at many
+brightness levels (e.g. Starry Night's dark navy through bright sky blue).
+
+Vertex colors use HSV histogram binning (:func:`_bin_pixels_hsv`) and
+diversity-weighted selection (:func:`_select_diverse_colors`), which
+works well for the simpler palettes typical of vertex-painted meshes.
 """
 
 import numpy as np
@@ -314,18 +319,18 @@ def _bin_pixels_hsv(srgb):
         mask = all_bin_ids == bid
         member_srgb = all_srgb[mask]
         member_hsv = all_hsv[mask]
-        # Representative color: median hue/sat (stable), but 75th
+        # Representative color: median hue/sat (stable), but 60th
         # percentile brightness.  On 3D models shadows cover more
         # surface area than highlights, so the median V is too dark.
-        # The 75th percentile picks the "typical lit surface" color.
+        # The 60th percentile nudges toward "typical lit surface" while
+        # keeping dark tones recognisably dark.
         med_srgb = np.median(member_srgb, axis=0)
-        v_75 = np.percentile(member_hsv[:, 2], 75)
+        v_60 = np.percentile(member_hsv[:, 2], 60)
         med_v = np.median(member_hsv[:, 2])
-        # Scale the median sRGB toward the brighter representative:
-        #   if med_v > 0 boost each channel by (v_75 / med_v),
-        #   clamped to [0, 1].
+        # Scale the median sRGB toward the brighter representative,
+        # but cap at 1.3× to avoid washing out dark colors.
         if med_v > 0.01:
-            boost = min(v_75 / med_v, 2.0)
+            boost = min(v_60 / med_v, 1.3)
             colors[out_i] = np.clip(med_srgb * boost, 0.0, 1.0)
         else:
             colors[out_i] = med_srgb
@@ -336,14 +341,17 @@ def _bin_pixels_hsv(srgb):
 
 
 def _hs_distance(colors_a, colors_b_row):
-    """Cyclic Hue-Saturation distance between (N,3) and (3,) sRGB arrays.
+    """Cyclic Hue-Saturation-Value distance between (N,3) and (3,) sRGB arrays.
 
-    Converts to HSV, then computes  sqrt(W_H*dh^2 + W_S*ds^2)  with cyclic
-    hue wrapping.  Achromatic entries (S < 0.10) use Euclidean RGB
-    distance instead so that black/white/grey are handled correctly.
+    Converts to HSV, then computes a weighted distance using cyclic hue,
+    saturation, and value.  Value is included so that dark navy vs bright
+    sky blue register as distinct colors.  Achromatic entries (S < 0.10)
+    use Euclidean RGB distance instead so that black/white/grey are
+    handled correctly.
     """
     W_H = 6.0
     W_S = 3.0
+    W_V = 2.0
 
     hsv_a = _srgb_to_hsv_array(colors_a)  # (N, 3)
     hsv_b = _srgb_to_hsv_array(colors_b_row.reshape(1, 3))  # (1, 3)
@@ -351,8 +359,9 @@ def _hs_distance(colors_a, colors_b_row):
     dh = np.abs(hsv_a[:, 0] - hsv_b[0, 0])
     dh = np.minimum(dh, 1.0 - dh)
     ds = hsv_a[:, 1] - hsv_b[0, 1]
+    dv = hsv_a[:, 2] - hsv_b[0, 2]
 
-    hsv_dist = np.sqrt(W_H * dh ** 2 + W_S * ds ** 2)
+    hsv_dist = np.sqrt(W_H * dh ** 2 + W_S * ds ** 2 + W_V * dv ** 2)
 
     # RGB fallback for achromatic pixels
     rgb_dist = np.sqrt(np.sum((colors_a - colors_b_row) ** 2, axis=1))
@@ -368,9 +377,9 @@ def _select_diverse_colors(bin_colors, bin_counts, num_colors):
 
     1. First pick = most frequent bin.
     2. Each subsequent pick maximises ``frequency_weight x min_distance``
-       where *min_distance* is the **HS-dominant distance** (cyclic hue +
-       saturation, with RGB fallback for greys) to the nearest already-
-       selected color.
+       where *min_distance* is the **HSV-dominant distance** (cyclic hue +
+       saturation + value, with RGB fallback for greys) to the nearest
+       already-selected color.
 
     Returns a list of ``(r, g, b)`` sRGB tuples.
     """
@@ -394,7 +403,7 @@ def _select_diverse_colors(bin_colors, bin_counts, num_colors):
 
     for step in range(num_colors - 1):
         last_sel = bin_colors[selected_indices[-1]]
-        # HS-dominant distance to the latest picked color
+        # HSV-dominant distance to the latest picked color
         dists = _hs_distance(bin_colors, last_sel)
         min_dists = np.minimum(min_dists, dists)
 
@@ -422,15 +431,223 @@ def _linear_to_srgb_array(rgb):
     return np.clip(srgb, 0.0, 1.0)
 
 
+def _srgb_to_linear_array(srgb):
+    """Convert an (N, 3) sRGB array to linear-light, clamped to [0, 1]."""
+    return np.where(
+        srgb <= 0.04045,
+        srgb / 12.92,
+        np.power((srgb + 0.055) / 1.055, 2.4),
+    )
+
+
+# -------------------------------------------------------------------
+#  OKLab perceptual color space (for k-means palette extraction)
+# -------------------------------------------------------------------
+
+# OKLab M1: linear RGB -> LMS
+_OKLAB_M1 = np.array([
+    [0.4122214708, 0.5363325363, 0.0514459929],
+    [0.2119034982, 0.6806995451, 0.1073969566],
+    [0.0883024619, 0.2817188376, 0.6299787005],
+], dtype=np.float64)
+
+# OKLab M2: LMS^(1/3) -> Lab
+_OKLAB_M2 = np.array([
+    [0.2104542553, 0.7936177850, -0.0040720468],
+    [1.9779984951, -2.4285922050, 0.4505937099],
+    [0.0259040371, 0.7827717662, -0.8086757660],
+], dtype=np.float64)
+
+_OKLAB_M1_INV = np.linalg.inv(_OKLAB_M1)
+_OKLAB_M2_INV = np.linalg.inv(_OKLAB_M2)
+
+
+def _srgb_to_oklab(srgb):
+    """Convert (N, 3) sRGB to OKLab.  Returns (N, 3) float64."""
+    linear = _srgb_to_linear_array(srgb).astype(np.float64)
+    lms = linear @ _OKLAB_M1.T
+    # Clamp before cube root to handle small negative values from
+    # out-of-gamut rounding
+    lms_g = np.cbrt(np.maximum(lms, 0.0))
+    return lms_g @ _OKLAB_M2.T
+
+
+def _oklab_to_srgb(lab):
+    """Convert (N, 3) OKLab to sRGB, clamped [0, 1].  Returns (N, 3) float32."""
+    lms_g = lab @ _OKLAB_M2_INV.T
+    lms = lms_g ** 3
+    linear = lms @ _OKLAB_M1_INV.T
+    srgb = np.where(
+        linear <= 0.0031308,
+        12.92 * linear,
+        1.055 * np.power(np.maximum(linear, 0.0), 1.0 / 2.4) - 0.055,
+    )
+    return np.clip(srgb, 0.0, 1.0).astype(np.float32)
+
+
+# -------------------------------------------------------------------
+#  K-means palette extraction in OKLab
+# -------------------------------------------------------------------
+
+_MAX_PER_CELL = 200    # max pixels sampled per sRGB grid cell
+_CELL_GRID = 8         # grid divisions per channel  (8^3 = 512 cells total)
+_MAX_ITER = 25         # k-means iterations (converges in <15 typically)
+
+
+def _spatially_balanced_sample(srgb, max_per_cell, grid_size):
+    """Sample *srgb* (N, 3) with at most *max_per_cell* pixels per coarse
+    sRGB grid cell (grid_size^3 cells total).
+
+    A random global subsample is blind to rare colours: in a painting
+    that is 75% blue and 5% yellow, a 50 K random draw yields ~37 500
+    blue pixels and only ~2 500 yellow pixels, so k-means allocates
+    almost all its clusters to blue and yellow disappears.  By capping
+    each colour cell at *max_per_cell*, the dominant colour is down-
+    sampled and rare colours are fully represented, giving k-means a
+    balanced view of the palette.
+
+    Returns ``(sample, n_occupied)`` where *sample* is (M, 3) float32
+    and *n_occupied* is the number of non-empty cells.
+    """
+    q = (np.clip(srgb, 0.0, 1.0) * grid_size).astype(np.int32)
+    q = np.clip(q, 0, grid_size - 1)
+    cell_ids = (q[:, 0] * grid_size + q[:, 1]) * grid_size + q[:, 2]
+
+    # Sort so all pixels in the same cell are contiguous
+    sort_order = np.argsort(cell_ids, kind='stable')
+    sorted_ids = cell_ids[sort_order]
+    _, first_occ = np.unique(sorted_ids, return_index=True)
+    boundaries = np.append(first_occ, len(sorted_ids))
+
+    rng = np.random.default_rng(42)
+    selected = []
+    for start, end in zip(boundaries[:-1], boundaries[1:]):
+        cell_pixel_indices = sort_order[start:end]
+        count = int(end - start)
+        n_take = min(max_per_cell, count)
+        if n_take < count:
+            chosen = rng.choice(cell_pixel_indices, n_take, replace=False)
+        else:
+            chosen = cell_pixel_indices
+        selected.append(chosen)
+
+    all_idx = np.concatenate(selected)
+    return srgb[all_idx], len(boundaries) - 1
+
+
+def _kmeans_pp_init(data, k, rng):
+    """K-means++ initialization.  *data* is (N, D), returns (k, D) centers."""
+    n = len(data)
+    centers = np.empty((k, data.shape[1]), dtype=data.dtype)
+    centers[0] = data[rng.integers(n)]
+    dist_sq = np.full(n, np.inf, dtype=np.float64)
+
+    for i in range(1, k):
+        d = np.sum((data - centers[i - 1]) ** 2, axis=1)
+        dist_sq = np.minimum(dist_sq, d)
+        prob = dist_sq / dist_sq.sum()
+        centers[i] = data[rng.choice(n, p=prob)]
+
+    return centers
+
+
+def _kmeans(data, k, max_iter=_MAX_ITER, seed=42):
+    """Run k-means in (N, D) space.  Returns (centers, labels, counts).
+
+    *centers* is (k, D), *labels* is (N,) cluster assignment,
+    *counts* is (k,) number of members per cluster.
+    """
+    rng = np.random.default_rng(seed)
+    centers = _kmeans_pp_init(data, k, rng)
+
+    labels = np.zeros(len(data), dtype=np.int32)
+    for iteration in range(max_iter):
+        # Assignment step: each point -> nearest center
+        # Compute distances in chunks to limit memory (50K × 32 is fine)
+        dists = np.sum((data[:, np.newaxis, :] - centers[np.newaxis, :, :]) ** 2, axis=2)
+        new_labels = np.argmin(dists, axis=1).astype(np.int32)
+
+        if np.array_equal(new_labels, labels):
+            debug(f"[Detect]   k-means converged at iteration {iteration}")
+            labels = new_labels
+            break
+        labels = new_labels
+
+        # Update step: new centers = mean of assigned points
+        for c in range(k):
+            mask = labels == c
+            if np.any(mask):
+                centers[c] = data[mask].mean(axis=0)
+
+    counts = np.bincount(labels, minlength=k)
+    return centers, labels, counts
+
+
+def _select_diverse_from_centers(centers_srgb, counts, num_colors):
+    """Greedily pick *num_colors* from overclustered k-means centers.
+
+    Uses OKLab Euclidean distance for perceptual uniformity.  Frequency
+    weighting is intentionally weak (fourth-root) so that small but
+    visually distinct clusters (e.g. yellow stars in a blue painting)
+    can compete with dominant colors.
+
+    Returns a list of ``(r, g, b)`` sRGB tuples.
+    """
+    n = len(centers_srgb)
+    if n == 0:
+        return []
+    if n <= num_colors:
+        return [tuple(centers_srgb[i]) for i in range(n)]
+
+    centers_lab = _srgb_to_oklab(centers_srgb)
+    max_count = float(np.max(counts))
+    # Fourth-root: a cluster 10000× larger only gets 10× weight
+    weights = np.power(counts.astype(np.float64) / max_count, 0.25)
+
+    debug(f"[Detect] _select_diverse: {n} clusters, picking {num_colors}")
+    order = np.argsort(-counts)
+    debug("[Detect]   Top 10 clusters by count:")
+    for rank in range(min(10, n)):
+        i = order[rank]
+        c = centers_srgb[i]
+        debug(f"    cluster[{i}] sRGB ({c[0]:.3f}, {c[1]:.3f}, {c[2]:.3f})  "
+              f"count={counts[i]}  weight={weights[i]:.4f}")
+
+    # First pick: most frequent cluster
+    selected = [int(order[0])]
+    min_dists = np.full(n, np.inf, dtype=np.float64)
+
+    for step in range(num_colors - 1):
+        last_lab = centers_lab[selected[-1]]
+        dists = np.sqrt(np.sum((centers_lab - last_lab) ** 2, axis=1))
+        min_dists = np.minimum(min_dists, dists)
+
+        scores = weights * min_dists
+        for idx in selected:
+            scores[idx] = -1.0
+        best = int(np.argmax(scores))
+        c = centers_srgb[best]
+        debug(f"    Step {step + 1}: picked cluster[{best}] sRGB ({c[0]:.3f}, {c[1]:.3f}, {c[2]:.3f})  "
+              f"count={counts[best]}  min_dist={min_dists[best]:.4f}  score={scores[best]:.4f}")
+        selected.append(best)
+
+    result = [tuple(centers_srgb[i]) for i in selected]
+    debug(f"[Detect] Final palette: {result}")
+    return result
+
+
 def _extract_texture_colors(image, num_colors):
-    """Extract the *num_colors* most dominant colors from *image*.
+    """Extract *num_colors* dominant, visually diverse colors from *image*.
 
-    Uses histogram binning (16 levels per RGB channel = 4096 bins)
-    to group similar colors, then selects the N most frequent *and*
-    visually diverse colors as sRGB (r, g, b) tuples.
+    Pipeline:
+    1. Read pixels, discard transparent and near-white.
+    2. Subsample to *_MAX_SAMPLE* pixels for speed.
+    3. Convert to OKLab (perceptually uniform color space).
+    4. K-means++ with ``k = num_colors * 3`` (overclustering).
+    5. Convert cluster centers back to sRGB.
+    6. Greedy diversity selection picks final *num_colors*.
 
-    Fully transparent pixels (alpha < 0.01) and near-white pixels
-    (likely untextured UV background) are ignored.
+    Returns a list of ``(r, g, b)`` sRGB tuples.
     """
     w, h = image.size
     debug(f"[Detect] _extract_texture_colors: image='{image.name}' size={w}x{h}")
@@ -445,32 +662,48 @@ def _extract_texture_colors(image, num_colors):
 
     # Discard fully transparent pixels
     opaque_mask = pixels[:, 3] >= 0.01
-    rgb = pixels[opaque_mask, :3]  # (M, 3) linear RGB
-    debug(f"[Detect]   Opaque pixels: {len(rgb)}")
-    if rgb.size == 0:
+    rgb_linear = pixels[opaque_mask, :3]  # (M, 3) linear RGB
+    debug(f"[Detect]   Opaque pixels: {len(rgb_linear)}")
+    if rgb_linear.size == 0:
         return []
 
-    srgb = _linear_to_srgb_array(rgb)
+    srgb = _linear_to_srgb_array(rgb_linear)
 
-    # Discard near-white pixels -- these are typically bare UV
-    # background, not actual texture content (sRGB > ~0.94 per ch)
+    # Discard near-white pixels -- typically bare UV background
     near_white = np.all(srgb > 0.94, axis=1)
     debug(f"[Detect]   Near-white pixels discarded: {np.sum(near_white)}")
     srgb = srgb[~near_white]
-    debug(f"[Detect]   Remaining pixels for binning: {len(srgb)}")
-    if srgb.size == 0:
+    debug(f"[Detect]   Remaining pixels: {len(srgb)}")
+    if len(srgb) == 0:
         return []
 
-    bin_colors, bin_counts = _bin_pixels_hsv(srgb)
-    debug(f"[Detect]   Unique bins: {len(bin_colors)}")
-    return _select_diverse_colors(bin_colors, bin_counts, num_colors)
+    # Colour-balanced sampling: cap each sRGB grid cell at _MAX_PER_CELL so
+    # rare colours (e.g. yellow stars in a mostly-blue painting) are not
+    # drowned out by the dominant colour in k-means cluster allocation.
+    srgb_sample, n_cells = _spatially_balanced_sample(srgb, _MAX_PER_CELL, _CELL_GRID)
+    debug(f"[Detect]   Balanced sample: {len(srgb_sample)} pixels from {n_cells} colour cells")
+
+    # K-means in OKLab
+    lab_sample = _srgb_to_oklab(srgb_sample)
+    k = min(num_colors * 3, 32, len(srgb_sample))
+    debug(f"[Detect]   Running k-means++ in OKLab (k={k}, max_iter={_MAX_ITER})")
+    centers_lab, _, counts = _kmeans(lab_sample, k)
+
+    # Discard empty clusters
+    nonempty = counts > 0
+    centers_lab = centers_lab[nonempty]
+    counts = counts[nonempty]
+
+    centers_srgb = _oklab_to_srgb(centers_lab)
+    return _select_diverse_from_centers(centers_srgb, counts, num_colors)
 
 
 def _extract_vertex_colors(obj, num_colors):
     """Extract the *num_colors* most dominant vertex colors from *obj*.
 
-    Reads the active color attribute and applies the same HSV histogram
-    binning + diversity-weighted selection as ``_extract_texture_colors``.
+    Reads the active color attribute and applies HSV histogram binning
+    + diversity-weighted selection (suitable for the simpler palettes
+    typical of vertex-painted meshes).
     """
     if not _has_vertex_colors(obj):
         debug("[Detect] _extract_vertex_colors: no vertex colors on object")

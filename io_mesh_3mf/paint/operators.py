@@ -93,15 +93,16 @@ class MMU_OT_initialize(bpy.types.Operator):
         # Limited Dissolve merges coplanar triangles, giving each face
         # more UV space and reducing blurriness.  ~2 deg is conservative
         # enough to keep all intentional geometry detail.
-        bm = bmesh.new()
-        bm.from_mesh(mesh)
-        bmesh.ops.dissolve_limit(
-            bm, angle_limit=0.0349,
-            verts=bm.verts, edges=bm.edges,
-        )
-        bm.to_mesh(mesh)
-        bm.free()
-        mesh.update()
+        if not settings.skip_dissolve:
+            bm = bmesh.new()
+            bm.from_mesh(mesh)
+            bmesh.ops.dissolve_limit(
+                bm, angle_limit=0.0349,
+                verts=bm.verts, edges=bm.edges,
+            )
+            bm.to_mesh(mesh)
+            bm.free()
+            mesh.update()
 
         bpy.ops.object.mode_set(mode="EDIT")
         bpy.ops.mesh.select_all(action="SELECT")

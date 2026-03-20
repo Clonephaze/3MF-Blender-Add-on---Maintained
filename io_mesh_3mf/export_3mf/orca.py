@@ -343,6 +343,22 @@ class OrcaExporter(BaseExporter):
 
         mesh.calc_loop_triangles()
 
+        # Adaptive pre-subdivision for PAINT mode: split large faces so each
+        # triangle can be encoded at full segmentation depth.
+        if ctx.options.use_orca_format == "PAINT" and mesh.uv_layers.active:
+            original_object = blender_object
+            if hasattr(blender_object, "original"):
+                original_object = blender_object.original
+            paint_img = self._find_paint_texture(original_object)
+            if paint_img:
+                from .segmentation import subdivide_mesh_for_segmentation
+                subdivide_mesh_for_segmentation(
+                    mesh,
+                    ctx.options.subdivision_depth,
+                    paint_img.size[0],
+                    paint_img.size[1],
+                )
+
         # Create object element
         obj_elem = xml.etree.ElementTree.SubElement(
             resources,
@@ -438,6 +454,7 @@ class OrcaExporter(BaseExporter):
                             default_extruder,
                             progress_callback=orca_seg_progress,
                             max_depth=ctx.options.subdivision_depth,
+                            mesh=mesh,
                         )
                         debug(
                             f"  Generated {len(segmentation_strings)} segmentation strings"
@@ -452,10 +469,12 @@ class OrcaExporter(BaseExporter):
 
             # Seam / support paint (independent of color paint)
             seam_strings = self._extract_auxiliary_segmentation(
-                original_object, blender_object, mesh, "SEAM"
+                original_object, blender_object, mesh, "SEAM",
+                subdivided_mesh=mesh,
             )
             support_strings = self._extract_auxiliary_segmentation(
-                original_object, blender_object, mesh, "SUPPORT"
+                original_object, blender_object, mesh, "SUPPORT",
+                subdivided_mesh=mesh,
             )
 
         # Triangles with paint_color

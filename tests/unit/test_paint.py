@@ -2,7 +2,8 @@
 Unit tests for paint module — bake, color detection, and helpers.
 
 Covers pure/numpy functions from:
-- ``io_mesh_3mf.paint.bake`` — _rgb_to_hsv, _hue_aware_distance, _quantize_pixels, _get_texture_size
+- ``io_mesh_3mf.paint.quantize`` — _rgb_to_hsv, _hue_aware_distance, _quantize_pixels, etc.
+- ``io_mesh_3mf.paint.bake`` — _get_texture_size
 - ``io_mesh_3mf.paint.color_detection`` — _deduplicate_colors, _srgb_to_hsv_array,
     _bin_pixels_hsv, _hs_distance, _select_diverse_colors, _linear_to_srgb_array
 - ``io_mesh_3mf.paint.helpers`` — DEFAULT_PALETTE, _layer_colors, _layer_uv_name,
@@ -21,7 +22,7 @@ class RgbToHsvTests(unittest.TestCase):
     """Tests for paint.bake._rgb_to_hsv()."""
 
     def setUp(self):
-        from io_mesh_3mf.paint.bake import _rgb_to_hsv
+        from io_mesh_3mf.paint.quantize import _rgb_to_hsv
         self._rgb_to_hsv = _rgb_to_hsv
 
     def test_pure_red(self):
@@ -75,7 +76,7 @@ class HueAwareDistanceTests(unittest.TestCase):
     """Tests for paint.bake._hue_aware_distance()."""
 
     def setUp(self):
-        from io_mesh_3mf.paint.bake import _hue_aware_distance, _rgb_to_hsv
+        from io_mesh_3mf.paint.quantize import _hue_aware_distance, _rgb_to_hsv
         self._hue_aware_distance = _hue_aware_distance
         self._rgb_to_hsv = _rgb_to_hsv
 
@@ -110,7 +111,7 @@ class QuantizePixelsTests(unittest.TestCase):
     """Tests for paint.bake._quantize_pixels()."""
 
     def setUp(self):
-        from io_mesh_3mf.paint.bake import _quantize_pixels
+        from io_mesh_3mf.paint.quantize import _quantize_pixels
         self._quantize_pixels = _quantize_pixels
 
     def test_single_color_no_change(self):
@@ -248,7 +249,7 @@ class ApplyMajorityFilterTests(unittest.TestCase):
     """Tests for paint.bake._apply_majority_filter()."""
 
     def setUp(self):
-        from io_mesh_3mf.paint.bake import _apply_majority_filter
+        from io_mesh_3mf.paint.quantize import _apply_majority_filter
         self._apply_majority_filter = _apply_majority_filter
 
     def test_uniform_image_no_change(self):
@@ -643,7 +644,7 @@ class FloodFillSegmentationTests(unittest.TestCase):
     """Tests for paint.bake._flood_fill_segmentation()."""
 
     def setUp(self):
-        from io_mesh_3mf.paint.bake import _flood_fill_segmentation
+        from io_mesh_3mf.paint.quantize import _flood_fill_segmentation
         self._flood_fill_segmentation = _flood_fill_segmentation
 
     def test_uniform_image_single_region(self):
@@ -702,7 +703,7 @@ class RegionRepresentativeColorsTests(unittest.TestCase):
     """Tests for paint.bake._compute_region_representative_colors()."""
 
     def setUp(self):
-        from io_mesh_3mf.paint.bake import _compute_region_representative_colors
+        from io_mesh_3mf.paint.quantize import _compute_region_representative_colors
         self._compute_region_representative_colors = _compute_region_representative_colors
 
     def test_uniform_region_same_color(self):
@@ -742,7 +743,7 @@ class QuantizeByRegionsTests(unittest.TestCase):
     """Tests for paint.bake._quantize_by_regions()."""
 
     def setUp(self):
-        from io_mesh_3mf.paint.bake import _quantize_by_regions
+        from io_mesh_3mf.paint.quantize import _quantize_by_regions
         self._quantize_by_regions = _quantize_by_regions
 
     def test_uniform_image_single_color(self):
@@ -858,7 +859,7 @@ class GradientMagnitudeTests(unittest.TestCase):
     """Tests for paint.bake._compute_gradient_magnitude()."""
 
     def setUp(self):
-        from io_mesh_3mf.paint.bake import _compute_gradient_magnitude
+        from io_mesh_3mf.paint.quantize import _compute_gradient_magnitude
         self._compute_gradient_magnitude = _compute_gradient_magnitude
 
     def test_uniform_image_zero_gradient(self):
@@ -906,7 +907,7 @@ class MergeSmallRegionsTests(unittest.TestCase):
     """Tests for paint.bake._merge_small_regions()."""
 
     def setUp(self):
-        from io_mesh_3mf.paint.bake import _merge_small_regions
+        from io_mesh_3mf.paint.quantize import _merge_small_regions
         self._merge_small_regions = _merge_small_regions
 
     def test_no_small_regions_unchanged(self):

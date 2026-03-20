@@ -32,6 +32,112 @@ from ..common.logging import debug, DEBUG_MODE
 # Maximum subdivision depth (7 gives 4^7 = 16384 potential leaf nodes per triangle)
 MAX_SUBDIVISION_DEPTH = 7
 
+# Maximum iterations for adaptive mesh pre-subdivision
+_MAX_SUBDIV_ITERATIONS = 6
+
+# Target pixels per segmentation leaf node (lower = finer detail, more triangles)
+_PIXELS_PER_LEAF = 4
+
+
+def subdivide_mesh_for_segmentation(
+    mesh, max_depth: int, tex_width: int, tex_height: int
+) -> bool:
+    """
+    Pre-subdivide mesh faces whose UV footprint exceeds segmentation resolution.
+
+    At *max_depth* ``d``, each triangle encodes up to ``4^d`` leaf colour regions.
+    When a triangle covers far more texture pixels than that, the recursive
+    encoder cannot capture enough detail and the result looks blocky.
+
+    This function detects such oversized faces (using their UV-space area
+    relative to the texture resolution) and iteratively splits them with bmesh
+    so each resulting triangle can be encoded at full fidelity.
+
+    Operates **in-place** on the temporary mesh from ``to_mesh()`` — the
+    original scene geometry is never touched.
+
+    :param mesh: Blender Mesh datablock (temporary copy from ``to_mesh()``).
+    :param max_depth: Maximum recursive segmentation depth per triangle.
+    :param tex_width: Texture width in pixels.
+    :param tex_height: Texture height in pixels.
+    :return: *True* if the mesh was modified, *False* otherwise.
+    """
+    import bmesh
+
+    if not mesh.uv_layers or not mesh.uv_layers.active:
+        return False
+
+    tex_area = tex_width * tex_height
+    if tex_area == 0:
+        return False
+
+    # Pixel-area budget per triangle: 4^depth leaves × pixels_per_leaf.
+    max_pixel_area = (4 ** max_depth) * _PIXELS_PER_LEAF
+
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+
+    uv_layer = bm.loops.layers.uv.active
+    if not uv_layer:
+        bm.free()
+        return False
+
+    modified = False
+
+    for iteration in range(_MAX_SUBDIV_ITERATIONS):
+        bm.faces.ensure_lookup_table()
+        edges_to_cut = set()
+        oversized = 0
+
+        for face in bm.faces:
+            loops = face.loops
+            if len(loops) < 3:
+                continue
+
+            # UV area via cross-product fan (handles tris and quads).
+            uvs = [l[uv_layer].uv for l in loops]
+            uv_area = 0.0
+            for i in range(1, len(uvs) - 1):
+                dx1 = uvs[i].x - uvs[0].x
+                dy1 = uvs[i].y - uvs[0].y
+                dx2 = uvs[i + 1].x - uvs[0].x
+                dy2 = uvs[i + 1].y - uvs[0].y
+                uv_area += abs(dx1 * dy2 - dx2 * dy1) * 0.5
+
+            if uv_area * tex_area > max_pixel_area:
+                for edge in face.edges:
+                    edges_to_cut.add(edge)
+                oversized += 1
+
+        if not edges_to_cut:
+            break
+
+        debug(
+            f"  Adaptive subdivision pass {iteration + 1}: "
+            f"{oversized} oversized faces, {len(edges_to_cut)} edges"
+        )
+
+        bmesh.ops.subdivide_edges(bm, edges=list(edges_to_cut), cuts=1)
+
+        # Ensure all faces are triangles after subdivision.
+        non_tris = [f for f in bm.faces if len(f.verts) > 3]
+        if non_tris:
+            bmesh.ops.triangulate(bm, faces=non_tris)
+
+        modified = True
+
+    if modified:
+        bm.to_mesh(mesh)
+        mesh.update()
+        mesh.calc_loop_triangles()
+        debug(
+            f"  Adaptive subdivision done: "
+            f"{len(mesh.vertices)} verts, {len(mesh.loop_triangles)} tris"
+        )
+
+    bm.free()
+    return modified
+
 
 def _build_state_map(
     pixels: np.ndarray,
@@ -243,6 +349,7 @@ def _analyze_recursive(
 def texture_to_segmentation(
     obj, image, extruder_colors: Dict[int, List[float]], default_extruder: int = 1,
     progress_callback=None, max_depth: int = MAX_SUBDIVISION_DEPTH,
+    mesh=None,
 ) -> Dict[int, str]:
     """
     Convert object's UV texture to PrusaSlicer segmentation strings.
@@ -253,13 +360,15 @@ def texture_to_segmentation(
     :param default_extruder: Default extruder index.
     :param progress_callback: Optional callback(current, total, message) for progress updates.
     :param max_depth: Maximum recursive subdivision depth (4-10, default 7).
+    :param mesh: Optional pre-subdivided mesh to use instead of ``obj.data``.
     :return: Dict mapping loop_triangle index -> segmentation_hex_string.
     """
     import time
 
     t_start = time.perf_counter()
 
-    mesh = obj.data
+    if mesh is None:
+        mesh = obj.data
     width, height = image.size
 
     # One-time read from Blender image into numpy for fast access.

@@ -182,5 +182,16 @@ class MMUPaintSettings(bpy.types.PropertyGroup):
         default="COLOR",
     )
 
+    # Skip dissolve — preserve original mesh topology
+    skip_dissolve: bpy.props.BoolProperty(
+        name="Skip Dissolve",
+        description=(
+            "Skip the Limited Dissolve step that merges coplanar faces. "
+            "Preserves original mesh detail at the cost of potentially "
+            "smaller UV islands per face"
+        ),
+        default=False,
+    )
+
     # Internal: tracks which mesh the filament list was loaded from
     loaded_mesh_name: bpy.props.StringProperty(default="")

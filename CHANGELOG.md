@@ -1,3 +1,37 @@
+2.4.0 — Adaptive Export Subdivision, OKLab Color Detection & Bake Improvements
+====
+
+Features
+----
+* **Adaptive pre-subdivision for PAINT exports** — New `subdivide_mesh_for_segmentation()` detects mesh faces whose UV footprint exceeds the segmentation resolution budget (`4^depth × 4` pixels) and iteratively splits them via bmesh before encoding. Operates on the temporary `to_mesh()` copy so original scene geometry is untouched. Integrated into both Orca and Standard export paths.
+* **OKLab k-means color detection** — Image texture color extraction completely rewritten. Uses k-means++ clustering in OKLab perceptual color space with spatially balanced sampling (8³ sRGB grid, 200 max per cell) for diverse, accurate palette extraction from photographic textures.
+* **Skip Dissolve option** — New `skip_dissolve` checkbox in the bake panel and MMU initialization. When enabled, Limited Dissolve is skipped to preserve original mesh topology (useful for models where the N-gon merging is undesirable).
+* **Quantize settings in panels** — `quantize_method`, `region_similarity`, and `min_region_size` now visible in the shader editor panel and 3D viewport panel.
+* **Improved Bake to MMU UI** — Popup dialog and sidebar panel redesigned with grouped boxes (Source Material, Filament Palette, Bake Settings, Quantization, Options), section icons, vertex color fast-path callout, and alert-styled warning. Sidebar quantize state also reorganised into distinct header and tool sections.
+
+Bug Fixes
+----
+* **UV active_render fix during bake** — `_ensure_uv_unwrap()` previously set MMU_Paint as `active_render` before baking, causing source textures to sample from the wrong UV layer. Now keeps the original UV as `active_render` during bake and switches after.
+* **Quantization brightness weight** — `_hue_aware_distance` had `W_V=0.05` (near-zero brightness weight), causing dark navy to match the same filament as bright sky blue. Raised to `W_V=2.0`.
+
+Performance
+----
+* **Vectorized region merge** — `_merge_small_regions()` replaced Python for-loop over border pairs with numpy filter/sort/unique operations.
+* **LUT-based palette application** — Steps 4+5 of `_quantize_by_regions()` replaced per-region Python loops (19K iterations × 67M pixels at 8192²) with two numpy LUT lookups.
+* **`_rebuild_region_palette`** — Returns numpy LUT array instead of dict for O(1) vectorized indexing.
+
+Technical
+----
+* **`bake.py` split into focused modules** — Monolithic 2770-line `bake.py` refactored into `paint/quantize.py` (pixel/region quantization pipeline), `paint/vertex_colors.py` (vertex colour detection, rasterisation, face assignment), and a slimmer `bake.py` (operators, panels, UV/texture helpers, registration). All public symbols re-exported for backward compatibility.
+* `BaseExporter._find_paint_texture()` static helper for quick paint texture lookup.
+* `texture_to_segmentation()` accepts optional `mesh` parameter for pre-subdivided meshes.
+* `_extract_auxiliary_segmentation()` accepts `subdivided_mesh` kwarg so seam/support segmentation uses the same subdivided mesh.
+* OKLab conversion helpers: `_srgb_to_linear_array()`, `_srgb_to_oklab()`, `_oklab_to_srgb()` with M1/M2 matrix transforms.
+* `_spatially_balanced_sample()` and `_kmeans_pp_init()` / `_kmeans()` for robust clustering.
+* `_select_diverse_from_centers()` with fourth-root frequency weighting for palette diversity.
+
+---
+
 2.3.0 — Region-Aware Quantization, Vertex Color Fast Path & API Discovery
 ====
 
