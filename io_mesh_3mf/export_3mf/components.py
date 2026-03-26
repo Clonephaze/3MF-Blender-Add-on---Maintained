@@ -34,7 +34,7 @@ from ..common.logging import debug
 def collect_mesh_objects(
     blender_objects,
     export_hidden: bool = False,
-    skip_disabled: bool = True,
+    include_disabled: bool = False,
 ) -> List[bpy.types.Object]:
     """
     Recursively collect all MESH objects, descending into EMPTY hierarchies.
@@ -48,8 +48,8 @@ def collect_mesh_objects(
         view layer are skipped.  This uses ``obj.visible_get()`` which
         accounts for the object eye-icon, collection visibility toggles,
         and view-layer excludes.
-    :param skip_disabled: When *True*, objects with ``hide_render`` or
-        objects whose collections are render-disabled are also skipped.
+    :param include_disabled: When *True*, objects with ``hide_render`` or
+        objects whose collections are render-disabled are also included.
     :return: Flat list of unique MESH objects found in the hierarchy.
     """
     result: List[bpy.types.Object] = []
@@ -67,7 +67,7 @@ def collect_mesh_objects(
                 continue
 
             # Skip objects disabled for rendering (camera icon).
-            if skip_disabled and obj.hide_render:
+            if not include_disabled and obj.hide_render:
                 continue
 
             if obj.type == "MESH":

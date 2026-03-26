@@ -956,7 +956,7 @@ def export_3mf(
     options = ExportOptions(
         use_selection=use_selection,
         export_hidden=export_hidden,
-        skip_disabled=skip_disabled,
+        include_disabled=not skip_disabled,
         global_scale=global_scale,
         use_mesh_modifiers=use_mesh_modifiers,
         coordinate_precision=coordinate_precision,

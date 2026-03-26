@@ -97,7 +97,7 @@ class OrcaExporter(BaseExporter):
             mesh_objs_for_paint = collect_mesh_objects(
                 blender_objects,
                 export_hidden=ctx.options.export_hidden,
-                skip_disabled=ctx.options.skip_disabled,
+                include_disabled=ctx.options.include_disabled,
             )
             for blender_object in mesh_objs_for_paint:
                 original_object = blender_object
@@ -150,7 +150,7 @@ class OrcaExporter(BaseExporter):
         mesh_objects = collect_mesh_objects(
             blender_objects,
             export_hidden=ctx.options.export_hidden,
-            skip_disabled=ctx.options.skip_disabled,
+            include_disabled=ctx.options.include_disabled,
         )
 
         if not mesh_objects:

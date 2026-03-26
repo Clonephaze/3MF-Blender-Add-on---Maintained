@@ -66,11 +66,11 @@ def _is_object_excluded(obj: bpy.types.Object, ctx) -> bool:
        eye icon, collection visibility toggles, and view-layer excludes.
        Skipped when ``export_hidden`` is *True*.
     2. **Render disabled** — the camera-icon on the object
-       (``obj.hide_render``).  Skipped when ``skip_disabled`` is *False*.
+       (``obj.hide_render``).  Included when ``include_disabled`` is *True*.
     """
     if not ctx.options.export_hidden and not obj.visible_get():
         return True
-    if ctx.options.skip_disabled and obj.hide_render:
+    if not ctx.options.include_disabled and obj.hide_render:
         return True
     return False
 
@@ -252,7 +252,7 @@ class StandardExporter(BaseExporter):
         all_mesh_objects = collect_mesh_objects(
             blender_objects,
             export_hidden=ctx.options.export_hidden,
-            skip_disabled=ctx.options.skip_disabled,
+            include_disabled=ctx.options.include_disabled,
         )
 
         (

@@ -167,7 +167,7 @@ class EXPORT_OT_threemf_preset(AddPresetBase, bpy.types.Operator):
     preset_values = [
         "op.use_selection",
         "op.export_hidden",
-        "op.skip_disabled",
+        "op.include_disabled",
         "op.global_scale",
         "op.use_mesh_modifiers",
         "op.coordinate_precision",
@@ -274,13 +274,13 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         description="Export objects hidden in the viewport (eye icon, collection visibility)",
         default=False,
     )
-    skip_disabled: bpy.props.BoolProperty(
-        name="Skip Disabled",
+    include_disabled: bpy.props.BoolProperty(
+        name="Include Disabled",
         description=(
-            "Skip objects disabled for rendering (camera icon) "
+            "Include objects disabled for rendering (camera icon) "
             "and objects in excluded collections"
         ),
-        default=True,
+        default=False,
     )
     global_scale: bpy.props.FloatProperty(
         name="Scale", default=1.0, soft_min=0.001, soft_max=1000.0, min=1e-6, max=1e6
@@ -494,7 +494,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             col = body.column(align=True)
             col.prop(self, "use_selection")
             col.prop(self, "export_hidden")
-            col.prop(self, "skip_disabled")
+            col.prop(self, "include_disabled")
             col.prop(self, "use_mesh_modifiers")
             col.prop(self, "use_components")
             col.separator()
@@ -533,7 +533,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         options = ExportOptions(
             use_selection=self.use_selection,
             export_hidden=self.export_hidden,
-            skip_disabled=self.skip_disabled,
+            include_disabled=self.include_disabled,
             global_scale=self.global_scale,
             use_mesh_modifiers=self.use_mesh_modifiers,
             coordinate_precision=self.coordinate_precision,
@@ -597,7 +597,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             mesh_objects = collect_mesh_objects(
                 blender_objects,
                 export_hidden=ctx.options.export_hidden,
-                skip_disabled=ctx.options.skip_disabled,
+                include_disabled=ctx.options.include_disabled,
             )
             if mesh_objects:
                 non_manifold_objects = check_non_manifold_geometry(

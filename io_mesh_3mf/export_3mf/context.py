@@ -40,7 +40,7 @@ class ExportOptions:
 
     use_selection: bool = False
     export_hidden: bool = False
-    skip_disabled: bool = True
+    include_disabled: bool = False
     global_scale: float = 1.0
     use_mesh_modifiers: bool = True
     coordinate_precision: int = 9
