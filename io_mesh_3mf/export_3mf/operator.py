@@ -579,9 +579,12 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             if ctx.options.use_selection:
                 blender_objects = context.selected_objects
                 # Validate that at least one mesh object is in the selection
-                # (recursively, since meshes may be parented to empties)
+                # (recursively, since meshes may be parented to empties).
+                # Use the most permissive filters here so that disabled/hidden
+                # objects in the selection are not incorrectly rejected before
+                # the real filter pass below.
                 mesh_objects = collect_mesh_objects(
-                    blender_objects, export_hidden=True
+                    blender_objects, export_hidden=True, include_disabled=True
                 )
                 if not mesh_objects:
                     ctx.safe_report(
