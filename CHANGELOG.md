@@ -4,6 +4,10 @@ Changes
 ----
 * **Skip Disabled Renamed** — The "Skip Disabled Objects" export option has been renamed to "Include Disabled" to match "Include Hidden" and align the options together. Now both options are "Opt in to export disabled objects". The underlying logic is unchanged — disabled objects are still excluded by default, and enabling this option includes them in the export. The api remains unchanged to avoid breaking existing scripts.
 
+Bug Fixes
+----
+* **Prusa paint segmentation export fixed** — Prusa-flavour PAINT export had regressed, producing files where shared materials were not mapped to the correct extruder. Fixed so each object with shared materials is properly assigned to a shared extruder when opened in PrusaSlicer.
+
 ----
 
 2.4.0 — Adaptive Export Subdivision, OKLab Color Detection & Bake Improvements
