@@ -95,7 +95,7 @@ def subdivide_mesh_for_segmentation(
                 continue
 
             # UV area via cross-product fan (handles tris and quads).
-            uvs = [l[uv_layer].uv for l in loops]
+            uvs = [loop[uv_layer].uv for loop in loops]
             uv_area = 0.0
             for i in range(1, len(uvs) - 1):
                 dx1 = uvs[i].x - uvs[0].x

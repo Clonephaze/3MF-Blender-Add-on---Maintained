@@ -22,13 +22,13 @@ Submodules:
 - ``bake``              — Bake-to-MMU operators and Shader Editor panel
 """
 
-from . import helpers       # noqa: F401
-from . import properties    # noqa: F401
-from . import quantize      # noqa: F401
-from . import vertex_colors # noqa: F401
-from . import operators     # noqa: F401
-from . import mmu_panel     # noqa: F401
-from . import bake          # noqa: F401
+from . import helpers        # noqa: F401
+from . import properties     # noqa: F401
+from . import quantize       # noqa: F401
+from . import vertex_colors  # noqa: F401
+from . import operators      # noqa: F401
+from . import mmu_panel      # noqa: F401
+from . import bake           # noqa: F401
 
 # Re-export key helpers used by other packages (bake, import, export).
 # These maintain backward-compatible import paths for external consumers.

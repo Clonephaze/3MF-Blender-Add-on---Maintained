@@ -701,6 +701,7 @@ def _merge_small_regions(
 
     return new_map.astype(np.int32), int(len(unique_ids))
 
+
 def _compute_region_representative_colors(
     pixels: np.ndarray,
     region_map: np.ndarray,

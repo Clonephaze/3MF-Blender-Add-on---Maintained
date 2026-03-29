@@ -33,6 +33,7 @@ from ..common.metadata import Metadata, MetadataEntry
 from .archive import write_core_properties
 from .geometry import write_metadata
 from .materials import collect_face_colors, write_prusa_filament_colors
+from .materials.base import material_to_hex_color
 from .components import collect_mesh_objects
 from .standard import BaseExporter, StandardExporter
 from .thumbnail import write_thumbnail
@@ -42,6 +43,111 @@ from ..slicer_profiles import get_profile_config
 
 class PrusaExporter(BaseExporter):
     """Exports PrusaSlicer compatible 3MF files with mmu_segmentation."""
+
+    def _generate_model_config(
+        self,
+        resources_element: xml.etree.ElementTree.Element,
+        mesh_objects: list,
+    ) -> bytes:
+        """Generate Slic3r_PE_model.config XML assigning extruders per object.
+
+        PrusaSlicer reads per-object extruder assignments from this config file.
+        Without it, every object defaults to extruder 1 regardless of material.
+
+        :param resources_element: The written <resources> element, scanned for
+            object IDs by name.
+        :param mesh_objects: Flat list of Blender MESH objects that were exported.
+        :return: UTF-8 encoded XML bytes ready to write into the archive.
+        """
+        ctx = self.ctx
+
+        # Build name -> resource_id from the written <object> elements.
+        name_to_id: dict = {}
+        for child in resources_element:
+            tag = child.tag.split("}")[1] if "}" in child.tag else child.tag
+            if tag == "object":
+                obj_id = child.get("id")
+                obj_name = child.get("name")
+                if obj_id and obj_name:
+                    name_to_id[obj_name] = obj_id
+
+        config_root = xml.etree.ElementTree.Element("config")
+
+        for blender_object in mesh_objects:
+            obj_name = str(blender_object.name)
+            obj_id = name_to_id.get(obj_name)
+            if obj_id is None:
+                debug(f"  [model_config] No resource ID found for '{obj_name}', skipping")
+                continue
+
+            # Count triangles on the (optionally evaluated) mesh.
+            try:
+                if ctx.options.use_mesh_modifiers:
+                    dep_graph = bpy.context.evaluated_depsgraph_get()
+                    eval_obj = blender_object.evaluated_get(dep_graph)
+                else:
+                    eval_obj = blender_object
+                mesh = eval_obj.to_mesh()
+                if mesh is None:
+                    continue
+                mesh.calc_loop_triangles()
+                num_triangles = len(mesh.loop_triangles)
+                eval_obj.to_mesh_clear()
+            except Exception as e:
+                debug(f"  [model_config] Failed to get mesh for '{obj_name}': {e}")
+                continue
+
+            if num_triangles == 0:
+                continue
+
+            # Determine the extruder number from the object's primary material.
+            extruder = 1
+            for slot in blender_object.material_slots:
+                if slot.material:
+                    hex_color = material_to_hex_color(slot.material)
+                    if hex_color and hex_color in ctx.vertex_colors:
+                        extruder = ctx.vertex_colors[hex_color]
+                        break
+
+            obj_elem = xml.etree.ElementTree.SubElement(config_root, "object")
+            obj_elem.set("id", obj_id)
+            obj_elem.set("instances_count", "1")
+
+            for key, val in (("name", obj_name), ("extruder", str(extruder))):
+                xml.etree.ElementTree.SubElement(
+                    obj_elem, "metadata",
+                    {"type": "object", "key": key, "value": val},
+                )
+
+            vol_elem = xml.etree.ElementTree.SubElement(obj_elem, "volume")
+            vol_elem.set("firstid", "0")
+            vol_elem.set("lastid", str(num_triangles - 1))
+
+            for key, val in (
+                ("name", obj_name),
+                ("volume_type", "ModelPart"),
+                ("extruder", str(extruder)),
+            ):
+                xml.etree.ElementTree.SubElement(
+                    vol_elem, "metadata",
+                    {"type": "volume", "key": key, "value": val},
+                )
+
+            mesh_elem = xml.etree.ElementTree.SubElement(vol_elem, "mesh")
+            for attr, val in (
+                ("edges_fixed", "0"),
+                ("degenerate_facets", "0"),
+                ("facets_removed", "0"),
+                ("facets_reversed", "0"),
+                ("backwards_edges", "0"),
+            ):
+                mesh_elem.set(attr, val)
+
+            debug(f"  [model_config] {obj_name} → object id={obj_id}, extruder={extruder}, tris={num_triangles}")
+
+        return xml.etree.ElementTree.tostring(
+            config_root, encoding="UTF-8", xml_declaration=True
+        )
 
     def execute(
         self,
@@ -164,6 +270,9 @@ class PrusaExporter(BaseExporter):
         write_prusa_filament_colors(archive, ctx.vertex_colors)
 
         # Write back stashed or profile PrusaSlicer config files.
+        # For Slic3r_PE_model.config specifically, fall back to generating it
+        # from the exported objects so per-object extruder assignments are
+        # always written (not just when a prior Prusa import was round-tripped).
         for config_path in ("Metadata/Slic3r_PE.config", "Metadata/Slic3r_PE_model.config"):
             stashed = get_stashed_config(config_path)
             if stashed is None and ctx.options.slicer_profile != "NONE":
@@ -180,6 +289,11 @@ class PrusaExporter(BaseExporter):
                 with archive.open(config_path, "w") as f:
                     f.write(stashed)
                 debug(f"Wrote {config_path} to archive")
+            elif config_path == "Metadata/Slic3r_PE_model.config":
+                generated = self._generate_model_config(resources_element, mesh_objects)
+                with archive.open(config_path, "w") as f:
+                    f.write(generated)
+                debug("Generated Slic3r_PE_model.config from object materials")
 
         document = xml.etree.ElementTree.ElementTree(root)
         with archive.open(MODEL_LOCATION, "w", force_zip64=True) as f:
