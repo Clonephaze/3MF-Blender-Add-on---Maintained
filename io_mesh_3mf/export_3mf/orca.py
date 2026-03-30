@@ -343,6 +343,11 @@ class OrcaExporter(BaseExporter):
 
         mesh.calc_loop_triangles()
 
+        if len(mesh.loop_triangles) == 0:
+            warn(f"Skipping '{blender_object.name}': mesh has no triangles")
+            eval_object.to_mesh_clear()
+            return
+
         # Adaptive pre-subdivision for PAINT mode: split large faces so each
         # triangle can be encoded at full segmentation depth.
         if ctx.options.use_orca_format == "PAINT" and mesh.uv_layers.active:

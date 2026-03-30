@@ -139,15 +139,22 @@ class ExtensionManager:
     def __init__(self):
         """Initialize with no active extensions."""
         self._active_extensions: Set[str] = set()
+        self._required_overrides: Set[str] = set()
 
-    def activate(self, namespace: str) -> None:
+    def activate(self, namespace: str, required: bool = False) -> None:
         """Activate an extension by its namespace URI.
 
+        :param namespace: The XML namespace URI of the extension.
+        :param required: If True, mark this extension as required in the
+            ``requiredextensions`` model attribute, even if the extension's
+            default ``required`` flag is False.
         :raises ValueError: If the namespace is not registered.
         """
         if namespace not in EXTENSION_REGISTRY:
             raise ValueError(f"Unknown extension namespace: {namespace}")
         self._active_extensions.add(namespace)
+        if required:
+            self._required_overrides.add(namespace)
 
     def deactivate(self, namespace: str) -> None:
         """Deactivate an extension."""
@@ -160,6 +167,7 @@ class ExtensionManager:
     def clear(self) -> None:
         """Deactivate all extensions."""
         self._active_extensions.clear()
+        self._required_overrides.clear()
 
     def get_active_extensions(self) -> List[Extension]:
         """Get list of all active Extension objects."""
@@ -168,10 +176,12 @@ class ExtensionManager:
     def get_required_extensions_string(self) -> str:
         """Build the ``requiredextensions`` attribute value for the model element.
 
-        :return: Space-separated string of namespace URIs that require declaration.
+        :return: Space-separated string of namespace prefixes that require declaration.
         """
         required = [
-            ext.namespace for ext in self.get_active_extensions() if ext.required
+            ext.prefix
+            for ext in self.get_active_extensions()
+            if ext.required or ext.namespace in self._required_overrides
         ]
         return " ".join(required)
 

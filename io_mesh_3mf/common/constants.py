@@ -35,6 +35,7 @@ __all__ = [
     "CORE_PROPERTIES_MIMETYPE",
     "TEXTURE_MIMETYPE_PNG",
     "TEXTURE_MIMETYPE_JPEG",
+    "TEXTURE_OPC_MIMETYPE",
     "MODEL_NAMESPACE",
     "SLIC3RPE_NAMESPACE",
     "TRIANGLE_SETS_NAMESPACE",
@@ -107,8 +108,11 @@ MODEL_MIMETYPE: str = "application/vnd.ms-package.3dmanufacturing-3dmodel+xml"  
 CORE_PROPERTIES_MIMETYPE: str = (
     "application/vnd.openxmlformats-package.core-properties+xml"
 )
-TEXTURE_MIMETYPE_PNG: str = "image/png"  # MIME type for PNG textures
-TEXTURE_MIMETYPE_JPEG: str = "image/jpeg"  # MIME type for JPEG textures
+TEXTURE_MIMETYPE_PNG: str = "image/png"  # MIME type for PNG textures (texture2d XML attribute)
+TEXTURE_MIMETYPE_JPEG: str = "image/jpeg"  # MIME type for JPEG textures (texture2d XML attribute)
+TEXTURE_OPC_MIMETYPE: str = (  # OPC content type for 3MF texture parts ([Content_Types].xml)
+    "application/vnd.ms-package.3dmanufacturing-3dmodeltexture"
+)
 
 # Constants in the 3D model file.
 MODEL_NAMESPACE: str = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"

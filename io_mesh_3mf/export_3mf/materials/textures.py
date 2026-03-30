@@ -295,10 +295,10 @@ def write_textures_to_archive(archive: zipfile.ZipFile, textured_materials: Dict
 
     :param archive: The 3MF zip archive
     :param textured_materials: Dict from detect_textured_materials()
-    :return: Dict mapping image name -> archive path (e.g. "/3D/Texture/image.png")
+    :return: Dict mapping image name -> archive path (e.g. "/3D/Textures/image.png")
     """
     image_to_path = {}
-    texture_folder = "3D/Texture"
+    texture_folder = "3D/Textures"
 
     for mat_name, tex_info in textured_materials.items():
         image = tex_info["image"]
@@ -561,7 +561,7 @@ def write_pbr_textures_to_archive(archive: zipfile.ZipFile, pbr_materials: Dict[
     :return: Dict mapping image name -> archive path
     """
     image_to_path = {}
-    texture_folder = "3D/Texture"
+    texture_folder = "3D/Textures"
 
     # Collect all unique images from all PBR channels (including base_color)
     for mat_name, pbr_info in pbr_materials.items():

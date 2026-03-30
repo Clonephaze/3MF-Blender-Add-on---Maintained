@@ -46,6 +46,7 @@ class ExportOptions:
     coordinate_precision: int = 9
     use_orca_format: str = "AUTO"  # "AUTO" | "STANDARD" | "PAINT"
     use_components: bool = True
+    flatten_hierarchy: bool = False
     mmu_slicer_format: str = "ORCA"  # "ORCA" | "PRUSA"
     subdivision_depth: int = 7  # 4-10, controls paint segmentation detail
     slicer_profile: str = "NONE"  # Profile name or "NONE" for built-in

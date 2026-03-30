@@ -111,7 +111,7 @@ from .common.units import (
 #: - MAJOR: Breaking changes to existing functions/signatures
 #: - MINOR: New features, backward-compatible
 #: - PATCH: Bug fixes only
-API_VERSION = (1, 0, 1)
+API_VERSION = (1, 1, 0)
 
 #: Human-readable version string
 API_VERSION_STRING = ".".join(str(v) for v in API_VERSION)
@@ -137,6 +137,7 @@ API_CAPABILITIES = frozenset({
     "use_components",      # Component instancing for linked duplicates (export)
     "auto_smooth",         # Auto smooth-by-angle on import
     "subdivision_depth",   # Paint segmentation subdivision depth control
+    "flatten_hierarchy",    # Option to flatten parented meshes into top-level build items (export)
 })
 
 #: Registry key in bpy.app.driver_namespace
@@ -862,6 +863,7 @@ def export_3mf(
     compression_level: int = 3,
     use_orca_format: str = "AUTO",
     use_components: bool = True,
+    flatten_hierarchy: bool = False,
     mmu_slicer_format: str = "ORCA",
     subdivision_depth: int = 7,
     thumbnail_mode: str = "AUTO",
@@ -899,6 +901,12 @@ def export_3mf(
         *object_settings* is provided, the Orca exporter is used
         automatically even in ``AUTO`` mode.
     :param use_components: Use component instances for linked duplicates.
+    :param flatten_hierarchy: When *True*, child meshes parented to an Empty
+        are written directly as top-level build items with their combined
+        world transform instead of wrapped in a component container.  Some
+        printing services reject files that use 3MF ``<component>``
+        references; enable this to maximize compatibility.  Default *False*
+        because it discards the parent–child hierarchy.
     :param mmu_slicer_format: ``"ORCA"`` | ``"PRUSA"`` (only relevant when
         *use_orca_format* is ``"PAINT"``).
     :param subdivision_depth: Maximum recursive subdivision depth for paint
@@ -963,6 +971,7 @@ def export_3mf(
         compression_level=compression_level,
         use_orca_format=use_orca_format,
         use_components=use_components,
+        flatten_hierarchy=flatten_hierarchy,
         mmu_slicer_format=mmu_slicer_format,
         subdivision_depth=subdivision_depth,
         thumbnail_mode=thumbnail_mode,

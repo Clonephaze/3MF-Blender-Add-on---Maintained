@@ -110,8 +110,6 @@ def write_core_properties(archive: zipfile.ZipFile) -> None:
     root = xml.etree.ElementTree.Element(
         f"{{{CORE_PROPERTIES_NAMESPACE}}}coreProperties"
     )
-    root.set("xmlns:dc", DC_NAMESPACE)
-    root.set("xmlns:dcterms", DCTERMS_NAMESPACE)
 
     # dc:creator - who created this file
     creator = xml.etree.ElementTree.SubElement(root, f"{{{DC_NAMESPACE}}}creator")

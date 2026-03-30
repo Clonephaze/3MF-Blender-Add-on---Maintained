@@ -31,7 +31,7 @@ import mathutils
 
 from ..common.constants import MODEL_NAMESPACE, MODEL_LOCATION
 from ..common.extensions import TRIANGLE_SETS_EXTENSION, MATERIALS_EXTENSION
-from ..common.logging import debug
+from ..common.logging import debug, warn
 from ..common.metadata import Metadata
 from ..common.xml import format_transformation
 
@@ -238,6 +238,8 @@ class StandardExporter(BaseExporter):
 
         # Create model root element
         root = xml.etree.ElementTree.Element(f"{{{MODEL_NAMESPACE}}}model")
+        root.set("unit", "millimeter")
+        root.set("xml:lang", "en-US")
 
         scene_metadata = Metadata()
         scene_metadata.retrieve(bpy.context.scene)
@@ -331,6 +333,30 @@ class StandardExporter(BaseExporter):
             )
             debug(f"Created {len(ctx.texture_groups)} texture groups")
 
+            # If every basematerial is now covered by a texture2dgroup, the
+            # basematerials element (and its linked PBR display properties)
+            # become dead weight that can confuse consumers.  Remove them so
+            # the exported file mirrors the consortium reference samples.
+            if (
+                basematerials_element is not None
+                and ctx.material_name_to_index
+                and set(ctx.material_name_to_index.keys()) <= set(textured_materials.keys())
+            ):
+                # Find and remove the PBR display properties element linked
+                # via displaypropertiesid before removing basematerials.
+                display_props_id = basematerials_element.get("displaypropertiesid")
+                if display_props_id:
+                    for child in list(resources_element):
+                        if child.get("id") == display_props_id:
+                            resources_element.remove(child)
+                            debug("Removed unused PBR display properties "
+                                  f"(id={display_props_id})")
+                            break
+
+                resources_element.remove(basematerials_element)
+                basematerials_element = None
+                debug("Removed unused basematerials — all faces use texture2dgroup")
+
         # Write passthrough texture images to the archive BEFORE writing XML references
         passthrough_image_paths = write_passthrough_textures_to_archive(archive)
         if passthrough_image_paths:
@@ -352,6 +378,19 @@ class StandardExporter(BaseExporter):
         ctx._progress_range = (15, 95)
         self.write_objects(root, resources_element, blender_objects, global_scale)
         ctx._progress_range = None
+
+        # Re-register namespaces now that all extensions have been activated.
+        # The initial registration (above) runs before material detection, so
+        # extensions activated during detection would get auto-prefixed (ns0,
+        # ns1, ...) instead of the correct short prefixes (m, t, etc.).
+        ctx.extension_manager.register_namespaces(xml.etree.ElementTree)
+        xml.etree.ElementTree.register_namespace("", MODEL_NAMESPACE)
+
+        # Declare required extensions on the model root element so consumers
+        # know they must support these namespaces to render the model.
+        required_ext_string = ctx.extension_manager.get_required_extensions_string()
+        if required_ext_string:
+            root.set("requiredextensions", required_ext_string)
 
         document = xml.etree.ElementTree.ElementTree(root)
         with archive.open(MODEL_LOCATION, "w", force_zip64=True) as f:
@@ -442,6 +481,34 @@ class StandardExporter(BaseExporter):
                     progress, f"Writing {processed_objects}/{total_objects} objects..."
                 )
 
+            # When flatten_hierarchy is enabled, EMPTYs are dissolved:
+            # their mesh descendants become individual build items with
+            # their full world transform, avoiding <components> containers
+            # that some printing services reject.
+            if ctx.options.flatten_hierarchy and blender_object.type == "EMPTY":
+                child_meshes = collect_mesh_objects(
+                    [blender_object],
+                    export_hidden=ctx.options.export_hidden,
+                    include_disabled=ctx.options.include_disabled,
+                )
+                if child_meshes:
+                    debug(
+                        f"Flattening EMPTY '{blender_object.name}': "
+                        f"{len(child_meshes)} child mesh(es) promoted to build items"
+                    )
+                for child_obj in child_meshes:
+                    child_id, _ = self.write_object_resource(
+                        resources_element, child_obj
+                    )
+                    if child_id is None:
+                        continue
+                    self._write_build_item(
+                        build_element, child_id,
+                        transformation @ child_obj.matrix_world,
+                        child_obj,
+                    )
+                continue
+
             # Check if this object is a component instance
             if (
                 component_groups
@@ -458,30 +525,14 @@ class StandardExporter(BaseExporter):
                     resources_element, blender_object
                 )
 
-            item_element = xml.etree.ElementTree.SubElement(
-                build_element, f"{{{MODEL_NAMESPACE}}}item"
+            if objectid is None:
+                continue
+
+            self._write_build_item(
+                build_element, objectid,
+                transformation @ blender_object.matrix_world,
+                blender_object,
             )
-            ctx.num_written += 1
-            item_element.attrib[self.attr("objectid")] = str(objectid)
-
-            mesh_transformation = transformation @ blender_object.matrix_world
-            if mesh_transformation != mathutils.Matrix.Identity(4):
-                item_element.attrib[self.attr("transform")] = format_transformation(
-                    mesh_transformation
-                )
-
-            metadata = Metadata()
-            metadata.retrieve(blender_object)
-            if "3mf:partnumber" in metadata:
-                item_element.attrib[self.attr("partnumber")] = metadata[
-                    "3mf:partnumber"
-                ].value
-                del metadata["3mf:partnumber"]
-            if metadata:
-                metadatagroup_element = xml.etree.ElementTree.SubElement(
-                    item_element, f"{{{MODEL_NAMESPACE}}}metadatagroup"
-                )
-                write_metadata(metadatagroup_element, metadata, ctx.options.use_orca_format)
 
         if hidden_skipped > 0:
             ctx.safe_report(
@@ -489,6 +540,39 @@ class StandardExporter(BaseExporter):
                 f"Skipped {hidden_skipped} hidden/disabled object(s). "
                 "Enable 'Include Hidden' or disable 'Skip Disabled' to export them.",
             )
+
+    def _write_build_item(
+        self,
+        build_element: xml.etree.ElementTree.Element,
+        objectid: int,
+        mesh_transformation: mathutils.Matrix,
+        blender_object: bpy.types.Object,
+    ) -> None:
+        """Write a single ``<item>`` inside the ``<build>`` element."""
+        ctx = self.ctx
+        item_element = xml.etree.ElementTree.SubElement(
+            build_element, f"{{{MODEL_NAMESPACE}}}item"
+        )
+        ctx.num_written += 1
+        item_element.attrib[self.attr("objectid")] = str(objectid)
+
+        if mesh_transformation != mathutils.Matrix.Identity(4):
+            item_element.attrib[self.attr("transform")] = format_transformation(
+                mesh_transformation
+            )
+
+        metadata = Metadata()
+        metadata.retrieve(blender_object)
+        if "3mf:partnumber" in metadata:
+            item_element.attrib[self.attr("partnumber")] = metadata[
+                "3mf:partnumber"
+            ].value
+            del metadata["3mf:partnumber"]
+        if metadata:
+            metadatagroup_element = xml.etree.ElementTree.SubElement(
+                item_element, f"{{{MODEL_NAMESPACE}}}metadatagroup"
+            )
+            write_metadata(metadatagroup_element, metadata, ctx.options.use_orca_format)
 
     def write_object_resource(
         self,
@@ -540,6 +624,8 @@ class StandardExporter(BaseExporter):
                     child_id, child_transformation = self.write_object_resource(
                         resources_element, child
                     )
+                    if child_id is None:
+                        continue
                     child_transformation = (
                         mesh_transformation.inverted_safe() @ child_transformation
                     )
@@ -553,6 +639,11 @@ class StandardExporter(BaseExporter):
                             format_transformation(child_transformation)
                         )
 
+                # Remove empty <components> if all children were filtered out
+                if len(components_element) == 0:
+                    object_element.remove(components_element)
+                    components_element = None
+
         # Get vertex data (may need to apply modifiers)
         original_object = blender_object
         if ctx.options.use_mesh_modifiers:
@@ -562,9 +653,19 @@ class StandardExporter(BaseExporter):
         try:
             mesh = blender_object.to_mesh()
         except RuntimeError:
-            return new_resource_id, mesh_transformation
+            # EMPTYs and other non-mesh objects can't produce a mesh, but
+            # if they have components they're still valid container objects.
+            if components_element is not None and len(components_element) > 0:
+                return new_resource_id, mesh_transformation
+            resources_element.remove(object_element)
+            ctx.next_resource_id = new_resource_id
+            return None, mesh_transformation
         if mesh is None:
-            return new_resource_id, mesh_transformation
+            if components_element is not None and len(components_element) > 0:
+                return new_resource_id, mesh_transformation
+            resources_element.remove(object_element)
+            ctx.next_resource_id = new_resource_id
+            return None, mesh_transformation
 
         mesh.calc_loop_triangles()
 
@@ -586,7 +687,7 @@ class StandardExporter(BaseExporter):
             f"  Got mesh: {len(mesh.vertices)} vertices, {len(mesh.loop_triangles)} triangles"
         )
 
-        if len(mesh.vertices) > 0:
+        if len(mesh.vertices) >= 3 and len(mesh.loop_triangles) > 0:
             if child_objects:
                 mesh_id = ctx.next_resource_id
                 ctx.next_resource_id += 1
@@ -783,6 +884,15 @@ class StandardExporter(BaseExporter):
         # Clean up the temporary mesh created by to_mesh()
         blender_object.to_mesh_clear()
 
+        # If the object has neither mesh nor components, it's invalid per
+        # the 3MF spec.  Remove it from the resources and signal the caller
+        # to skip any build-item / component reference.
+        if len(object_element) == 0:
+            resources_element.remove(object_element)
+            ctx.next_resource_id = new_resource_id  # revert ID allocation
+            warn(f"Skipping '{object_name}': mesh has no triangles")
+            return None, mesh_transformation
+
         return new_resource_id, mesh_transformation
 
     def _extract_segmentation(
@@ -916,7 +1026,7 @@ class StandardExporter(BaseExporter):
 
         mesh.calc_loop_triangles()
 
-        if len(mesh.vertices) > 0:
+        if len(mesh.vertices) >= 3 and len(mesh.loop_triangles) > 0:
             mesh_element = xml.etree.ElementTree.SubElement(
                 object_element, f"{{{MODEL_NAMESPACE}}}mesh"
             )

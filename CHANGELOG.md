@@ -1,3 +1,20 @@
+2.4.3 — Flatten Hierarchy & Spec Compliance
+====
+
+Features
+----
+* **Flatten Hierarchy export option** — New `flatten_hierarchy` option (disabled by default) writes child meshes parented to an Empty directly as top-level build items instead of wrapping them in `<component>` containers. Some printing services (e.g. JLC3DP) reject files using 3MF component references; enable this to maximize compatibility. Available in the operator UI, export presets, and the public API.
+
+Bug Fixes
+----
+* **Skip faceless mesh objects** — Mesh objects with vertices but no faces (e.g. armature bone widget shapes like `WGT-rig_*`) were exported as empty `<object>` elements with no `<mesh>` child, violating the 3MF Core Spec which requires every object to have either a mesh or components. Printing services rejected these files. Such objects are now filtered out during export with a warning.
+* **Invalid object cleanup** — Objects that produce no triangles after modifier evaluation (e.g. edge-only meshes, failed `to_mesh()`) no longer leave orphaned `<object>` elements in the 3MF XML. The exporter removes them and skips the corresponding build item or component reference.
+* **Namespace prefix cleanup** — Materials Extension namespace was serialised as `ns1:` instead of the standard `m:` prefix. Now correctly registered before XML output.
+* **Model root attributes** — Added `unit="millimeter"` and `xml:lang="en-US"` to the model root element for spec compliance.
+* **Core properties duplicate xmlns** — `core.xml` had duplicate `xmlns:dc` and `xmlns:dcterms` declarations. Removed duplicates.
+
+----
+
 2.4.2 — Texture Export Spec Compliance
 ====
 
@@ -13,8 +30,6 @@ Tests
 * **New `test_texture_rels.py`** — 11 unit tests covering `write_texture_relationships()`: namespace correctness, no `ns0:` prefix, relationship count/type/target/id, empty dict edge case, and global namespace registry safety.
 * **New `TestWriteContentTypes`** — 4 unit tests in `test_annotations.py` verifying `write_content_types()` preserves 3MF texture OPC types and falls back correctly.
 * **New `test_sphere_logo_opc_texture_structure`** — Integration test verifying full round-trip OPC packaging of `sphere_logo.3mf`: content types, texture files, rels structure, and target validity.
-
-----
 
 2.4.1 — Minor Export UX Improvement
 ====

@@ -44,6 +44,7 @@ from .constants import (
     CORE_PROPERTIES_LOCATION,
     CORE_PROPERTIES_REL,
     CORE_PROPERTIES_MIMETYPE,
+    TEXTURE_OPC_MIMETYPE,
 )
 
 # Annotation types
@@ -234,12 +235,15 @@ class Annotations:
         most_common[".model"] = MODEL_MIMETYPE
         most_common[".config"] = "application/xml"
         most_common[".xml"] = CORE_PROPERTIES_MIMETYPE
-        # Only set .png as image/png if no annotations provide a more specific
-        # content type (e.g. application/vnd.ms-package.3dmanufacturing-3dmodeltexture
-        # for 3MF texture parts).  Hardcoding here would override the correct
-        # content type that the import stored from the original archive.
+        # Per 3MF Materials Extension Appendix E.1, the OPC content type for
+        # texture parts is the 3MF texture type, NOT image/png.  The image/png
+        # value belongs only in the texture2d XML contenttype attribute.
         if ".png" not in most_common:
-            most_common[".png"] = "image/png"
+            most_common[".png"] = TEXTURE_OPC_MIMETYPE
+        if ".jpg" not in most_common:
+            most_common[".jpg"] = TEXTURE_OPC_MIMETYPE
+        if ".jpeg" not in most_common:
+            most_common[".jpeg"] = TEXTURE_OPC_MIMETYPE
 
         root = xml.etree.ElementTree.Element(f"{{{CONTENT_TYPES_NAMESPACE}}}Types")
         for extension, mime_type in most_common.items():

@@ -344,6 +344,14 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         default=True,
     )
 
+    flatten_hierarchy: bpy.props.BoolProperty(
+        name="Flatten Hierarchy",
+        description="Write child meshes directly as top-level build items instead of "
+        "using component containers. Some printing services reject files that use "
+        "3MF component references. Enable this to maximize compatibility",
+        default=False,
+    )
+
     mmu_slicer_format: bpy.props.EnumProperty(
         name="Slicer Format",
         description="Target slicer format for multi-material export",
@@ -497,6 +505,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             col.prop(self, "include_disabled")
             col.prop(self, "use_mesh_modifiers")
             col.prop(self, "use_components")
+            col.prop(self, "flatten_hierarchy")
             col.separator()
             col.prop(self, "global_scale")
             col.prop(self, "coordinate_precision")
@@ -540,6 +549,7 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             compression_level=self.compression_level,
             use_orca_format=self.use_orca_format,
             use_components=self.use_components,
+            flatten_hierarchy=self.flatten_hierarchy,
             mmu_slicer_format=self.mmu_slicer_format,
             subdivision_depth=self.subdivision_depth,
             slicer_profile=self.slicer_profile,

@@ -137,10 +137,20 @@ class TestExtensionManager(unittest.TestCase):
         self.mgr.activate(MATERIALS_EXTENSION.namespace)  # not required
         self.mgr.activate(PRODUCTION_EXTENSION.namespace)  # required
         result = self.mgr.get_required_extensions_string()
-        self.assertIn(PRODUCTION_EXTENSION.namespace, result)
-        self.assertNotIn(MATERIALS_EXTENSION.namespace, result)
+        self.assertIn(PRODUCTION_EXTENSION.prefix, result)
+        self.assertNotIn(MATERIALS_EXTENSION.prefix, result)
 
     def test_get_required_extensions_string_empty(self):
+        self.assertEqual(self.mgr.get_required_extensions_string(), "")
+
+    def test_activate_with_required_override(self):
+        self.mgr.activate(MATERIALS_EXTENSION.namespace, required=True)
+        result = self.mgr.get_required_extensions_string()
+        self.assertIn(MATERIALS_EXTENSION.prefix, result)
+
+    def test_required_override_cleared(self):
+        self.mgr.activate(MATERIALS_EXTENSION.namespace, required=True)
+        self.mgr.clear()
         self.assertEqual(self.mgr.get_required_extensions_string(), "")
 
     def test_get_vendor_attributes(self):

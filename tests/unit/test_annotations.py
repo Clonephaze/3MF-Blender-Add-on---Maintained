@@ -246,13 +246,16 @@ class TestWriteContentTypes(unittest.TestCase):
         # image/png should NOT appear (it would mean the fallback overwrote)
         self.assertNotIn("image/png", content)
 
-    def test_defaults_png_to_image_png_when_no_annotations(self):
-        """When no .png files are annotated, .png defaults to image/png."""
+    def test_defaults_png_to_3mf_texture_opc_type_when_no_annotations(self):
+        """When no .png files are annotated, .png defaults to the 3MF texture OPC type."""
         ann = Annotations()
 
         content = self._write_and_read_content_types(ann)
 
-        self.assertIn("image/png", content)
+        self.assertIn(
+            "application/vnd.ms-package.3dmanufacturing-3dmodeltexture",
+            content,
+        )
 
     def test_write_content_types_produces_valid_xml(self):
         """write_content_types() should produce parseable XML."""

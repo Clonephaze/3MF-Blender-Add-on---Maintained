@@ -24,7 +24,7 @@ from dataclasses import dataclass
 
 import bpy
 
-from ..common.logging import debug
+from ..common.logging import debug, warn
 
 
 # ---------------------------------------------------------------------------
@@ -71,6 +71,9 @@ def collect_mesh_objects(
                 continue
 
             if obj.type == "MESH":
+                if len(obj.data.polygons) == 0:
+                    warn(f"Skipping '{obj.name}': mesh has no faces")
+                    continue
                 result.append(obj)
             elif obj.type == "EMPTY" and obj.children:
                 _walk(obj.children)
