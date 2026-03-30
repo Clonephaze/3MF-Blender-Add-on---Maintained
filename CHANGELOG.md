@@ -1,3 +1,21 @@
+2.4.2 — Texture Export Spec Compliance
+====
+
+Bug Fixes
+----
+* **OPC content type for textures** — `[Content_Types].xml` was hardcoding `.png` as `image/png`, overriding the 3MF-spec-required `application/vnd.ms-package.3dmanufacturing-3dmodeltexture`. Services like JLC3DP that validate OPC content types rejected these files. The fallback is now only applied when no more specific content type was recorded during import.
+* **Texture path preservation** — Exported textures were always written to `3D/Texture/` regardless of the original archive path. Round-trip exports now preserve the original texture path (e.g. `3D/Textures/`) when available, keeping model XML references, relationships, and content types consistent.
+* **Relationship file overwriting** — `write_texture_relationships()` was called separately for PBR, standard, and passthrough texture pipelines, each overwriting the previous `3D/_rels/3dmodel.model.rels`. All texture relationships are now accumulated and written once.
+* **Rels namespace prefix** — Texture relationship XML was serialised with `ns0:` prefixed elements instead of a clean `xmlns=` default namespace declaration, which some strict OPC parsers rejected.
+
+Tests
+----
+* **New `test_texture_rels.py`** — 11 unit tests covering `write_texture_relationships()`: namespace correctness, no `ns0:` prefix, relationship count/type/target/id, empty dict edge case, and global namespace registry safety.
+* **New `TestWriteContentTypes`** — 4 unit tests in `test_annotations.py` verifying `write_content_types()` preserves 3MF texture OPC types and falls back correctly.
+* **New `test_sphere_logo_opc_texture_structure`** — Integration test verifying full round-trip OPC packaging of `sphere_logo.3mf`: content types, texture files, rels structure, and target validity.
+
+----
+
 2.4.1 — Minor Export UX Improvement
 ====
 Changes
