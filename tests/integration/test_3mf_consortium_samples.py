@@ -159,6 +159,103 @@ class Test3MFConsortiumSamples(Blender3mfTestCase):
             expected_elements=['colorgroup', 'texture2d', 'texture2dgroup']
         )
     
+    def test_sphere_logo_opc_texture_structure(self):
+        """Verify sphere_logo export has correct OPC texture packaging.
+        
+        Catches five bugs fixed in the texture export pipeline:
+        1. [Content_Types].xml must use the 3MF texture OPC content type, not image/png
+        2. Texture files must exist at the paths referenced in model XML
+        3. 3D/_rels/3dmodel.model.rels must exist with texture relationships
+        4. Rels XML must not have ns0: namespace prefixes
+        5. Rels targets must point to actual archive entries
+        """
+        import xml.etree.ElementTree as ET
+        from io_mesh_3mf.common.constants import TEXTURE_REL, RELS_NAMESPACE
+        
+        sample_path = self.samples_dir / "sphere_logo.3mf"
+        if not sample_path.exists():
+            self.skipTest("sphere_logo.3mf not found")
+        
+        TEXTURE_OPC_TYPE = (
+            "application/vnd.ms-package.3dmanufacturing-3dmodeltexture"
+        )
+        
+        # Check original file has the 3MF texture content type
+        with zipfile.ZipFile(sample_path, 'r') as orig:
+            orig_ct = orig.read('[Content_Types].xml').decode('utf-8')
+            self.assertIn(TEXTURE_OPC_TYPE, orig_ct,
+                          "Original sphere_logo.3mf should use 3MF texture OPC content type")
+        
+        # Import
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        result = bpy.ops.import_mesh.threemf(filepath=str(sample_path))
+        self.assertEqual(result, {'FINISHED'}, "Import failed")
+        
+        # Export
+        with tempfile.NamedTemporaryFile(suffix='.3mf', delete=False) as tmp:
+            export_path = tmp.name
+        
+        try:
+            result = bpy.ops.export_mesh.threemf(filepath=export_path)
+            self.assertEqual(result, {'FINISHED'}, "Export failed")
+            
+            with zipfile.ZipFile(export_path, 'r') as archive:
+                names = archive.namelist()
+                
+                # 1. Texture files should be present in the archive
+                texture_files = [
+                    n for n in names
+                    if n.lower().endswith(('.png', '.jpg', '.jpeg'))
+                    and '3d/' in n.lower()
+                    and 'thumbnail' not in n.lower()
+                    and '_rels' not in n.lower()
+                ]
+                self.assertGreater(
+                    len(texture_files), 0,
+                    "No texture files found in exported archive"
+                )
+                
+                # 2. [Content_Types].xml must preserve the 3MF texture content type
+                ct_xml = archive.read('[Content_Types].xml').decode('utf-8')
+                self.assertIn(
+                    TEXTURE_OPC_TYPE, ct_xml,
+                    "[Content_Types].xml should preserve the 3MF texture OPC content type, "
+                    "not replace it with image/png"
+                )
+                
+                # 3. Texture relationships file must exist
+                rels_path = '3D/_rels/3dmodel.model.rels'
+                self.assertIn(
+                    rels_path, names,
+                    "3D/_rels/3dmodel.model.rels missing — texture relationships not written"
+                )
+                
+                # 4. Rels XML must not have ns0: prefix
+                rels_xml = archive.read(rels_path).decode('utf-8')
+                self.assertNotIn(
+                    'ns0:', rels_xml,
+                    "Relationship XML contains ns0: prefix (namespace bug)"
+                )
+                
+                # 5. Rels must declare TEXTURE_REL type
+                self.assertIn(
+                    TEXTURE_REL, rels_xml,
+                    "Texture relationship type URI not found in rels file"
+                )
+                
+                # 6. Every texture target in rels must exist in the archive
+                rels_root = ET.fromstring(rels_xml.encode('utf-8'))
+                for rel in rels_root.findall(f'{{{RELS_NAMESPACE}}}Relationship'):
+                    target = rel.get('Target', '')
+                    archive_entry = target.lstrip('/')
+                    self.assertIn(
+                        archive_entry, names,
+                        f"Rels references '{target}' but it's not in the archive"
+                    )
+        finally:
+            if os.path.exists(export_path):
+                os.unlink(export_path)
+    
     def test_multiprop_opaque(self):
         """Test multiproperties with opaque materials sample file."""
         self._test_sample_file_roundtrip(

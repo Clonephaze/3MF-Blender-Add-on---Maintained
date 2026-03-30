@@ -7,8 +7,11 @@ Tests that need ``bpy.data.texts`` (store/retrieve) are in integration tests.
 """
 
 import io
+import os
+import tempfile
 import unittest
 import xml.etree.ElementTree as ET
+import zipfile
 
 from io_mesh_3mf.common.annotations import (
     Annotations,
@@ -16,6 +19,7 @@ from io_mesh_3mf.common.annotations import (
     ContentType,
     ConflictingContentType,
 )
+from io_mesh_3mf.common.constants import CONTENT_TYPES_NAMESPACE
 
 
 # ============================================================================
@@ -199,6 +203,80 @@ class TestAddRels(unittest.TestCase):
         ann = Annotations()
         ann.add_rels(stream)  # Should not raise
         self.assertEqual(ann.annotations, {})
+
+
+# ============================================================================
+# Annotations.write_content_types()
+# ============================================================================
+
+
+class TestWriteContentTypes(unittest.TestCase):
+    """Tests for Annotations.write_content_types()."""
+
+    def _write_and_read_content_types(self, annotations):
+        """Write content types to a temp archive and return the XML string."""
+        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            with zipfile.ZipFile(tmp_path, "w") as archive:
+                annotations.write_content_types(archive)
+
+            with zipfile.ZipFile(tmp_path, "r") as archive:
+                return archive.read("[Content_Types].xml").decode("utf-8")
+        finally:
+            os.unlink(tmp_path)
+
+    def test_preserves_3mf_texture_content_type_for_png(self):
+        """Annotations with the 3MF texture OPC type for .png should NOT be
+        overridden by the image/png fallback."""
+        TEXTURE_OPC_TYPE = (
+            "application/vnd.ms-package.3dmanufacturing-3dmodeltexture"
+        )
+
+        ann = Annotations()
+        ann.annotations["3D/Textures/logo.png"] = {
+            ContentType(TEXTURE_OPC_TYPE)
+        }
+
+        content = self._write_and_read_content_types(ann)
+
+        # The 3MF texture OPC type should appear as the Default for .png
+        self.assertIn(TEXTURE_OPC_TYPE, content)
+        # image/png should NOT appear (it would mean the fallback overwrote)
+        self.assertNotIn("image/png", content)
+
+    def test_defaults_png_to_image_png_when_no_annotations(self):
+        """When no .png files are annotated, .png defaults to image/png."""
+        ann = Annotations()
+
+        content = self._write_and_read_content_types(ann)
+
+        self.assertIn("image/png", content)
+
+    def test_write_content_types_produces_valid_xml(self):
+        """write_content_types() should produce parseable XML."""
+        ann = Annotations()
+        ann.annotations["some/file.bin"] = {
+            ContentType("application/octet-stream")
+        }
+
+        content = self._write_and_read_content_types(ann)
+        root = ET.fromstring(content)
+
+        self.assertEqual(
+            root.tag.split("}")[-1] if "}" in root.tag else root.tag,
+            "Types",
+        )
+
+    def test_no_ns0_prefix_in_content_types(self):
+        """[Content_Types].xml should not contain ns0: prefixed elements."""
+        ann = Annotations()
+        ann.annotations["3D/Textures/tex.png"] = {ContentType("image/png")}
+
+        content = self._write_and_read_content_types(ann)
+
+        self.assertNotIn("ns0:", content)
 
 
 if __name__ == "__main__":
