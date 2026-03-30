@@ -318,13 +318,20 @@ def write_textures_to_archive(archive: zipfile.ZipFile, textured_materials: Dict
         else:
             ext = ".png"
 
-        # Sanitize filename
-        safe_name = "".join(c if c.isalnum() or c in "._-" else "_" for c in image_name)
-        if not safe_name.lower().endswith(ext):
-            safe_name += ext
+        # Use original archive path when available (round-trip preservation).
+        # This keeps the texture2d path, relationships, and content types
+        # consistent with what the original 3MF file used.
+        if original_path:
+            archive_path = original_path.lstrip("/")
+            full_archive_path = f"/{archive_path}"
+        else:
+            # Sanitize filename
+            safe_name = "".join(c if c.isalnum() or c in "._-" else "_" for c in image_name)
+            if not safe_name.lower().endswith(ext):
+                safe_name += ext
 
-        archive_path = f"{texture_folder}/{safe_name}"
-        full_archive_path = f"/{archive_path}"
+            archive_path = f"{texture_folder}/{safe_name}"
+            full_archive_path = f"/{archive_path}"
 
         # Check if already in archive (e.g., written by PBR texture pass)
         try:
@@ -394,12 +401,14 @@ def write_texture_relationships(archive: zipfile.ZipFile, image_to_path: Dict[st
     rel_id = 1
     for image_name, archive_path in image_to_path.items():
         rel_element = xml.etree.ElementTree.SubElement(relationships_element, f"{{{RELS_NAMESPACE}}}Relationship")
-        rel_element.attrib["Type"] = TEXTURE_REL
-        rel_element.attrib["Target"] = archive_path
-        rel_element.attrib["Id"] = f"rel{rel_id}"
+        rel_element.attrib[f"{{{RELS_NAMESPACE}}}Type"] = TEXTURE_REL
+        rel_element.attrib[f"{{{RELS_NAMESPACE}}}Target"] = archive_path
+        rel_element.attrib[f"{{{RELS_NAMESPACE}}}Id"] = f"rel{rel_id}"
         rel_id += 1
 
     # Write to archive at 3D/_rels/3dmodel.model.rels
+    # Use namespace-qualified attributes + default_namespace to produce clean
+    # XML like annotations.write_rels() does, avoiding ns0: prefixes.
     rels_path = "3D/_rels/3dmodel.model.rels"
     tree = xml.etree.ElementTree.ElementTree(relationships_element)
     with archive.open(rels_path, "w") as f:
@@ -407,6 +416,7 @@ def write_texture_relationships(archive: zipfile.ZipFile, image_to_path: Dict[st
             f,
             xml_declaration=True,
             encoding="UTF-8",
+            default_namespace=RELS_NAMESPACE,
         )
 
     debug(f"Wrote {len(image_to_path)} texture relationships to {rels_path}")

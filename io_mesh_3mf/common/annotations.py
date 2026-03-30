@@ -234,7 +234,12 @@ class Annotations:
         most_common[".model"] = MODEL_MIMETYPE
         most_common[".config"] = "application/xml"
         most_common[".xml"] = CORE_PROPERTIES_MIMETYPE
-        most_common[".png"] = "image/png"
+        # Only set .png as image/png if no annotations provide a more specific
+        # content type (e.g. application/vnd.ms-package.3dmanufacturing-3dmodeltexture
+        # for 3MF texture parts).  Hardcoding here would override the correct
+        # content type that the import stored from the original archive.
+        if ".png" not in most_common:
+            most_common[".png"] = "image/png"
 
         root = xml.etree.ElementTree.Element(f"{{{CONTENT_TYPES_NAMESPACE}}}Types")
         for extension, mime_type in most_common.items():

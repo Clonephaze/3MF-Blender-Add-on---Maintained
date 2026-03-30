@@ -268,6 +268,11 @@ class StandardExporter(BaseExporter):
             ctx.next_resource_id,
         )
 
+        # Accumulate all texture relationships across PBR, standard, and
+        # passthrough pipelines, then write them once at the end to avoid
+        # each call overwriting the previous rels file.
+        all_texture_rels = {}
+
         # Detect PBR textured materials FIRST — these use pbmetallictexturedisplayproperties
         pbr_textured_materials = detect_pbr_textured_materials(all_mesh_objects)
 
@@ -285,7 +290,7 @@ class StandardExporter(BaseExporter):
                 )
 
                 if pbr_image_to_path:
-                    write_texture_relationships(archive, pbr_image_to_path)
+                    all_texture_rels.update(pbr_image_to_path)
 
                     material_to_display_props, ctx.next_resource_id = (
                         write_pbr_texture_display_properties(
@@ -315,7 +320,7 @@ class StandardExporter(BaseExporter):
             image_to_path = write_textures_to_archive(
                 archive, textured_materials
             )
-            write_texture_relationships(archive, image_to_path)
+            all_texture_rels.update(image_to_path)
 
             ctx.texture_groups, ctx.next_resource_id = write_texture_resources(
                 resources_element,
@@ -329,10 +334,12 @@ class StandardExporter(BaseExporter):
         # Write passthrough texture images to the archive BEFORE writing XML references
         passthrough_image_paths = write_passthrough_textures_to_archive(archive)
         if passthrough_image_paths:
-            passthrough_rel_paths = {
-                path: f"/{path}" for path in passthrough_image_paths
-            }
-            write_texture_relationships(archive, passthrough_rel_paths)
+            for path in passthrough_image_paths:
+                all_texture_rels[path] = f"/{path}"
+
+        # Write all texture relationships in a single call
+        if all_texture_rels:
+            write_texture_relationships(archive, all_texture_rels)
 
         # Write passthrough materials (compositematerials, multiproperties, etc.)
         ctx.next_resource_id, passthrough_written, ctx.passthrough_id_remap = (
