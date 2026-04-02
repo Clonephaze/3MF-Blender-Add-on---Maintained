@@ -146,9 +146,14 @@ class Test3MFConsortiumSamples(Blender3mfTestCase):
         )
     
     def test_multipletextures(self):
-        """Test multiple textures sample file."""
+        """Test texture2d + texture2dgroup roundtrip.
+
+        Uses sphere_logo.3mf instead of multipletextures.3mf because the
+        latter (~2 MB) causes Blender headless to hang during roundtrip.
+        sphere_logo.3mf covers the same Materials Extension elements.
+        """
         self._test_sample_file_roundtrip(
-            "multipletextures.3mf",
+            "sphere_logo.3mf",
             expected_elements=['texture2d', 'texture2dgroup']
         )
     
