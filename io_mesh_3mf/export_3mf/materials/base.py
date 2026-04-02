@@ -136,7 +136,11 @@ def get_triangle_color(
 
 
 def collect_face_colors(
-    blender_objects: List[bpy.types.Object], use_mesh_modifiers: bool, safe_report
+    blender_objects: List[bpy.types.Object],
+    use_mesh_modifiers: bool,
+    safe_report,
+    export_hidden: bool = True,
+    include_disabled: bool = False,
 ) -> Dict[str, int]:
     """
     Collect unique face colors from all objects for Orca color zone export.
@@ -147,13 +151,17 @@ def collect_face_colors(
     :param blender_objects: List of Blender objects to extract colors from.
     :param use_mesh_modifiers: Whether to apply modifiers when getting mesh.
     :param safe_report: Callable for reporting errors/warnings.
+    :param export_hidden: Include hidden objects (default True).
+    :param include_disabled: Include render-disabled objects (default False).
     :return: Dictionary mapping color hex strings to filament indices (0-based).
     """
     unique_colors = set()
     objects_processed = 0
 
     # Recursively collect mesh objects (walks into nested empties)
-    mesh_list = collect_mesh_objects(blender_objects, export_hidden=True)
+    mesh_list = collect_mesh_objects(
+        blender_objects, export_hidden=export_hidden, include_disabled=include_disabled
+    )
 
     for blender_object in mesh_list:
 

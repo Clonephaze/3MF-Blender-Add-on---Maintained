@@ -421,7 +421,11 @@ class StandardExporter(BaseExporter):
         # Detect linked duplicates if component optimization is enabled
         component_groups = {}
         if ctx.options.use_components:
-            component_groups = detect_linked_duplicates(blender_objects)
+            component_groups = detect_linked_duplicates(
+                blender_objects,
+                export_hidden=ctx.options.export_hidden,
+                include_disabled=ctx.options.include_disabled,
+            )
 
             if component_groups and should_use_components(
                 component_groups, blender_objects

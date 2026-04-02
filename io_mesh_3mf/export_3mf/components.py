@@ -100,6 +100,8 @@ class ComponentGroup:
 
 def detect_linked_duplicates(
     blender_objects: List[bpy.types.Object],
+    export_hidden: bool = True,
+    include_disabled: bool = False,
 ) -> Dict[bpy.types.Mesh, ComponentGroup]:
     """
     Detect linked duplicates — objects that share the same mesh data.
@@ -110,10 +112,14 @@ def detect_linked_duplicates(
     - Export each object as an instance with just a transform
 
     :param blender_objects: List of Blender objects to analyze.
+    :param export_hidden: Include hidden objects (default True).
+    :param include_disabled: Include render-disabled objects (default False).
     :return: Dictionary mapping mesh data to ComponentGroup objects.
     """
     # Use collect_mesh_objects to find meshes at any nesting depth
-    all_mesh_objects = collect_mesh_objects(blender_objects, export_hidden=True)
+    all_mesh_objects = collect_mesh_objects(
+        blender_objects, export_hidden=export_hidden, include_disabled=include_disabled
+    )
 
     mesh_to_objects: Dict[bpy.types.Mesh, List[bpy.types.Object]] = {}
 

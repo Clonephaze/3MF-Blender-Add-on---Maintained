@@ -1,3 +1,20 @@
+2.4.4 — Disabled Object Export & Thumbnail Fixes
+====
+
+Bug Fixes
+----
+* **Disabled objects lost colors during export** — `collect_face_colors()` hardcoded `export_hidden=True` but never passed `include_disabled`, so render-disabled objects were silently excluded from color collection even when "Include Disabled" was enabled. This caused "No face colors detected" warnings and missing/randomly-swapped material colors. All internal `collect_mesh_objects()` wrappers (`collect_face_colors`, `detect_linked_duplicates`) now accept and forward `export_hidden`/`include_disabled` from the export context.
+* **API `objects=` parameter ignored visibility settings** — `export_3mf(objects=[...])` accepted an explicit object list but downstream exporters still filtered by viewport visibility and render-disable state, silently dropping valid objects. The API now forces `export_hidden=True` and `include_disabled=True` when an explicit object list is provided.
+* **API non-manifold check skipped disabled objects** — The pre-export geometry validation in `api.py` hardcoded `export_hidden=True` without `include_disabled`, so disabled objects bypassed non-manifold warnings. Now uses the resolved export options consistently.
+* **Component detection missed disabled objects** — `detect_linked_duplicates()` hardcoded `export_hidden=True` without `include_disabled`, so disabled linked duplicates were excluded from component instancing in the StandardExporter. Now forwards the export context visibility settings.
+* **Windows Explorer thumbnails not showing** — The OPC `[Content_Types].xml` mapped all `.png` files to the 3MF texture content type (`application/vnd.ms-package.3dmanufacturing-3dmodeltexture`), including `Metadata/thumbnail.png`. Windows Explorer's OPC thumbnail handler requires `image/png`. An explicit `<Override>` for the thumbnail part is now written when the `.png` default isn't `image/png`.
+
+API
+----
+* **API version bumped to 1.1.1** (patch — no surface changes).
+
+----
+
 2.4.3 — Flatten Hierarchy & Spec Compliance
 ====
 

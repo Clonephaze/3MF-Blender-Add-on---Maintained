@@ -1028,7 +1028,9 @@ def export_3mf(
         options.include_disabled = True
     elif use_selection:
         blender_objects = context.selected_objects
-        mesh_objects = collect_mesh_objects(blender_objects, export_hidden=True)
+        mesh_objects = collect_mesh_objects(
+            blender_objects, export_hidden=True, include_disabled=True
+        )
         if not mesh_objects:
             error("Export cancelled: No mesh objects in selection")
             result.status = "CANCELLED"
@@ -1042,7 +1044,11 @@ def export_3mf(
     # Non-manifold check.
     # Use collect_mesh_objects to walk into Empty hierarchies (e.g. when
     # the caller passes a parent Empty grouping several mesh children).
-    mesh_objects = collect_mesh_objects(blender_objects, export_hidden=True)
+    mesh_objects = collect_mesh_objects(
+        blender_objects,
+        export_hidden=options.export_hidden,
+        include_disabled=options.include_disabled,
+    )
     if mesh_objects:
         non_manifold = check_non_manifold_geometry(mesh_objects, use_mesh_modifiers)
         if non_manifold:

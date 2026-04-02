@@ -127,7 +127,11 @@ class OrcaExporter(BaseExporter):
         # If no paint colors found, fall back to face material colors
         if not paint_colors_collected:
             ctx.vertex_colors = collect_face_colors(
-                blender_objects, ctx.options.use_mesh_modifiers, ctx.safe_report
+                blender_objects,
+                ctx.options.use_mesh_modifiers,
+                ctx.safe_report,
+                export_hidden=ctx.options.export_hidden,
+                include_disabled=ctx.options.include_disabled,
             )
 
         debug(f"Orca mode enabled with {len(ctx.vertex_colors)} color zones")
