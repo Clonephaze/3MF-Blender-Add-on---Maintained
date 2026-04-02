@@ -273,6 +273,20 @@ class Annotations:
                         },
                     )
 
+        # The thumbnail is a standard PNG image, not a 3MF texture part.
+        # If the .png extension default is the 3MF texture MIME type, add an
+        # explicit Override so Windows Explorer's OPC thumbnail handler
+        # recognises the content type as image/png.
+        if most_common.get(".png") != "image/png":
+            xml.etree.ElementTree.SubElement(
+                root,
+                f"{{{CONTENT_TYPES_NAMESPACE}}}Override",
+                attrib={
+                    f"{{{CONTENT_TYPES_NAMESPACE}}}PartName": "/Metadata/thumbnail.png",
+                    f"{{{CONTENT_TYPES_NAMESPACE}}}ContentType": "image/png",
+                },
+            )
+
         document = xml.etree.ElementTree.ElementTree(root)
         with archive.open(CONTENT_TYPES_LOCATION, "w") as f:
             document.write(

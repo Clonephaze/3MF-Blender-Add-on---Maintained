@@ -111,7 +111,7 @@ from .common.units import (
 #: - MAJOR: Breaking changes to existing functions/signatures
 #: - MINOR: New features, backward-compatible
 #: - PATCH: Bug fixes only
-API_VERSION = (1, 1, 0)
+API_VERSION = (1, 1, 1)
 
 #: Human-readable version string
 API_VERSION_STRING = ".".join(str(v) for v in API_VERSION)
@@ -1022,6 +1022,10 @@ def export_3mf(
     context = bpy.context
     if objects is not None:
         blender_objects = objects
+        # The caller explicitly chose these objects — bypass visibility and
+        # render-disable filters so the exporter doesn't silently skip them.
+        options.export_hidden = True
+        options.include_disabled = True
     elif use_selection:
         blender_objects = context.selected_objects
         mesh_objects = collect_mesh_objects(blender_objects, export_hidden=True)
