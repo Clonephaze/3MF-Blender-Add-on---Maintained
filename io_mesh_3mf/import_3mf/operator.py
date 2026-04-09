@@ -441,6 +441,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         ctx.part_groups = {}
         ctx.part_metadata = {}
         ctx.wrapper_metadata = {}
+        ctx.part_names = {}
 
         # Read filament colours (single archive open, priority order).
         read_all_slicer_colors(ctx, path)

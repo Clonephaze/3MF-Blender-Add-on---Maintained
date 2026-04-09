@@ -108,6 +108,9 @@ class ImportContext:
     # Per-wrapper (object-level) slicer setting overrides.
     # Keyed by wrapper_id, values are {setting_key: value}.
     wrapper_metadata: Dict[str, Dict[str, str]] = field(default_factory=dict)
+    # Part names from model_settings.config.
+    # Keyed by (wrapper_id, part_id), values are display names.
+    part_names: Dict[Tuple[str, str], str] = field(default_factory=dict)
 
     # --- Extension tracking -------------------------------------------------
     extension_manager: ExtensionManager = field(default_factory=ExtensionManager)

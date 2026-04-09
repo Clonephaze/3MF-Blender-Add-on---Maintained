@@ -803,6 +803,7 @@ def import_3mf(
         ctx.part_groups = {}
         ctx.part_metadata = {}
         ctx.wrapper_metadata = {}
+        ctx.part_names = {}
 
         if on_progress:
             on_progress(20, "Reading filament colours…")

@@ -426,15 +426,22 @@ def read_orca_part_subtypes(
                         ctx.part_subtypes[(wrapper_id, part_id)] = subtype
                         debug(f"Part ({wrapper_id}, {part_id}) subtype: {subtype}")
 
-                    # Collect part-level setting overrides.
+                    # Collect part name and setting overrides.
+                    part_name = None
                     part_overrides: dict[str, str] = {}
                     for meta in part_elem.findall("metadata"):
                         key = meta.get("key")
                         value = meta.get("value")
                         if key is None or value is None:
                             continue
-                        if key not in _PART_STANDARD_KEYS:
+                        if key == "name":
+                            part_name = value
+                        elif key not in _PART_STANDARD_KEYS:
                             part_overrides[key] = value
+
+                    if part_name and wrapper_id:
+                        ctx.part_names[(wrapper_id, part_id)] = part_name
+
                     if part_overrides and wrapper_id:
                         ctx.part_metadata[(wrapper_id, part_id)] = part_overrides
                         debug(

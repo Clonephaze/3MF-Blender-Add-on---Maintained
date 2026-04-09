@@ -10,8 +10,8 @@ Features
 
 Bug Fixes
 ----
-* **No paint data on non-normal parts** — Modifier, support, and negative parts no longer have paint segmentation, seam, or support data written during Orca export. Only `normal_part` objects get paint attributes.
 * **Part ID collision fix** — Part IDs in `model_settings.config` are scoped per-model-file. A composite `(wrapper_id, part_id)` key is now used internally to prevent incorrect subtype assignment when IDs are reused across wrappers.
+* **Object names preserved on import** — Imported objects were all named "3MF Object" instead of using the actual name from the file. Names are now resolved from `model_settings.config` part names (Orca/BambuStudio) or the 3MF `<object>` `name` attribute, fixing round-trip name loss and dictionary collisions during grouped export.
 
 API
 ----

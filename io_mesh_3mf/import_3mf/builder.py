@@ -147,7 +147,19 @@ def build_object(
 
     # --- Create Blender object ---
     if mesh is not None:
-        blender_object = bpy.data.objects.new("3MF Object", mesh)
+        # Determine object name.  Priority:
+        # 1. Part name from model_settings.config (Orca/BambuStudio)
+        # 2. name attribute from 3MF <object> element
+        # 3. Fallback: "3MF Object"
+        wrapper_id = objectid_stack_trace[0] if objectid_stack_trace else None
+        current_id = objectid_stack_trace[-1] if objectid_stack_trace else None
+        name_key = (wrapper_id, current_id) if wrapper_id and current_id else None
+        object_name = "3MF Object"
+        if name_key and name_key in ctx.part_names:
+            object_name = ctx.part_names[name_key]
+        elif "Title" in resource_object.metadata:
+            object_name = str(resource_object.metadata["Title"].value)
+        blender_object = bpy.data.objects.new(object_name, mesh)
         ctx.num_loaded += 1
         if parent is not None:
             blender_object.parent = parent
@@ -176,9 +188,7 @@ def build_object(
         # Apply part subtype from model_settings.config (Orca/BambuStudio).
         # Uses composite (wrapper_id, part_id) key since part IDs are
         # scoped per-model-file and can collide across different wrappers.
-        wrapper_id = objectid_stack_trace[0] if objectid_stack_trace else None
-        current_id = objectid_stack_trace[-1] if objectid_stack_trace else None
-        subtype_key = (wrapper_id, current_id) if wrapper_id and current_id else None
+        subtype_key = name_key
         if subtype_key and subtype_key in ctx.part_subtypes:
             part_subtype = ctx.part_subtypes[subtype_key]
             blender_object["3mf_part_subtype"] = part_subtype
