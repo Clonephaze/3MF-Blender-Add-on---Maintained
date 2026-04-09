@@ -60,6 +60,44 @@ from ..import_3mf.archive import get_stashed_config
 from ..slicer_profiles import get_profile_config
 
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _write_stashed_settings(
+    parent_elem: xml.etree.ElementTree.Element,
+    blender_object: bpy.types.Object,
+    prop_name: str = "3mf_orca_settings",
+) -> None:
+    """Write stashed slicer setting overrides as ``<metadata>`` children.
+
+    Reads a JSON dict from *blender_object[prop_name]* and writes each
+    key/value pair as a ``<metadata key="..." value="..."/>`` element.
+
+    :param parent_elem: The ``<object>`` or ``<part>`` XML element.
+    :param blender_object: Blender object carrying the stashed settings.
+    :param prop_name: Custom property name (default ``"3mf_orca_settings"``).
+    """
+    raw = blender_object.get(prop_name)
+    if not raw:
+        return
+    try:
+        settings = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return
+    if not isinstance(settings, dict):
+        return
+    for key, value in settings.items():
+        xml.etree.ElementTree.SubElement(
+            parent_elem, "metadata",
+            key=str(key), value=str(value),
+        )
+    debug(
+        f"Wrote {len(settings)} stashed overrides from "
+        f"'{blender_object.name}'.{prop_name}"
+    )
+
+
 class OrcaExporter(BaseExporter):
     """Exports Orca Slicer compatible 3MF files using Production Extension."""
 
@@ -354,7 +392,9 @@ class OrcaExporter(BaseExporter):
 
         # Adaptive pre-subdivision for PAINT mode: split large faces so each
         # triangle can be encoded at full segmentation depth.
-        if ctx.options.use_orca_format == "PAINT" and mesh.uv_layers.active:
+        # Skip for non-normal parts (modifiers, support enforcers/blockers, etc.)
+        is_normal_part = blender_object.get("3mf_part_subtype", "normal_part") == "normal_part"
+        if is_normal_part and ctx.options.use_orca_format == "PAINT" and mesh.uv_layers.active:
             original_object = blender_object
             if hasattr(blender_object, "original"):
                 original_object = blender_object.original
@@ -397,10 +437,11 @@ class OrcaExporter(BaseExporter):
             )
 
         # Generate segmentation strings from UV texture if in PAINT mode
+        # Non-normal parts (modifiers, support, negative) get no paint data.
         segmentation_strings = {}
         seam_strings = {}
         support_strings = {}
-        if ctx.options.use_orca_format == "PAINT" and mesh.uv_layers.active:
+        if is_normal_part and ctx.options.use_orca_format == "PAINT" and mesh.uv_layers.active:
             # Read from original object's data, not the temporary evaluated mesh
             original_object = blender_object
             if hasattr(blender_object, "original"):
@@ -511,13 +552,15 @@ class OrcaExporter(BaseExporter):
                     continue
 
             # Fall back to simple paint_color from face material colors
-            triangle_color = get_triangle_color(mesh, triangle, blender_object, eval_object)
-            if triangle_color and triangle_color in ctx.vertex_colors:
-                filament_index = ctx.vertex_colors[triangle_color]
-                if filament_index < len(ORCA_FILAMENT_CODES):
-                    paint_code = ORCA_FILAMENT_CODES[filament_index]
-                    if paint_code:
-                        tri_attribs["paint_color"] = paint_code
+            # (skip for non-normal parts — they carry no paint data)
+            if is_normal_part:
+                triangle_color = get_triangle_color(mesh, triangle, blender_object, eval_object)
+                if triangle_color and triangle_color in ctx.vertex_colors:
+                    filament_index = ctx.vertex_colors[triangle_color]
+                    if filament_index < len(ORCA_FILAMENT_CODES):
+                        paint_code = ORCA_FILAMENT_CODES[filament_index]
+                        if paint_code:
+                            tri_attribs["paint_color"] = paint_code
 
             # Seam / support for non-segmentation triangles
             if seam_strings and tri_idx in seam_strings and seam_strings[tri_idx]:
@@ -1035,6 +1078,11 @@ class OrcaExporter(BaseExporter):
                 object_elem, "metadata", key="name", value=grp["name"]
             )
 
+            # Wrapper-level slicer setting overrides (round-trip passthrough)
+            group_empty = grp.get("empty")
+            if group_empty is not None:
+                _write_stashed_settings(object_elem, group_empty)
+
             # Determine dominant extruder for entire group by aggregating part colors
             group_dominant_extruder = "1"
             group_color_counts: dict[str, int] = {}
@@ -1057,8 +1105,12 @@ class OrcaExporter(BaseExporter):
                         if dominant_color in ctx.vertex_colors:
                             extruder_value = str(ctx.vertex_colors[dominant_color])
 
+                part_subtype = "normal_part"
+                if blender_object is not None:
+                    part_subtype = blender_object.get("3mf_part_subtype", "normal_part")
+
                 part_elem = xml.etree.ElementTree.SubElement(
-                    object_elem, "part", id=str(member["mesh_id"]), subtype="normal_part"
+                    object_elem, "part", id=str(member["mesh_id"]), subtype=part_subtype
                 )
                 xml.etree.ElementTree.SubElement(
                     part_elem, "metadata", key="name", value=obj_name
@@ -1070,6 +1122,10 @@ class OrcaExporter(BaseExporter):
                 xml.etree.ElementTree.SubElement(
                     part_elem, "metadata", key="extruder", value=extruder_value
                 )
+
+                # Per-part slicer setting overrides (round-trip passthrough)
+                if blender_object is not None:
+                    _write_stashed_settings(part_elem, blender_object)
 
             # Set group-level extruder to most common color among its parts
             if group_color_counts and ctx.vertex_colors:
@@ -1106,7 +1162,8 @@ class OrcaExporter(BaseExporter):
                 object_elem, "metadata", key="extruder", value=extruder_value
             )
 
-            # Per-object setting overrides (passthrough, no validation)
+            # Per-object setting overrides (passthrough, no validation).
+            # Priority: explicit API object_settings > stashed from import.
             if obj_name in ctx.object_settings:
                 for setting_key, setting_value in ctx.object_settings[obj_name].items():
                     xml.etree.ElementTree.SubElement(
@@ -1119,9 +1176,18 @@ class OrcaExporter(BaseExporter):
                     f"Wrote {len(ctx.object_settings[obj_name])} per-object overrides "
                     f"for '{obj_name}'"
                 )
+            elif blender_object is not None:
+                _write_stashed_settings(
+                    object_elem, blender_object,
+                    prop_name="3mf_orca_wrapper_settings",
+                )
+
+            part_subtype = "normal_part"
+            if blender_object is not None:
+                part_subtype = blender_object.get("3mf_part_subtype", "normal_part")
 
             part_elem = xml.etree.ElementTree.SubElement(
-                object_elem, "part", id=str(mesh_id), subtype="normal_part"
+                object_elem, "part", id=str(mesh_id), subtype=part_subtype
             )
             xml.etree.ElementTree.SubElement(
                 part_elem, "metadata", key="name", value=obj_name

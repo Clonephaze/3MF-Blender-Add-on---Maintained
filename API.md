@@ -10,7 +10,7 @@ docs/build.ps1          # or: docs/build.ps1 -Clean
 
 The docs include:
 
-- **Getting Started** — overview, quick start, export format reference, callbacks, CLI usage
+- **Getting Started** — overview, quick start, export format reference, modifier parts, callbacks, CLI usage
 - **Recipes** — ready-to-use patterns (import, export, round-trip, batch, inspect)
 - **Core API Reference** — auto-generated parameter docs for `import_3mf`, `export_3mf`, `inspect_3mf`, and batch helpers
 - **API Discovery** — version checking, capability detection, standalone helper module

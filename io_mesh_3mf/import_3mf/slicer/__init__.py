@@ -26,6 +26,7 @@ from .colors import (
     read_blender_addon_colors,
     read_prusa_object_extruders,
     read_prusa_filament_colors,
+    read_orca_part_subtypes,
 )
 from .paint import (
     ORCA_PAINT_TO_INDEX,
@@ -42,6 +43,7 @@ __all__ = [
     "read_blender_addon_colors",
     "read_prusa_object_extruders",
     "read_prusa_filament_colors",
+    "read_orca_part_subtypes",
     "ORCA_PAINT_TO_INDEX",
     "parse_paint_color_to_index",
     "get_or_create_paint_material",

@@ -62,6 +62,18 @@ _READONLY_KEYS = set(_SCENE_READONLY_KEYS) | _SLICER_META_KEYS
 # Config stash indicator prefix (matches import_3mf/archive.py).
 _CONFIG_STASH_PREFIX = ".3mf_config/"
 
+# Valid part subtypes for Orca/BambuStudio modifier system.
+_PART_SUBTYPES = [
+    ("normal_part", "Normal Part", "Standard geometry"),
+    ("modifier_part", "Modifier", "Changes print settings in intersection volume"),
+    ("support_enforcer", "Support Enforcer", "Forces support generation in volume"),
+    ("support_blocker", "Support Blocker", "Prevents support generation in volume"),
+    ("negative_part", "Negative Part", "Subtracts volume from the parent object"),
+]
+
+# Mapping from subtype value to display label.
+_SUBTYPE_LABELS = {item[0]: item[1] for item in _PART_SUBTYPES}
+
 
 # ===================================================================
 #  Helpers
@@ -292,6 +304,46 @@ class THREEMF_OT_remove_metadata(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class THREEMF_OT_set_part_subtype(bpy.types.Operator):
+    """Set the Orca/BambuStudio part subtype for the active object"""
+
+    bl_idname = "threemf.set_part_subtype"
+    bl_label = "Set Part Type"
+    bl_options = {"REGISTER", "UNDO", "INTERNAL"}
+
+    subtype: bpy.props.EnumProperty(
+        name="Part Type",
+        items=_PART_SUBTYPES,
+        default="normal_part",
+    )
+
+    @classmethod
+    def poll(cls, context):
+        return (
+            context.mode == "OBJECT"
+            and context.active_object is not None
+            and context.active_object.type == "MESH"
+        )
+
+    def execute(self, context):
+        from ..common.colors import apply_subtype_material
+
+        obj = context.active_object
+
+        if self.subtype == "normal_part":
+            if "3mf_part_subtype" in obj:
+                del obj["3mf_part_subtype"]
+            apply_subtype_material(obj, "normal_part")
+        else:
+            obj["3mf_part_subtype"] = self.subtype
+            apply_subtype_material(obj, self.subtype)
+
+        self.report({"INFO"}, f"Part type: {_SUBTYPE_LABELS[self.subtype]}")
+        return {"FINISHED"}
+
+
+
+
 # ===================================================================
 #  Panel
 # ===================================================================
@@ -460,6 +512,18 @@ class VIEW3D_PT_3mf_metadata(bpy.types.Panel):
         split = row.split(factor=0.35, align=True)
         split.label(text="Dimensions:")
         split.label(text=f"{dims.x:.4g} \u00d7 {dims.y:.4g} \u00d7 {dims.z:.4g}")
+
+        # Part subtype (Orca/BambuStudio modifier system).
+        current_subtype = obj.get("3mf_part_subtype", "normal_part")
+        row = col.row(align=True)
+        split = row.split(factor=0.35, align=True)
+        split.label(text="Part Type:")
+        split.operator_menu_enum(
+            "threemf.set_part_subtype",
+            "subtype",
+            text=_SUBTYPE_LABELS.get(current_subtype, current_subtype),
+            icon="MODIFIER" if current_subtype != "normal_part" else "MESH_CUBE",
+        )
 
     # ---------------------------------------------------------------
     #  Section: Object Metadata
@@ -651,6 +715,7 @@ _metadata_classes = (
     THREEMF_OT_edit_metadata,
     THREEMF_OT_add_metadata,
     THREEMF_OT_remove_metadata,
+    THREEMF_OT_set_part_subtype,
     VIEW3D_PT_3mf_metadata,
 )
 

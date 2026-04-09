@@ -100,6 +100,14 @@ class ImportContext:
     vendor_format: Optional[str] = None  # "orca" | None
     orca_filament_colors: Dict[int, str] = field(default_factory=dict)
     object_default_extruders: Dict[str, int] = field(default_factory=dict)
+    part_subtypes: Dict[Tuple[str, str], str] = field(default_factory=dict)
+    part_groups: Dict[str, Dict] = field(default_factory=dict)
+    # Per-part slicer setting overrides from model_settings.config.
+    # Keyed by (wrapper_id, part_id), values are {setting_key: value}.
+    part_metadata: Dict[Tuple[str, str], Dict[str, str]] = field(default_factory=dict)
+    # Per-wrapper (object-level) slicer setting overrides.
+    # Keyed by wrapper_id, values are {setting_key: value}.
+    wrapper_metadata: Dict[str, Dict[str, str]] = field(default_factory=dict)
 
     # --- Extension tracking -------------------------------------------------
     extension_manager: ExtensionManager = field(default_factory=ExtensionManager)

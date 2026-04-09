@@ -111,7 +111,7 @@ from .common.units import (
 #: - MAJOR: Breaking changes to existing functions/signatures
 #: - MINOR: New features, backward-compatible
 #: - PATCH: Bug fixes only
-API_VERSION = (1, 1, 1)
+API_VERSION = (1, 2, 0)
 
 #: Human-readable version string
 API_VERSION_STRING = ".".join(str(v) for v in API_VERSION)
@@ -138,6 +138,7 @@ API_CAPABILITIES = frozenset({
     "auto_smooth",         # Auto smooth-by-angle on import
     "subdivision_depth",   # Paint segmentation subdivision depth control
     "flatten_hierarchy",    # Option to flatten parented meshes into top-level build items (export)
+    "modifier_parts",       # Orca/BambuStudio modifier part subtypes (import, export, inspect)
 })
 
 #: Registry key in bpy.app.driver_namespace
@@ -376,6 +377,14 @@ class InspectResult:
         num_objects: Total number of ``<object>`` resources.
         num_triangles_total: Sum of all triangle counts across objects.
         num_vertices_total: Sum of all vertex counts across objects.
+        part_subtypes: Per-part subtype info from ``model_settings.config``
+            (Orca/BambuStudio only).  Each entry is a dict with keys:
+
+            - ``"part_id"`` — part ID string
+            - ``"subtype"`` — ``"normal_part"`` | ``"modifier_part"`` |
+              ``"support_enforcer"`` | ``"support_blocker"``
+            - ``"name"`` — part name (or ``""`` if unnamed)
+
         warnings: Accumulated warnings during inspection.
     """
 
@@ -392,6 +401,7 @@ class InspectResult:
     num_objects: int = 0
     num_triangles_total: int = 0
     num_vertices_total: int = 0
+    part_subtypes: List[Dict] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
 
 
@@ -557,6 +567,34 @@ def inspect_3mf(filepath: str) -> InspectResult:
             result.num_vertices_total += num_verts
 
     result.num_objects = len(result.objects)
+
+    # --- Parse model_settings.config for part subtypes (Orca/BambuStudio) ---
+    config_path = "Metadata/model_settings.config"
+    if config_path in result.archive_files:
+        try:
+            with archive.open(config_path) as f:
+                config_root = xml.etree.ElementTree.fromstring(
+                    f.read().decode("UTF-8")
+                )
+            for obj_elem in config_root.findall(".//object"):
+                for part_elem in obj_elem.findall("part"):
+                    part_id = part_elem.get("id", "")
+                    subtype = part_elem.get("subtype", "normal_part")
+                    part_name = ""
+                    for meta in part_elem.findall("metadata"):
+                        if meta.get("key") == "name":
+                            part_name = meta.get("value", "")
+                            break
+                    result.part_subtypes.append({
+                        "part_id": part_id,
+                        "subtype": subtype,
+                        "name": part_name,
+                    })
+        except Exception as e:
+            result.warnings.append(
+                f"Could not parse model_settings.config: {e}"
+            )
+
     archive.close()
     return result
 
@@ -761,12 +799,21 @@ def import_3mf(
         ctx.resource_texture_groups = {}
         ctx.orca_filament_colors = {}
         ctx.object_default_extruders = {}
+        ctx.part_subtypes = {}
+        ctx.part_groups = {}
+        ctx.part_metadata = {}
+        ctx.wrapper_metadata = {}
 
         if on_progress:
             on_progress(20, "Reading filament colours…")
 
         # Read filament colours (single archive open, priority order).
         read_all_slicer_colors(ctx, filepath)
+
+        # Read modifier part subtypes from Orca/BambuStudio model_settings.
+        if ctx.vendor_format == "orca":
+            from .import_3mf.slicer.colors import read_orca_part_subtypes
+            read_orca_part_subtypes(ctx, filepath)
 
         # Metadata.
         for metadata_node in root.iterfind("./3mf:metadata", MODEL_NAMESPACES):

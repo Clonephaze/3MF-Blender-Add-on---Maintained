@@ -1,3 +1,25 @@
+2.5.0 — Modifier Parts & Slicer Settings Passthrough
+====
+
+Features
+----
+* **Modifier parts support (Issue #27)** — Import and export Orca Slicer / BambuStudio modifier meshes. All five part subtypes are supported: `normal_part`, `modifier_part`, `support_enforcer`, `support_blocker`, and `negative_part`. Part subtypes are stored as the `3mf_part_subtype` custom property on Blender Objects and round-trip through `model_settings.config`.
+* **Part Type dropdown** — New inline dropdown in the 3MF Metadata sidebar panel to assign part subtypes in Object mode. Non-normal parts get viewport materials matching Orca Slicer's color scheme.
+* **Per-object slicer settings passthrough** — Custom slicer setting overrides on `<object>` and `<part>` elements in `model_settings.config` (e.g. `wall_loops`, `sparse_infill_density`) are now preserved through import/export round-trips. Settings are stored as JSON in `3mf_orca_settings` and `3mf_orca_wrapper_settings` custom properties.
+* **Parent-child hierarchy preservation** — Multi-part assemblies (modifier groups) create an Empty parent on import, preserving the grouped structure for round-trip export.
+
+Bug Fixes
+----
+* **No paint data on non-normal parts** — Modifier, support, and negative parts no longer have paint segmentation, seam, or support data written during Orca export. Only `normal_part` objects get paint attributes.
+* **Part ID collision fix** — Part IDs in `model_settings.config` are scoped per-model-file. A composite `(wrapper_id, part_id)` key is now used internally to prevent incorrect subtype assignment when IDs are reused across wrappers.
+
+API
+----
+* **API version bumped to 1.2.0** — new `"modifier_parts"` capability.
+* `inspect_3mf()` now returns `part_subtypes` — a list of dicts with `part_id`, `subtype`, and `name` for each non-normal part.
+
+----
+
 2.4.4 — Disabled Object Export & Thumbnail Fixes
 ====
 

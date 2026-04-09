@@ -24,6 +24,8 @@ __all__ = [
     "hex_to_linear_rgb",
     "rgb_to_hex",
     "linear_rgb_to_hex",
+    "SUBTYPE_COLORS",
+    "apply_subtype_material",
 ]
 
 
@@ -109,3 +111,59 @@ def linear_rgb_to_hex(r: float, g: float, b: float) -> str:
     Use this when reading colors from Blender materials for 3MF export.
     """
     return rgb_to_hex(linear_to_srgb(r), linear_to_srgb(g), linear_to_srgb(b))
+
+
+# ---------------------------------------------------------------------------
+#  Part subtype viewport colors (Orca Slicer / BambuStudio)
+# ---------------------------------------------------------------------------
+
+# sRGB byte values + alpha matching Orca Slicer's modifier colours.
+SUBTYPE_COLORS = {
+    "modifier_part":    (0x92, 0x92, 0x18, 0xFC),
+    "support_blocker":  (0x74, 0x3A, 0x3D, 0xFC),
+    "support_enforcer": (0x39, 0x39, 0x77, 0xFC),
+    "negative_part":    (0x39, 0x39, 0x3C, 0xFC),
+}
+
+
+def apply_subtype_material(blender_object, subtype: str) -> None:
+    """Assign a viewport-coloured material to a modifier/support/negative part.
+
+    Creates (or reuses) a shared material named ``3MF <Label>`` with the
+    Orca Slicer colour set as ``diffuse_color`` (including alpha).  When
+    *subtype* is ``"normal_part"`` or unknown, any existing subtype material
+    is removed.
+
+    :param blender_object: The Blender object (must have ``.data.materials``).
+    :param subtype: One of the ``SUBTYPE_COLORS`` keys, or ``"normal_part"``.
+    """
+    import bpy  # deferred — common/ is importable without bpy in tests
+
+    color_bytes = SUBTYPE_COLORS.get(subtype)
+
+    if color_bytes is None:
+        # normal_part or unknown — strip any previous subtype material
+        if blender_object.data.materials:
+            for i, mat in enumerate(blender_object.data.materials):
+                if mat and mat.name.startswith("3MF "):
+                    blender_object.data.materials.pop(index=i)
+                    break
+        return
+
+    r, g, b, a = color_bytes
+    linear_r = srgb_to_linear(r / 255.0)
+    linear_g = srgb_to_linear(g / 255.0)
+    linear_b = srgb_to_linear(b / 255.0)
+    alpha = a / 255.0
+
+    label = subtype.replace("_", " ").title()
+    mat_name = f"3MF {label}"
+
+    mat = bpy.data.materials.get(mat_name)
+    if mat is None:
+        mat = bpy.data.materials.new(mat_name)
+        mat.use_nodes = False
+        mat.diffuse_color = (linear_r, linear_g, linear_b, alpha)
+
+    blender_object.data.materials.clear()
+    blender_object.data.materials.append(mat)

@@ -29,6 +29,7 @@ from ..common import debug, warn, MODEL_NAMESPACES
 from ..common.metadata import Metadata, MetadataEntry
 from ..common.xml import parse_transformation, read_metadata as _read_metadata
 from ..common.types import ResourceObject
+from ..common.colors import apply_subtype_material
 
 from .scene import (
     create_mesh_from_data,
@@ -172,6 +173,32 @@ def build_object(
         metadata.store(blender_object)
         resource_object.metadata.store(blender_object)
 
+        # Apply part subtype from model_settings.config (Orca/BambuStudio).
+        # Uses composite (wrapper_id, part_id) key since part IDs are
+        # scoped per-model-file and can collide across different wrappers.
+        wrapper_id = objectid_stack_trace[0] if objectid_stack_trace else None
+        current_id = objectid_stack_trace[-1] if objectid_stack_trace else None
+        subtype_key = (wrapper_id, current_id) if wrapper_id and current_id else None
+        if subtype_key and subtype_key in ctx.part_subtypes:
+            part_subtype = ctx.part_subtypes[subtype_key]
+            blender_object["3mf_part_subtype"] = part_subtype
+            apply_subtype_material(blender_object, part_subtype)
+
+        # Stash per-part slicer setting overrides for round-trip export.
+        if subtype_key and subtype_key in ctx.part_metadata:
+            import json as _json
+            blender_object["3mf_orca_settings"] = _json.dumps(
+                ctx.part_metadata[subtype_key]
+            )
+
+        # For ungrouped objects (no Empty parent), stash wrapper-level
+        # slicer overrides directly on the mesh object.
+        if wrapper_id and wrapper_id in ctx.wrapper_metadata and parent is None:
+            import json as _json
+            blender_object["3mf_orca_wrapper_settings"] = _json.dumps(
+                ctx.wrapper_metadata[wrapper_id]
+            )
+
         if (
             "3mf:object_type" in resource_object.metadata
             and resource_object.metadata["3mf:object_type"].value in {"solidsupport", "support"}
@@ -182,7 +209,36 @@ def build_object(
         if ctx.options.auto_smooth:
             _apply_auto_smooth(blender_object, ctx.options.auto_smooth_angle)
     else:
-        blender_object = parent
+        # No mesh: either pass through parent, or create an Empty for
+        # multi-part assemblies (Orca modifier groups) so the hierarchy
+        # is preserved for round-trip export.
+        wrapper_id = objectid_stack_trace[0] if objectid_stack_trace else None
+        if (
+            parent is None
+            and resource_object.components
+            and len(resource_object.components) > 1
+            and wrapper_id
+            and wrapper_id in ctx.part_groups
+        ):
+            group_info = ctx.part_groups[wrapper_id]
+            empty = bpy.data.objects.new(group_info["name"], None)
+            empty.empty_display_type = "PLAIN_AXES"
+            empty.empty_display_size = 0.01
+            bpy.context.collection.objects.link(empty)
+            empty.matrix_world = transformation
+            ctx.imported_objects.append(empty)
+            metadata.store(empty)
+
+            # Stash wrapper-level slicer setting overrides on the Empty.
+            if wrapper_id in ctx.wrapper_metadata:
+                import json as _json
+                empty["3mf_orca_settings"] = _json.dumps(
+                    ctx.wrapper_metadata[wrapper_id]
+                )
+
+            blender_object = empty
+        else:
+            blender_object = parent
 
     # --- Recurse for components ---
     if not is_component_instance:

@@ -437,9 +437,18 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         ctx.resource_texture_groups = {}
         ctx.orca_filament_colors = {}
         ctx.object_default_extruders = {}
+        ctx.part_subtypes = {}
+        ctx.part_groups = {}
+        ctx.part_metadata = {}
+        ctx.wrapper_metadata = {}
 
         # Read filament colours (single archive open, priority order).
         read_all_slicer_colors(ctx, path)
+
+        # Read modifier part subtypes from Orca/BambuStudio model_settings.
+        if ctx.vendor_format == "orca":
+            from .slicer.colors import read_orca_part_subtypes
+            read_orca_part_subtypes(ctx, path)
 
         self._progress_update(25, "Reading materials and objects...")
 

@@ -382,6 +382,14 @@ _CAPABILITY_COMMENTS = {
     "project_template": "Custom Orca project template",
     "object_settings": "Per-object Orca settings",
     "building_blocks": "colors, types, segmentation sub-namespaces",
+    "global_scale": "Scale multiplier parameter (import & export)",
+    "compression": "Configurable ZIP compression level (export)",
+    "thumbnail": "Thumbnail generation (export)",
+    "use_components": "Component instancing for linked duplicates (export)",
+    "auto_smooth": "Auto smooth-by-angle on import",
+    "subdivision_depth": "Paint segmentation subdivision depth control",
+    "flatten_hierarchy": "Flatten parented meshes into top-level build items (export)",
+    "modifier_parts": "Orca/BambuStudio modifier part subtypes (import, export, inspect)",
 }
 
 

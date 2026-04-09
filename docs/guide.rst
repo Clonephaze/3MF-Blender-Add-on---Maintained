@@ -67,6 +67,44 @@ In **AUTO** mode the addon inspects your scene and picks the best path:
 - If *project_template* or *object_settings* is provided → Orca exporter
 
 
+Modifier Parts (Orca / BambuStudio)
+------------------------------------
+
+Orca Slicer and BambuStudio support **modifier meshes** — child objects that
+override print settings for a region of the parent without adding visible
+geometry.  The addon stores the part type as a custom property on the Blender
+**Object** (not Mesh):
+
+.. code-block:: python
+
+   obj["3mf_part_subtype"] = "modifier_part"
+
+Valid subtypes:
+
+- ``"normal_part"`` — standard geometry (default when property is absent)
+- ``"modifier_part"`` — settings modifier (infill, walls, etc.)
+- ``"support_enforcer"`` — force supports in this region
+- ``"support_blocker"`` — suppress supports in this region
+- ``"negative_part"`` — subtract this volume from the parent
+
+These are automatically imported from Orca/BambuStudio ``.3mf`` files and
+written back on export.  You can also set them via the **3MF Metadata** sidebar
+panel (Part Type dropdown) or the API:
+
+.. code-block:: python
+
+   from io_mesh_3mf.api import export_3mf, inspect_3mf
+
+   # Tag an object as a modifier before export
+   bpy.data.objects["Cylinder"]["3mf_part_subtype"] = "support_enforcer"
+   export_3mf("output.3mf", use_orca_format="AUTO")
+
+   # Inspect modifier parts without importing
+   info = inspect_3mf("model.3mf")
+   for part in info.part_subtypes:
+       print(f"  Part {part['part_id']}: {part['subtype']} ({part.get('name', '')})")
+
+
 Callbacks
 ---------
 

@@ -123,6 +123,35 @@ Round-Trip Conversion
        )
 
 
+Modifier Parts
+--------------
+
+Tag objects as modifiers, support enforcers, or support blockers for
+Orca Slicer / BambuStudio:
+
+.. code-block:: python
+
+   import bpy
+   from io_mesh_3mf.api import export_3mf
+
+   parent = bpy.data.objects["MainBody"]
+   modifier = bpy.data.objects["InfillRegion"]
+   blocker = bpy.data.objects["NoSupportZone"]
+
+   modifier["3mf_part_subtype"] = "modifier_part"
+   blocker["3mf_part_subtype"] = "support_blocker"
+
+   result = export_3mf(
+       "/output/with_modifiers.3mf",
+       objects=[parent, modifier, blocker],
+       use_orca_format="AUTO",
+   )
+
+Valid subtypes: ``normal_part``, ``modifier_part``, ``support_enforcer``,
+``support_blocker``, ``negative_part``.  Objects without the property
+default to ``normal_part``.
+
+
 Inspect Without Importing
 --------------------------
 
