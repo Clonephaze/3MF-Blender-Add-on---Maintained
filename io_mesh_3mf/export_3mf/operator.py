@@ -41,6 +41,10 @@ from .orca import OrcaExporter
 from .prusa import PrusaExporter
 from .standard import StandardExporter
 
+# The top-level package name — works in both dev (io_mesh_3mf.export_3mf)
+# and installed-extension namespace (bl_ext.user_default.io_mesh_3mf.export_3mf).
+_ADDON_PACKAGE = __package__.rsplit(".", 1)[0]
+
 # IDE and Documentation support.
 __all__ = ["Export3MF", "EXPORT_MT_threemf_presets", "EXPORT_OT_threemf_preset"]
 
@@ -57,6 +61,53 @@ def _scene_has_paint_textures() -> bool:
         if obj.data.get("3mf_is_paint_texture"):
             return True
     return False
+
+
+def _draw_rating_popup(self, context):
+    """Draw callback for the rating nudge popup_menu."""
+    layout = self.layout
+    layout.separator(factor=0.5)
+    col = layout.column(align=True)
+    col.label(text="You've exported several files now, glad it's been useful!", icon='FUND')
+    col.separator(factor=0.4)
+    col.label(text="A quick rating on the Blender Extensions marketplace would")
+    col.label(text="be really appreciated, and helps support continued development.")
+    layout.separator()
+    layout.operator("threemf.rating_nudge", text="Rate it \u2605  (opens browser)").action = "RATE"
+    layout.operator("threemf.rating_nudge", text="Remind me after 5 more exports").action = "SNOOZE"
+    layout.operator("threemf.rating_nudge", text="Don't ask again").action = "DISMISS"
+    layout.separator(factor=0.5)
+
+
+def _maybe_show_rating_nudge(context) -> None:
+    """Increment the export counter and schedule a rating prompt if the threshold is reached.
+
+    The popup is deferred via bpy.app.timers so it fires after the export
+    operator has fully returned — Blender cannot open a dialog from inside a
+    running operator's execute().  The timer callback uses temp_override to
+    supply a real window, which is required for INVOKE_DEFAULT to work.
+    """
+    try:
+        prefs_entry = context.preferences.addons.get(_ADDON_PACKAGE)
+        if prefs_entry is None:
+            return
+        prefs = prefs_entry.preferences
+        if prefs.rating_prompt_after == -1:
+            return  # User permanently dismissed the prompt
+        prefs.export_count += 1
+        if prefs.export_count >= prefs.rating_prompt_after:
+            def _show():
+                try:
+                    wm = bpy.context.window_manager
+                    for window in wm.windows:
+                        with bpy.context.temp_override(window=window, screen=window.screen):
+                            wm.popup_menu(_draw_rating_popup, title="Enjoying 3MF Format?", icon='FUND')
+                        break
+                except Exception:
+                    pass
+            bpy.app.timers.register(_show, first_interval=0.1)
+    except Exception:
+        pass  # Never let the nudge break an export
 
 
 def _select_exporter(ctx, context, mesh_objects, has_materials):
@@ -647,7 +698,10 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             # Dispatch to format-specific exporter
             exporter = _select_exporter(ctx, context, mesh_objects, has_materials)
 
-            return exporter.execute(context, archive, blender_objects, global_scale)
+            result = exporter.execute(context, archive, blender_objects, global_scale)
+            if result == {"FINISHED"}:
+                _maybe_show_rating_nudge(context)
+            return result
         finally:
             ctx._progress_end()
 

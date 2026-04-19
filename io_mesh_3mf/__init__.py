@@ -63,6 +63,7 @@ __all__ = [
     "THREEMF_OT_load_slicer_profile",
     "THREEMF_OT_delete_slicer_profile",
     "THREEMF_OT_rename_slicer_profile",
+    "THREEMF_OT_rating_nudge",
     "register",
     "unregister",
 ]
@@ -303,6 +304,21 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         step=64,
     )
 
+    # ---- Rating nudge tracking (not shown in prefs UI) ----
+    export_count: bpy.props.IntProperty(
+        name="Export Count",
+        description="Number of successful exports since the addon was installed",
+        default=0,
+        options={'HIDDEN'},
+    )
+
+    rating_prompt_after: bpy.props.IntProperty(
+        name="Rating Prompt After",
+        description="Show the rating prompt when export_count reaches this value. -1 = never show again",
+        default=5,
+        options={'HIDDEN'},
+    )
+
     def draw(self, context):
         layout = self.layout
 
@@ -396,6 +412,61 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
             box.operator("threemf.load_slicer_profile", icon="FILEBROWSER")
 
 
+# ---------------------------------------------------------------------------
+# Rating nudge
+# ---------------------------------------------------------------------------
+
+_EXTENSIONS_URL = "https://extensions.blender.org/add-ons/threemf-io/"
+
+
+class THREEMF_OT_rating_nudge(bpy.types.Operator):
+    """Ask the user to rate the addon after several successful exports."""
+
+    bl_idname = "threemf.rating_nudge"
+    bl_label = "Enjoying 3MF Format?"
+    bl_options = {'INTERNAL'}
+
+    action: bpy.props.EnumProperty(
+        name="",
+        items=[
+            ("RATE", "Rate it ★  (opens browser)", "Open the Blender Extensions page to leave a rating"),
+            ("SNOOZE", "Remind me after 5 more exports", "Ask again later"),
+            ("DISMISS", "Don't ask again", "Stop showing this prompt"),
+        ],
+        default="RATE",
+        options={'SKIP_SAVE'},
+    )
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self, width=440)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.separator(factor=0.5)
+        col = layout.column(align=True)
+        col.label(text="You've exported several files — glad it's been useful!", icon='FUND')
+        col.separator(factor=0.4)
+        col.label(text="A quick rating on the Blender Extensions marketplace helps")
+        col.label(text="others discover this add-on. It only takes a few seconds.")
+        layout.separator()
+        layout.prop(self, "action", expand=True)
+        layout.separator(factor=0.5)
+
+    def execute(self, context):
+        prefs_entry = context.preferences.addons.get(__package__)
+        if prefs_entry is None:
+            return {'FINISHED'}
+        prefs = prefs_entry.preferences
+        if self.action == "RATE":
+            bpy.ops.wm.url_open(url=_EXTENSIONS_URL)
+            prefs.rating_prompt_after = -1
+        elif self.action == "SNOOZE":
+            prefs.rating_prompt_after = prefs.export_count + 5
+        else:  # DISMISS
+            prefs.rating_prompt_after = -1
+        return {'FINISHED'}
+
+
 def menu_import(self, _) -> None:
     """
     Calls the 3MF import operator from the menu item.
@@ -412,6 +483,7 @@ def menu_export(self, _) -> None:
 
 classes = (
     ThreeMFPreferences,
+    THREEMF_OT_rating_nudge,
     EXPORT_MT_threemf_presets,
     EXPORT_OT_threemf_preset,
     THREEMF_OT_load_slicer_profile,

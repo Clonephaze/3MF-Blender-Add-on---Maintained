@@ -1,3 +1,12 @@
+2.5.1 — Rating Nudge
+====
+
+Features
+----
+* **Rating nudge popup** — After every 5 successful exports, a popup asks if you'd like to rate the addon on the Blender Extensions marketplace. Options: **Rate it ★** (opens the Extensions page and dismisses permanently), **Remind me after 5 more exports** (snoozes), or **Don't ask again** (dismisses permanently). The prompt count persists across Blender sessions and addon updates. These reminders help support continued development and are much appreciated if you find the addon useful! It also helps others discover the addon when browsing the marketplace.
+
+----
+
 2.5.0 — Modifier Parts & Slicer Settings Passthrough
 ====
 
@@ -10,7 +19,6 @@ Features
 
 Bug Fixes
 ----
-* **Part ID collision fix** — Part IDs in `model_settings.config` are scoped per-model-file. A composite `(wrapper_id, part_id)` key is now used internally to prevent incorrect subtype assignment when IDs are reused across wrappers.
 * **Object names preserved on import** — Imported objects were all named "3MF Object" instead of using the actual name from the file. Names are now resolved from `model_settings.config` part names (Orca/BambuStudio) or the 3MF `<object>` `name` attribute, fixing round-trip name loss and dictionary collisions during grouped export.
 
 API
