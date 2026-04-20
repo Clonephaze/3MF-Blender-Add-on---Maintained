@@ -534,3 +534,74 @@ Phase 2 adds authoring capabilities in Blender.
 | `Multi-color Cute Dragon by IK3Digital/` | Simple 6-definition file (u1–u6), 6 physical filaments |
 | `ReferenceFiles/PeggyPalette38+Mini+BRYW/` | Complex 40-definition file with patterns, 4 physical (CMYW) |
 | `ReferenceFiles/OrcaSlicer-FullSpectrum-main/` | Full slicer source code |
+
+---
+
+## 12. Phase 2 UI Implementation Plan
+
+### Overview
+
+Phase 2 adds the authoring UI for mixed filaments inside the MMU Paint panel.
+The feature is **hidden by default** and becomes visible automatically when a
+FullSpectrum file has been imported, or when the user enables it in Preferences.
+
+### Chunk 1 — Preference toggle + scene property plumbing
+
+**Files:** `__init__.py`, `paint/properties.py`, `paint/__init__.py`
+
+- Add `show_mixed_filaments: BoolProperty` to `ThreeMFPreferences` (shown in ADVANCED tab)
+- Add `MMUMixedFilamentItem` PropertyGroup with fields: `component_a`, `component_b`,
+  `mix_b_percent`, `distribution_mode`, `manual_pattern`, `display_color` (FloatVector RGB),
+  `stable_id`, `enabled`, `deleted`, `label` (computed display name)
+- Add to `MMUPaintSettings`: `has_mixed_filaments: BoolProperty`,
+  `mixed_filaments: CollectionProperty(type=MMUMixedFilamentItem)`,
+  `active_mixed_filament_index: IntProperty`
+- Register `MMUMixedFilamentItem` before `MMUPaintSettings` in `paint/__init__.py`
+- In `import_3mf/operator.py`: after storing scene property, also populate
+  `scene.mmu_paint.mixed_filaments` from `ctx.mixed_filament_entries` and set
+  `scene.mmu_paint.has_mixed_filaments = True`
+
+### Chunk 2 — Sync virtual slots into the filament palette
+
+**Files:** `paint/helpers.py`, `import_3mf/operator.py`
+
+- After populating `mixed_filaments`, also append them to `scene.mmu_paint.filaments`
+  (the existing `MMUFilamentItem` list used by the live palette)
+- Virtual slots use `display_color` as their swatch. Their `index` values continue
+  the sequence above the physical filament count
+- Existing brush-switching (`MMU_OT_select_filament`) requires zero changes — virtual
+  slots are just more entries in the same list
+
+### Chunk 3 — "Mix Colors" sub-panel draw
+
+**Files:** `paint/mmu_panel.py`, `paint/__init__.py`
+
+- New `VIEW3D_PT_mmu_mix_colors` panel with `bl_parent_id = "VIEW3D_PT_mmu_paint"`,
+  `bl_options = {'DEFAULT_CLOSED'}`, same `bl_context = "imagepaint"`
+- `poll()`: `(prefs.show_mixed_filaments OR scene.mmu_paint.has_mixed_filaments)
+  AND _get_paint_mesh(context) is not None`
+- `draw()`: `MMU_UL_mixed_filaments` UIList + Add/Remove buttons
+- Per-entry row: blended color swatch (read-only), component A index label,
+  component B index label, mix % display
+
+### Chunk 4 — Mix Colors operators
+
+**Files:** `paint/operators.py`
+
+- `MMU_OT_add_mixed_filament` — adds new entry, auto-picks next C(N,2) unused pair,
+  assigns `stable_id = max_existing + 1`, computes `display_color`, appends to palette
+- `MMU_OT_remove_mixed_filament` — soft-deletes active entry (sets `deleted=True`),
+  removes from palette filament list
+- `MMU_OT_recompute_mix_color` — recomputes `display_color` on an entry;
+  called as `update=` callback on `mix_b_percent`, `component_a`, `component_b`
+
+### Chunk 5 — Export round-trip from UI edits
+
+**Files:** `export_3mf/orca.py`, `common/mixed_filaments.py`
+
+- In `generate_project_settings()`: if `scene.mmu_paint.mixed_filaments` has entries
+  AND those entries differ from the raw stash (or stash is empty), re-serialize from
+  the PropertyGroup instead of using the raw string
+- Conversion: `MMUMixedFilamentItem` → `MixedFilament` dataclass →
+  `serialize_mixed_filament_definitions()` → write to config JSON
+- This closes the loop: user can add a mix in the UI and export a valid FullSpectrum file
