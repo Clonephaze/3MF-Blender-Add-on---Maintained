@@ -101,6 +101,38 @@ def read_orca_filament_colors(
                     f"Loaded {len(filament_colours)} Orca filament colors",
                 )
 
+            # --- OrcaSlicer-FullSpectrum: mixed filament definitions ---
+            mixed_defs = config.get("mixed_filament_definitions", "")
+            if mixed_defs:
+                from ...common.mixed_filaments import (
+                    parse_mixed_filament_definitions,
+                    populate_display_colors,
+                )
+                ctx.mixed_filament_definitions_raw = mixed_defs
+                ctx.has_mixed_filaments = True
+
+                # Build a 0-indexed list of physical colors for display computation
+                num_physical = len(filament_colours)
+                physical_colors = [filament_colours[i] for i in range(num_physical)]
+
+                entries = parse_mixed_filament_definitions(mixed_defs)
+                populate_display_colors(entries, physical_colors)
+                ctx.mixed_filament_entries = entries
+
+                # Append virtual display colors into orca_filament_colors so
+                # paint materials can look them up by index (num_physical onwards).
+                for virt_idx, mf in enumerate(e for e in entries if e.enabled and not e.deleted):
+                    ctx.orca_filament_colors[num_physical + virt_idx] = mf.display_color
+
+                debug(
+                    f"Loaded {len(entries)} mixed filament definitions "
+                    f"({sum(1 for e in entries if e.enabled and not e.deleted)} enabled)"
+                )
+                ctx.safe_report(
+                    {"INFO"},
+                    f"Loaded {len(entries)} FullSpectrum mixed filament definitions",
+                )
+
     if archive is not None:
         _read(archive)
     else:

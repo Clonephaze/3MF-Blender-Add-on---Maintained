@@ -98,7 +98,12 @@ class ImportContext:
 
     # --- Slicer-specific data -----------------------------------------------
     vendor_format: Optional[str] = None  # "orca" | None
+    has_mixed_filaments: bool = False    # True when mixed_filament_definitions found
     orca_filament_colors: Dict[int, str] = field(default_factory=dict)
+    # Raw mixed_filament_definitions string — preserved for exact round-trip export.
+    mixed_filament_definitions_raw: str = ""
+    # Parsed mixed filament entries — populated by read_orca_filament_colors.
+    mixed_filament_entries: List = field(default_factory=list)
     object_default_extruders: Dict[str, int] = field(default_factory=dict)
     part_subtypes: Dict[Tuple[str, str], str] = field(default_factory=dict)
     part_groups: Dict[str, Dict] = field(default_factory=dict)

@@ -129,6 +129,13 @@ class OrcaExporter(BaseExporter):
         # Collect face colors for Orca export
         ctx.safe_report({"INFO"}, "Collecting face colors for Orca export...")
 
+        # Read mixed filament definitions from scene custom property (set on import).
+        if not ctx.mixed_filament_definitions_raw:
+            scene_defs = context.scene.get("3mf_mixed_filament_definitions", "")
+            if scene_defs:
+                ctx.mixed_filament_definitions_raw = str(scene_defs)
+                debug(f"Loaded mixed filament definitions from scene property ({len(scene_defs)} chars)")
+
         # For PAINT mode, collect colors from paint texture metadata instead of face materials
         paint_colors_collected = False
         if ctx.options.use_orca_format == "PAINT":
@@ -995,6 +1002,18 @@ class OrcaExporter(BaseExporter):
         if not color_list:
             color_list = ["#FFFFFF"]
 
+        # Append virtual (mixed) filament display colors after the physical ones.
+        # This extends the filament_colour array so the slicer can display blended
+        # swatches for each virtual filament slot.
+        mixed_defs_to_write = ""
+        if hasattr(ctx, "mixed_filament_definitions_raw") and ctx.mixed_filament_definitions_raw:
+            mixed_defs_to_write = ctx.mixed_filament_definitions_raw
+            from ..common.mixed_filaments import parse_mixed_filament_definitions
+            entries = parse_mixed_filament_definitions(mixed_defs_to_write)
+            for mf in entries:
+                if mf.enabled and not mf.deleted and mf.display_color:
+                    color_list.append(mf.display_color)
+
         num_colors = len(color_list)
         settings["filament_colour"] = color_list
 
@@ -1040,6 +1059,12 @@ class OrcaExporter(BaseExporter):
                         settings[key] = value + [value[-1]] * (num_colors - len(value))
                     elif len(value) > num_colors:
                         settings[key] = value[:num_colors]
+
+        # Write mixed filament definitions (FullSpectrum).  The stashed
+        # project_settings already carries these, but if the user has re-exported
+        # from scratch (no stash) we still write the definitions if we have them.
+        if mixed_defs_to_write:
+            settings["mixed_filament_definitions"] = mixed_defs_to_write
 
         return settings
 

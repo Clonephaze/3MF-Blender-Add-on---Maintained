@@ -373,18 +373,38 @@ In the OrcaExporter:
 
 **Effort:** Large — full UI feature
 
-Extend MMU Paint sidebar:
-- "Add Mixed Filament" button → two physical-filament dropdowns + ratio slider
-- Optional pattern field for 3-way+ blends
-- Distribution mode selector (Layer Cycle / Pointillism / Simple)
-- Live blended color preview swatch (using FilamentMixer)
-- Two-tier display: "Quick Pairs" (auto C(N,2)) and "Custom" (user-defined)
+**User spec:**
+- The entire advanced (mixed filament) feature is **hidden by default**. It becomes visible either when the user explicitly enables it in addon Preferences, OR when importing a file that contains `mixed_filament_definitions`.
+- The "Mix Colors" section lives in a **separate, collapsed-by-default sub-panel** (dropdown) inside the texture paint mode panel only — NOT in the seam or support paint panels. It should be visually distinct from the regular filament palette above it.
+- Within that sub-panel: show/add/remove/reorder virtual mixed filaments.
+
+**UI structure:**
+```
+[MMU Paint Panel - Texture Paint mode only]
+  ┌─────────────────────────────────────┐
+  │  [Regular filament palette here]    │
+  ├─────────────────────────────────────┤
+  │  ▶ Mix Colors  (collapsed by default)│  ← separate sub-panel
+  │    [Mixed filament list]            │
+  │    [+ Add Mix] [× Remove]           │
+  │    Per-entry: A picker, B picker,   │
+  │    ratio slider, mode dropdown,     │
+  │    pattern field, color swatch      │
+  └─────────────────────────────────────┘
+```
+
+**Visibility logic:**
+- Addon preference: `show_mixed_filaments: BoolProperty` (default False)
+- Scene property: `has_mixed_filaments: BoolProperty` (set True on import if defs found)
+- Panel polls: `show_mixed_filaments OR has_mixed_filaments`
+- The "Mix Colors" sub-panel is its own `bpy.types.Panel` with `bl_parent_id` pointing to the main MMU panel — this lets it collapse independently
 
 **New properties:**
 - `MMUMixedFilamentItem` PropertyGroup with all MixedFilament fields
-- Scene-level collection on `MMUPaintSettings`
+- Scene-level `CollectionProperty` on `MMUPaintSettings`
+- Addon preference `show_mixed_filaments` in the existing preferences class in `__init__.py`
 
-**Files:** `paint/properties.py`, `paint/mmu_panel.py`, `paint/operators.py`
+**Files:** `paint/properties.py`, `paint/mmu_panel.py`, `paint/operators.py`, `__init__.py`
 
 ### 7.9 Bake Pipeline — Virtual Filament Matching 🔴
 

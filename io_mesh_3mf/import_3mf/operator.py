@@ -361,6 +361,14 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         self._zoom_to_imported()
 
         self._progress_update(100, "Finalizing import...")
+
+        # Store FullSpectrum mixed filament definitions on the scene so they
+        # survive and can be round-tripped on export.
+        if ctx.mixed_filament_definitions_raw:
+            context.scene["3mf_mixed_filament_definitions"] = ctx.mixed_filament_definitions_raw
+            context.scene["3mf_has_mixed_filaments"] = True
+            debug("Stored mixed filament definitions on scene")
+
         debug(f"Imported {ctx.num_loaded} objects from 3MF files.")
         self.safe_report({"INFO"}, f"Imported {ctx.num_loaded} objects from 3MF files")
 
