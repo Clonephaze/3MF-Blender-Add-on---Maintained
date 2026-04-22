@@ -416,7 +416,7 @@ class VIEW3D_PT_mmu_mix_colors(bpy.types.Panel):
             col = layout.column()
             col.label(text="No mixed filaments defined.", icon="INFO")
             col.label(text="Add a mix below to get started.")
-            layout.operator("mmu.add_mixed_filament", icon="ADD")
+            layout.menu("MMU_MT_add_mix_menu", icon="ADD")
             return
 
         # List
@@ -433,7 +433,7 @@ class VIEW3D_PT_mmu_mix_colors(bpy.types.Panel):
         )
 
         col = row.column(align=True)
-        col.operator("mmu.add_mixed_filament", icon="ADD", text="")
+        col.menu("MMU_MT_add_mix_menu", icon="ADD", text="")
         col.operator("mmu.remove_mixed_filament", icon="REMOVE", text="")
 
         # Active entry detail

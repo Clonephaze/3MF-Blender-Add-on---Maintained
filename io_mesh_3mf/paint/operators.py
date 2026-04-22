@@ -1262,3 +1262,214 @@ class MMU_OT_recompute_mix_color(bpy.types.Operator):
                     return {"FINISHED"}
 
         return {"FINISHED"}
+
+
+# ===================================================================
+#  Add-mix menu and three add-type operators
+# ===================================================================
+
+
+class MMU_MT_add_mix_menu(bpy.types.Menu):
+    """Popup menu offering three ways to add a virtual mixed filament."""
+
+    bl_idname = "MMU_MT_add_mix_menu"
+    bl_label = "Add Mix"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator("mmu.add_mix_by_color", icon="EYEDROPPER", text="Add: Color")
+        layout.operator("mmu.add_mix_gradient", icon="IPO_LINEAR", text="Add: Gradient")
+        layout.operator("mmu.add_mix_pattern", icon="TEXTURE", text="Add: Pattern")
+
+
+class MMU_OT_add_mix_gradient(bpy.types.Operator):
+    """Add a new gradient-type virtual mixed filament."""
+
+    bl_idname = "mmu.add_mix_gradient"
+    bl_label = "Add: Gradient"
+    bl_description = "Add a new gradient virtual mixed filament (blend ratio between two filaments)"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.mmu_paint is not None
+
+    def execute(self, context):
+        settings = context.scene.mmu_paint
+        a, b = _next_unused_pair(settings)
+
+        item = settings.mixed_filaments.add()
+        item.component_a = a
+        item.component_b = b
+        item.mix_b_percent = 50
+        item.distribution_mode = "2"
+        item.ui_type = "gradient"
+        item.enabled = True
+        item.deleted = False
+        item.stable_id = _next_stable_id(settings)
+
+        _recompute_display_color_for_item(item, settings)
+        settings.has_mixed_filaments = True
+        settings.active_mixed_filament_index = len(settings.mixed_filaments) - 1
+        _refresh_virtual_slots_in_palette(settings)
+        return {"FINISHED"}
+
+
+class MMU_OT_add_mix_pattern(bpy.types.Operator):
+    """Add a new pattern-type virtual mixed filament."""
+
+    bl_idname = "mmu.add_mix_pattern"
+    bl_label = "Add: Pattern"
+    bl_description = "Add a new pattern virtual mixed filament (repeating layer sequence)"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.mmu_paint is not None
+
+    def execute(self, context):
+        settings = context.scene.mmu_paint
+        a, b = _next_unused_pair(settings)
+
+        item = settings.mixed_filaments.add()
+        item.component_a = a
+        item.component_b = b
+        item.mix_b_percent = 50
+        item.distribution_mode = "2"
+        item.ui_type = "pattern"
+        item.manual_pattern = "12"
+        item.enabled = True
+        item.deleted = False
+        item.stable_id = _next_stable_id(settings)
+
+        _recompute_display_color_for_item(item, settings)
+        settings.has_mixed_filaments = True
+        settings.active_mixed_filament_index = len(settings.mixed_filaments) - 1
+        _refresh_virtual_slots_in_palette(settings)
+        return {"FINISHED"}
+
+
+class MMU_OT_add_mix_by_color(bpy.types.Operator):
+    """Pick a target color and find the best filament blend to match it."""
+
+    bl_idname = "mmu.add_mix_by_color"
+    bl_label = "Add: Color"
+    bl_description = (
+        "Pick a target color; the solver searches all filament pairs and three-way "
+        "patterns to find the best pigment blend match"
+    )
+    bl_options = {'REGISTER', 'UNDO'}
+
+    target_color: bpy.props.FloatVectorProperty(  # type: ignore[assignment]
+        name="Target Color",
+        subtype="COLOR_GAMMA",
+        size=3,
+        min=0.0,
+        max=1.0,
+        default=(0.5, 0.5, 0.5),
+    )
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.mmu_paint is not None
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def draw(self, context):
+        self.layout.prop(self, "target_color")
+
+    def execute(self, context):
+        from ..common.mixed_filaments import MixedFilament, compute_display_color, DIST_SIMPLE
+        from ..common.colors import rgb_to_hex, hex_to_rgb
+
+        settings = context.scene.mmu_paint
+        num_virt = sum(1 for m in settings.mixed_filaments if m.enabled and not m.deleted)
+        num_physical = max(len(settings.filaments) - num_virt, 1)
+        physical_hexes = [rgb_to_hex(*fi.color[:3]) for fi in settings.filaments[:num_physical]]
+
+        if not physical_hexes:
+            self.report({'WARNING'}, "No physical filaments in palette")
+            return {'CANCELLED'}
+
+        # Target colour in 0-255 space for distance comparisons.
+        tr = self.target_color[0] * 255.0
+        tg = self.target_color[1] * 255.0
+        tb = self.target_color[2] * 255.0
+
+        best_dist = float("inf")
+        best_a = 1
+        best_b = min(2, len(physical_hexes))
+        best_mix = 50
+        best_pattern = ""
+        best_ui_type = "gradient"
+
+        def _dist(hex_color):
+            r, g, b = hex_to_rgb(hex_color)
+            return (r * 255.0 - tr) ** 2 + (g * 255.0 - tg) ** 2 + (b * 255.0 - tb) ** 2
+
+        n = len(physical_hexes)
+
+        # --- 2-way gradient search: all ordered pairs × mix ratios ---
+        for i in range(n):
+            for j in range(n):
+                if i == j:
+                    continue
+                for mix_b in range(0, 101, 5):
+                    mf = MixedFilament(
+                        component_a=i + 1,
+                        component_b=j + 1,
+                        mix_b_percent=mix_b,
+                        distribution_mode=DIST_SIMPLE,
+                    )
+                    d = _dist(compute_display_color(mf, physical_hexes))
+                    if d < best_dist:
+                        best_dist = d
+                        best_a, best_b, best_mix = i + 1, j + 1, mix_b
+                        best_pattern = ""
+                        best_ui_type = "gradient"
+
+        # --- 3-way pattern search: all triples (A < B < C), four proportion variants ---
+        # Since k >= 2 (0-based), the direct digit str(k+1) >= '3' so it never
+        # conflicts with the reserved '1' (component_a) and '2' (component_b) tokens.
+        for i in range(n):
+            for j in range(i + 1, n):
+                for k in range(j + 1, n):
+                    c_digit = str(k + 1)
+                    # Try equal and skewed proportions to cover the triangle interior.
+                    for pat in (
+                        "12" + c_digit,          # 1:1:1
+                        "112" + c_digit,          # 2:1:1 (A-heavy)
+                        "122" + c_digit,          # 1:2:1 (B-heavy)
+                        "12" + c_digit * 2,       # 1:1:2 (C-heavy)
+                    ):
+                        mf = MixedFilament(
+                            component_a=i + 1,
+                            component_b=j + 1,
+                            mix_b_percent=50,
+                            manual_pattern=pat,
+                            distribution_mode=DIST_SIMPLE,
+                        )
+                        d = _dist(compute_display_color(mf, physical_hexes))
+                        if d < best_dist:
+                            best_dist = d
+                            best_a, best_b, best_mix = i + 1, j + 1, 50
+                            best_pattern = pat
+                            best_ui_type = "pattern"
+
+        item = settings.mixed_filaments.add()
+        item.component_a = best_a
+        item.component_b = best_b
+        item.mix_b_percent = best_mix
+        item.distribution_mode = "2"
+        item.ui_type = best_ui_type
+        item.manual_pattern = best_pattern
+        item.enabled = True
+        item.deleted = False
+        item.stable_id = _next_stable_id(settings)
+
+        _recompute_display_color_for_item(item, settings)
+        settings.has_mixed_filaments = True
+        settings.active_mixed_filament_index = len(settings.mixed_filaments) - 1
+        _refresh_virtual_slots_in_palette(settings)
+        return {"FINISHED"}
