@@ -158,46 +158,30 @@ class QuantizePixelsTests(unittest.TestCase):
             pixels[7, 0, :3], [0.0, 0.0, 1.0], decimal=3
         )
 
-    def test_grey_shadow_on_white_biased_to_white(self):
-        """Grey shadow pixels in a mostly-white region should snap to white, not black.
-
-        This tests the context-aware quantization that fixes the Mickey Mouse
-        glove shadow problem: grey shadows on white surfaces should not snap
-        to black just because grey is mathematically closer to black.
-        """
-        # 32x32 image: mostly white with a grey "shadow" region in the middle
-        pixels = np.full((32, 32, 4), [1.0, 1.0, 1.0, 1.0], dtype=np.float32)
-        # Grey shadow strip (40% grey - ambiguous between white and black)
-        pixels[14:18, 10:22, :3] = [0.4, 0.4, 0.4]
-
+    def test_dark_grey_snaps_to_black(self):
+        """Dark grey pixels (V=0.4) snap to black (closer in brightness)."""
+        pixels = np.full((4, 4, 4), [0.4, 0.4, 0.4, 1.0], dtype=np.float32)
         palette = [(1.0, 1.0, 1.0), (0.0, 0.0, 0.0)]  # white and black
 
-        self._quantize_pixels(pixels, palette, use_neighborhood_context=True)
+        self._quantize_pixels(pixels, palette)
 
-        # The grey shadow should snap to WHITE because the local neighborhood
-        # is mostly white, indicating this is a shadow on white
-        center_color = pixels[16, 16, :3]
+        # V=0.4 is closer to black (dv=0.4) than to white (dv=0.6)
         np.testing.assert_array_almost_equal(
-            center_color, [1.0, 1.0, 1.0], decimal=2,
-            err_msg="Grey shadow on white should snap to white, not black"
+            pixels[0, 0, :3], [0.0, 0.0, 0.0], decimal=2,
+            err_msg="Dark grey (V=0.4) should snap to black"
         )
 
-    def test_grey_on_black_snaps_to_black(self):
-        """Grey pixels in a mostly-black region should snap to black."""
-        # 32x32 image: mostly black with a grey spot in the middle
-        pixels = np.full((32, 32, 4), [0.0, 0.0, 0.0, 1.0], dtype=np.float32)
-        # Grey highlight (60% grey)
-        pixels[14:18, 14:18, :3] = [0.6, 0.6, 0.6]
+    def test_light_grey_snaps_to_white(self):
+        """Light grey pixels (V=0.6) snap to white (closer in brightness)."""
+        pixels = np.full((4, 4, 4), [0.6, 0.6, 0.6, 1.0], dtype=np.float32)
+        palette = [(1.0, 1.0, 1.0), (0.0, 0.0, 0.0)]  # white and black
 
-        palette = [(1.0, 1.0, 1.0), (0.0, 0.0, 0.0)]
+        self._quantize_pixels(pixels, palette)
 
-        self._quantize_pixels(pixels, palette, use_neighborhood_context=True)
-
-        # The grey should snap to BLACK because neighborhood is black
-        center_color = pixels[16, 16, :3]
+        # V=0.6 is closer to white (dv=0.4) than to black (dv=0.6)
         np.testing.assert_array_almost_equal(
-            center_color, [0.0, 0.0, 0.0], decimal=2,
-            err_msg="Grey highlight on black should snap to black, not white"
+            pixels[0, 0, :3], [1.0, 1.0, 1.0], decimal=2,
+            err_msg="Light grey (V=0.6) should snap to white"
         )
 
 

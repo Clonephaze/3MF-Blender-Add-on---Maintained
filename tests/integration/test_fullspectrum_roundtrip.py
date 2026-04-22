@@ -139,7 +139,7 @@ class PeggyPaletteRoundTripTests(Blender3mfTestCase):
         original_raw = str(bpy.context.scene.get("3mf_mixed_filament_definitions", ""))
         result = bpy.ops.export_mesh.threemf(
             filepath=str(self.temp_file),
-            use_orca_format="ORCA",
+            use_orca_format="AUTO",
         )
         self.assertIn("FINISHED", result, "Export did not finish")
         self.assertTrue(self.temp_file.exists())

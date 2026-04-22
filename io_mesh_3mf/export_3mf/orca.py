@@ -1067,6 +1067,21 @@ class OrcaExporter(BaseExporter):
         if not color_list:
             color_list = ["#FFFFFF"]
 
+        # For FullSpectrum files, the stashed filament_colour is the canonical list of
+        # physical filament colors.  Re-exporting a FullSpectrum file must preserve all
+        # physical filaments even when some are not applied to any visible face — the
+        # mixed_filament_definitions reference slots by 1-based index, so losing a slot
+        # would corrupt the virtual filament recipe.
+        if stashed_config and "filament_colour" in stashed_config and ctx.mixed_filament_definitions_raw:
+            stashed_physical = [c.upper() for c in stashed_config["filament_colour"]]
+            stashed_set = set(stashed_physical)
+            # Preserve original order; append any new colours that appeared in the mesh.
+            for c in color_list:
+                if c.upper() not in stashed_set:
+                    stashed_physical.append(c.upper())
+                    stashed_set.add(c.upper())
+            color_list = stashed_physical
+
         # Append virtual (mixed) filament display colors after the physical ones.
         # This extends the filament_colour array so the slicer can display blended
         # swatches for each virtual filament slot.

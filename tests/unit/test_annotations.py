@@ -243,8 +243,9 @@ class TestWriteContentTypes(unittest.TestCase):
 
         # The 3MF texture OPC type should appear as the Default for .png
         self.assertIn(TEXTURE_OPC_TYPE, content)
-        # image/png should NOT appear (it would mean the fallback overwrote)
-        self.assertNotIn("image/png", content)
+        # image/png legitimately appears as an Override for the thumbnail PNG;
+        # what matters is that the Default for .png uses the 3MF texture type.
+        self.assertNotIn('Extension="png" ContentType="image/png"', content)
 
     def test_defaults_png_to_3mf_texture_opc_type_when_no_annotations(self):
         """When no .png files are annotated, .png defaults to the 3MF texture OPC type."""
