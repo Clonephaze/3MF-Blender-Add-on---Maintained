@@ -170,11 +170,34 @@ def _get_filament_colors_from_settings(context):
     Returns list of (r, g, b) tuples in **sRGB**, matching the colour
     space of ``image.pixels`` for sRGB-tagged images (Blender's default
     for newly-created images).
+
+    When OrcaSlicer-FullSpectrum mixed filaments are present
+    (``settings.has_mixed_filaments``), the computed display colors for
+    all enabled, non-deleted virtual filament entries are appended after
+    the physical filament colors.  This extends the quantization palette
+    so that pixels painted with a virtual mixed color are assigned the
+    correct virtual filament index on bake/quantize.
     """
     settings = context.scene.mmu_paint
     colors = []
     for item in settings.init_filaments:
         colors.append(tuple(item.color[:3]))
+
+    # Append virtual (mixed) filament display colors when present.
+    # Only enabled, non-deleted entries contribute virtual slots —
+    # the same logic used by virtual_filament_id_to_index().
+    if getattr(settings, "has_mixed_filaments", False):
+        for mf_item in settings.mixed_filaments:
+            if not getattr(mf_item, "enabled", True):
+                continue
+            if getattr(mf_item, "deleted", False):
+                continue
+            dc = getattr(mf_item, "display_color", None)
+            if dc is None:
+                continue
+            # display_color is stored as a FloatVectorProperty (r,g,b)
+            colors.append(tuple(dc[:3]))
+
     return colors
 
 

@@ -184,6 +184,15 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         ],
         default="0",
     )
+    shared_paint_texture: bpy.props.BoolProperty(
+        name="Shared UV Texture",
+        description=(
+            "Pack all solid-color parts into one shared UV texture using "
+            "multi-object UV projection. Saves memory and lets you paint "
+            "across all parts at once. Disable to give each part its own texture"
+        ),
+        default=True,
+    )
 
     # ----- UI ---------------------------------------------------------------
 
@@ -232,6 +241,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             if self.show_advanced:
                 adv_box.prop(self, "paint_uv_method")
                 adv_box.prop(self, "paint_texture_size")
+                adv_box.prop(self, "shared_paint_texture")
 
     def invoke(self, context, event):
         """Initialize properties from preferences when the import dialog opens."""
@@ -322,6 +332,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             auto_smooth_angle=self.auto_smooth_angle,
             paint_uv_method=self.paint_uv_method,
             paint_texture_size=int(self.paint_texture_size),
+            shared_paint_texture=self.shared_paint_texture,
         )
         ctx = ImportContext(options=options, operator=self)
 
@@ -367,7 +378,59 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         if ctx.mixed_filament_definitions_raw:
             context.scene["3mf_mixed_filament_definitions"] = ctx.mixed_filament_definitions_raw
             context.scene["3mf_has_mixed_filaments"] = True
+            context.scene["3mf_num_physical_filaments"] = ctx.num_physical_filaments
             debug("Stored mixed filament definitions on scene")
+
+            # Populate the UI collection for the Mix Colors panel.
+            settings = context.scene.mmu_paint
+            settings.has_mixed_filaments = True
+            settings.mixed_filaments.clear()
+            from ..common.colors import hex_to_rgb
+            for mf in ctx.mixed_filament_entries:
+                item = settings.mixed_filaments.add()
+                item.component_a = mf.component_a
+                item.component_b = mf.component_b
+                item.mix_b_percent = mf.mix_b_percent
+                item.distribution_mode = str(mf.distribution_mode)
+                item.manual_pattern = mf.manual_pattern or ""
+                # Set UI type from mode + pattern presence
+                if mf.distribution_mode == 1:
+                    item.ui_type = "pointillism"
+                elif mf.distribution_mode == 0:
+                    item.ui_type = "layer_cycle"
+                elif mf.manual_pattern:
+                    item.ui_type = "pattern"
+                else:
+                    item.ui_type = "gradient"
+                item.stable_id = mf.stable_id
+                item.enabled = mf.enabled
+                item.deleted = mf.deleted
+                if mf.display_color:
+                    try:
+                        r, g, b = hex_to_rgb(mf.display_color)
+                        item.display_color = (r, g, b)
+                    except Exception:
+                        pass
+            debug(f"Populated {len(settings.mixed_filaments)} mixed filament UI entries")
+
+        # Force-sync the filament palette.  For deferred solid-paint textures
+        # (e.g. PeggyPalette shared-texture mode) the mesh custom properties
+        # are set AFTER the objects are added to the scene, so the depsgraph
+        # handler may have already run with stale state.  We explicitly find
+        # an imported paint object and trigger a fresh sync so that the
+        # physical filament list (CMYK etc.) is populated immediately.
+        _paint_obj = next(
+            (o for o in context.selected_objects
+             if o.type == "MESH" and o.data.get("3mf_is_paint_texture")),
+            None,
+        )
+        if _paint_obj is not None:
+            context.view_layer.objects.active = _paint_obj
+            from ..paint.helpers import _sync_filaments_from_mesh
+            settings = context.scene.mmu_paint
+            settings.loaded_mesh_name = ""  # Invalidate cache so sync always runs
+            _sync_filaments_from_mesh(context)
+            debug(f"Force-synced filament palette: {len(settings.filaments)} slots")
 
         debug(f"Imported {ctx.num_loaded} objects from 3MF files.")
         self.safe_report({"INFO"}, f"Imported {ctx.num_loaded} objects from 3MF files")
@@ -388,6 +451,9 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         annotations: Annotations,
     ) -> None:
         """Import a single 3MF archive into the running context."""
+        import time as _time
+        _t0_archive = _time.perf_counter()
+
         files_by_content_type = archive_mod.read_archive(ctx, path)
 
         # File metadata.
@@ -413,6 +479,8 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
             self._process_model_root(ctx, root, path, context, scene_metadata)
 
+        debug(f"[TIMING] Total archive import: {_time.perf_counter() - _t0_archive:.3f}s  ({os.path.basename(path)})")
+
     def _process_model_root(
         self,
         ctx: ImportContext,
@@ -422,6 +490,19 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         scene_metadata: Metadata,
     ) -> None:
         """Process a single <model> root element."""
+        # --- Early-out for external resource files (Orca multi-file format) ---
+        # External object files (e.g. 3D/Objects/*.model) have no <build>/<item>
+        # entries.  Their geometry is already loaded via load_external_model when
+        # the main model's wrapper objects reference them through p:path.  Re-
+        # processing them here would redundantly re-parse all geometry for no
+        # benefit — the main model's build_items already created every object.
+        build_node = root.find("./3mf:build", MODEL_NAMESPACES)
+        if build_node is None or next(
+            build_node.iterfind("./3mf:item", MODEL_NAMESPACES), None
+        ) is None:
+            debug("No <build>/<item> in model — skipping (external resource file).")
+            return
+
         # Vendor detection.
         if ctx.options.import_materials != "NONE":
             ctx.vendor_format = detect_vendor(root)
@@ -450,35 +531,71 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         ctx.part_metadata = {}
         ctx.wrapper_metadata = {}
         ctx.part_names = {}
+        ctx.part_extruders = {}
+        ctx.pending_solid_paint_parts = []
 
         # Read filament colours (single archive open, priority order).
+        import time as _time
+        _t = _time.perf_counter()
         read_all_slicer_colors(ctx, path)
+        debug(f"[TIMING]   slicer colors:    {_time.perf_counter() - _t:.3f}s")
 
         # Read modifier part subtypes from Orca/BambuStudio model_settings.
-        if ctx.vendor_format == "orca":
+        # orca_fullspectrum is a superset of orca: same file layout, same
+        # model_settings.config structure, so part_groups / part_extruders /
+        # part_names all need to be populated for either format.
+        if ctx.vendor_format in ("orca", "orca_fullspectrum"):
+            _t = _time.perf_counter()
             from .slicer.colors import read_orca_part_subtypes
             read_orca_part_subtypes(ctx, path)
+            debug(f"[TIMING]   part subtypes:    {_time.perf_counter() - _t:.3f}s")
 
         self._progress_update(25, "Reading materials and objects...")
 
         # Metadata.
+        _t = _time.perf_counter()
         self._read_metadata(ctx, root, scene_metadata)
+        debug(f"[TIMING]   metadata:         {_time.perf_counter() - _t:.3f}s")
 
         # Materials.
+        _t = _time.perf_counter()
         self._read_all_materials(ctx, root)
+        debug(f"[TIMING]   materials:        {_time.perf_counter() - _t:.3f}s")
 
         # Extract texture images.
+        _t = _time.perf_counter()
         _extract_textures_impl(ctx, path)
+        debug(f"[TIMING]   textures:         {_time.perf_counter() - _t:.3f}s")
 
         # Objects.
+        _t = _time.perf_counter()
         geometry_mod.read_objects(ctx, root)
+        debug(f"[TIMING]   read_objects:     {_time.perf_counter() - _t:.3f}s  "
+              f"({len(ctx.resource_objects)} objects)")
 
         # Build items.
         self._progress_update(60, "Building objects...")
+        _t = _time.perf_counter()
         builder_mod.build_items(
             ctx, root, scale_unit,
             progress_callback=lambda v, m: self._progress_update(v, m),
         )
+        debug(f"[TIMING]   build_items:      {_time.perf_counter() - _t:.3f}s  "
+              f"({ctx.num_loaded} objects loaded)")
+
+        # Finalize deferred solid-paint parts.
+        if ctx.pending_solid_paint_parts:
+            self._progress_update(80, "Creating paint texture(s)...")
+            _t = _time.perf_counter()
+            if ctx.options.shared_paint_texture:
+                from .scene import finalize_shared_solid_texture
+                finalize_shared_solid_texture(ctx)
+            else:
+                from .scene import create_solid_paint_texture
+                for mesh, extruder_1based in list(ctx.pending_solid_paint_parts):
+                    create_solid_paint_texture(ctx, mesh, extruder_1based)
+                ctx.pending_solid_paint_parts.clear()
+            debug(f"[TIMING]   paint texture:    {_time.perf_counter() - _t:.3f}s")
 
     # ----- Extension handling -----------------------------------------------
 

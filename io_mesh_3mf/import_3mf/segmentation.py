@@ -31,6 +31,36 @@ from ..common import debug
 from ..common.segmentation import SegmentationNode, TriangleState, decode_segmentation_string
 
 
+def _get_leaf_state(hex_string: str) -> "Optional[int]":
+    """Fast-path decoder for single-state (leaf) segmentation strings.
+
+    The segmentation string is stored reversed on disk, so ``hex_string[-1]``
+    is the first nibble of the tree root.  If that nibble has
+    ``split_sides == 0`` the root is a leaf and the whole triangle has one
+    color — no recursion or object creation needed.
+
+    :return: Integer state (0 = default, N = extruder N) if the string is a
+        simple undivided leaf, or ``None`` if it needs full tree decoding.
+    """
+    if not hex_string:
+        return None
+    try:
+        first_nibble = int(hex_string[-1], 16)
+    except ValueError:
+        return None
+    if first_nibble & 0b11:          # split_sides != 0 → internal node
+        return None
+    special_side = (first_nibble >> 2) & 0b11
+    if special_side == 0b11:         # state ≥ 3 encoded in next nibble
+        if len(hex_string) < 2:
+            return None
+        try:
+            return int(hex_string[-2], 16) + 3
+        except ValueError:
+            return None
+    return special_side
+
+
 def subdivide_in_uv_space(
     uv0: Tuple[float, float],
     uv1: Tuple[float, float],
@@ -263,38 +293,32 @@ def _dilate_pass(buf: np.ndarray, min_neighbors: int) -> np.ndarray:
 
 
 def close_gaps_in_texture(buf: np.ndarray, width: int, height: int,
-                          uv_method: str = "SMART") -> np.ndarray:
+                          uv_method: str = "SMART",
+                          dilation_rounds: int = 4) -> np.ndarray:
     """
     Morphological dilation to seal edge gaps between triangles.
 
-    The number of passes depends on the UV unwrap method:
-
-    * **Smart UV** (default) — 2 passes.  Adjacent faces share island
-      boundaries so only single-pixel rasterization seams need filling.
-    * **Lightmap Pack** — 6 passes.  Each face is an isolated rectangle
-      with empty space between islands, so more aggressive dilation is
-      needed to pad the colour outward and prevent the background from
-      showing through at edges when rendered on the 3D model.
-
-    Each pass:
+    Each round runs two passes:
       - First fills pixels with >= 2 opaque neighbours (safe consensus).
       - Then fills pixels with >= 1 opaque neighbour  (catches corners).
+
+    *dilation_rounds* controls how many pixels outward each island is padded.
+    Callers should set this to match the island margin used during UV unwrap
+    (e.g. ``int(margin_uv * texture_size) + 1``) so the padding fully bridges
+    the gap between adjacent islands.
 
     :param buf: Numpy array of shape (H, W, 4)
     :param width: Image width
     :param height: Image height
     :param uv_method: ``"SMART"`` or ``"LIGHTMAP"``
+    :param dilation_rounds: Number of dilation rounds (each round ~1 px outward).
     :return: Modified buffer
     """
     if uv_method == "LIGHTMAP":
-        # Lightmap Pack: faces are isolated — pad outward aggressively.
-        # 3 rounds × 2 passes = 6 pixels of dilation, enough to fill
-        # the margin between islands at typical resolutions.
-        for _ in range(3):
-            buf = _dilate_pass(buf, min_neighbors=2)
-            buf = _dilate_pass(buf, min_neighbors=1)
+        rounds = max(dilation_rounds, 6)
     else:
-        # Smart UV: faces share edges — only seal hairline seams.
+        rounds = dilation_rounds
+    for _ in range(rounds):
         buf = _dilate_pass(buf, min_neighbors=2)
         buf = _dilate_pass(buf, min_neighbors=1)
     return buf
@@ -312,6 +336,7 @@ def render_segmentation_to_texture(
     default_color_override: "List[float] | None" = None,
     image_name_override: "str | None" = None,
     set_active_render: bool = True,
+    source_uv_layer_name: "str | None" = None,
 ) -> "bpy.types.Image":
     """
     Render segmentation strings to a UV texture.
@@ -356,43 +381,73 @@ def render_segmentation_to_texture(
     if set_active_render:
         uv_layer.active_render = True
 
-    _bpy.context.view_layer.objects.active = obj
-    _bpy.ops.object.mode_set(mode="EDIT")
+    num_loops = len(mesh.loops)
 
-    _bpy.ops.mesh.select_all(action="SELECT")
+    import time as _time
 
-    if uv_method == "LIGHTMAP":
-        # Lightmap Pack — every face gets its own UV rectangle.
-        # Higher fidelity, but may show thin gaps at edges.
-        _bpy.ops.uv.lightmap_pack(
-            PREF_CONTEXT="ALL_FACES",
-            PREF_PACK_IN_ONE=True,
-            PREF_NEW_UVLAYER=False,
-            PREF_BOX_DIV=48,
-            PREF_MARGIN_DIV=0.05,
-        )
-    else:
-        # Smart UV Project — groups coplanar faces into contiguous islands.
-        # area_weight=0.6 allocates UV space proportional to 3D face area.
-        # angle_limit is in radians (1.15192 rad ≈ 66°).
-        _bpy.ops.uv.smart_project(
-            angle_limit=1.15192,
-            margin_method="SCALED",
-            rotate_method="AXIS_ALIGNED",
-            island_margin=0.002,
-            area_weight=0.6,
-            correct_aspect=True,
-            scale_to_bounds=False,
-        )
+    # Try to reuse an existing UV layout instead of running a UV project operator.
+    # This saves significant time when paint + seam + support all share the same mesh.
+    _reused_uvs = False
+    if source_uv_layer_name:
+        src_layer = mesh.uv_layers.get(source_uv_layer_name)
+        if src_layer is not None and len(src_layer.data) > 0:
+            src_flat = np.zeros(num_loops * 2, dtype=np.float64)
+            src_layer.data.foreach_get("uv", src_flat)
+            uv_layer.data.foreach_set("uv", src_flat)
+            debug(f"Reused UV layout from '{source_uv_layer_name}' for '{uv_layer_name}'")
+            _reused_uvs = True
+        else:
+            debug(f"Source UV layer '{source_uv_layer_name}' not found — running UV project.")
 
-    _bpy.ops.object.mode_set(mode="OBJECT")
+    if not _reused_uvs:
+        _bpy.context.view_layer.objects.active = obj
+        _bpy.ops.object.mode_set(mode="EDIT")
+        _bpy.ops.mesh.select_all(action="SELECT")
+
+        _t_uv = _time.perf_counter()
+        if uv_method == "LIGHTMAP":
+            # Lightmap Pack — every face gets its own UV rectangle.
+            # Higher fidelity, but may show thin gaps at edges.
+            _bpy.ops.uv.lightmap_pack(
+                PREF_CONTEXT="ALL_FACES",
+                PREF_PACK_IN_ONE=True,
+                PREF_NEW_UVLAYER=False,
+                PREF_BOX_DIV=48,
+                PREF_MARGIN_DIV=0.05,
+            )
+        else:
+            # Smart UV Project — groups coplanar faces into contiguous islands.
+            # area_weight=0.6 allocates UV space proportional to 3D face area.
+            # angle_limit is in radians (1.15192 rad ≈ 66°).
+            # island_margin targets ~4px gap regardless of texture resolution
+            # so small islands don't bleed into background at large sizes.
+            _island_margin = max(0.0002, 4.0 / texture_size)
+            _bpy.ops.uv.smart_project(
+                angle_limit=1.15192,
+                margin_method="SCALED",
+                rotate_method="AXIS_ALIGNED",
+                island_margin=_island_margin,
+                area_weight=0.6,
+                correct_aspect=True,
+                scale_to_bounds=False,
+            )
+
+        _bpy.ops.object.mode_set(mode="OBJECT")
+        debug(f"[TIMING]         uv_project ({uv_method}):  {_time.perf_counter() - _t_uv:.3f}s")
 
     # Bulk-read all UVs into a numpy array instead of per-loop attribute access.
     uv_layer_data = mesh.uv_layers.active.data
-    num_loops = len(uv_layer_data)
     uv_flat = np.zeros(num_loops * 2, dtype=np.float64)
     uv_layer_data.foreach_get("uv", uv_flat)
     all_uvs = uv_flat.reshape(-1, 2)
+
+    # Pre-batch polygon loop starts for fast UV coordinate lookup (avoids
+    # per-face Python object creation via mesh.polygons[face_idx]).
+    num_polys = len(mesh.polygons)
+    poly_loop_starts = np.zeros(num_polys, dtype=np.int32)
+    poly_loop_totals = np.zeros(num_polys, dtype=np.int32)
+    mesh.polygons.foreach_get("loop_start", poly_loop_starts)
+    mesh.polygons.foreach_get("loop_total", poly_loop_totals)
 
     img_name = image_name_override or f"{obj.name}_segmentation"
     image = _bpy.data.images.new(img_name, width=texture_size, height=texture_size, alpha=True)
@@ -409,36 +464,46 @@ def render_segmentation_to_texture(
         default_color_index = default_extruder - 1
         default_color = color_table[min(max(default_color_index, 0), len(color_table) - 1)]
 
-    # Numpy pixel buffer: (H, W, 4) — pre-fill with the default/base color so
-    # the entire texture starts as the base filament.  Any UV regions not
-    # covered by segmentation data will naturally show the base color.
+    # Numpy pixel buffer: (H, W, 4) — pre-fill with the default/base color but
+    # with alpha=0 so that the dilation pass (close_gaps_in_texture) can
+    # propagate real island edge colors outward into the gaps.  If any pixels
+    # remain transparent after dilation (e.g. fully unused UV regions), they are
+    # replaced with the opaque default color in a final pass below.
     buf = np.empty((texture_size, texture_size, 4), dtype=np.float32)
-    buf[:] = default_color
+    transparent_default = np.array([default_color[0], default_color[1], default_color[2], 0.0], dtype=np.float32)
+    buf[:] = transparent_default
 
     decode_failures = 0
     subdivision_failures = 0
 
-    # When Lightmap Pack is used, each face is an isolated UV rectangle.
-    # Expand parent/whole-face fills outward by 1.5 px so every pixel in
-    # the UV island is covered.  The per-edge normalised threshold ensures
-    # the expansion is a consistent pixel distance regardless of triangle
-    # shape.  Sub-triangle overdraw keeps the tight threshold (expand=0)
-    # for crisp colour boundaries.
     fill_expand = 1.5 if uv_method == "LIGHTMAP" else 0.0
 
+    _t_seg = _time.perf_counter()
     for face_idx, seg_string in seg_strings.items():
-        if face_idx >= len(mesh.polygons):
+        if face_idx >= num_polys:
+            continue
+        if poly_loop_totals[face_idx] != 3:
             continue
 
-        poly = mesh.polygons[face_idx]
-        if len(poly.loop_indices) != 3:
+        ls = int(poly_loop_starts[face_idx])
+        uv0 = all_uvs[ls]
+        uv1 = all_uvs[ls + 1]
+        uv2 = all_uvs[ls + 2]
+
+        # --- Fast path: whole triangle is one color (simple leaf node) -------
+        leaf_state = _get_leaf_state(seg_string)
+        if leaf_state is not None:
+            if leaf_state != 0 and leaf_state != TriangleState.DEFAULT:
+                ci = int(leaf_state) - 1
+                leaf_color = color_table[ci] if 0 <= ci < len(color_table) else default_color
+                render_triangle_to_image(
+                    buf, texture_size, texture_size, uv0, uv1, uv2, leaf_color,
+                    expand_px=fill_expand,
+                )
+            # Default-state leaves: already covered by still_transparent fill — skip.
             continue
 
-        loop_indices = list(poly.loop_indices)
-        uv0 = all_uvs[loop_indices[0]]
-        uv1 = all_uvs[loop_indices[1]]
-        uv2 = all_uvs[loop_indices[2]]
-
+        # --- Full decode path for subdivided trees ---------------------------
         tree = decode_segmentation_string(seg_string)
         if tree is None:
             decode_failures += 1
@@ -482,21 +547,14 @@ def render_segmentation_to_texture(
 
             render_triangle_to_image(buf, texture_size, texture_size, sub_uv0, sub_uv1, sub_uv2, color)
 
-    # Fill any faces without segmentation with the default color.
-    for face_idx, poly in enumerate(mesh.polygons):
-        if face_idx in seg_strings:
-            continue
-        if len(poly.loop_indices) != 3:
-            continue
+    # Unsegmented faces are handled by the final still_transparent fill below
+    # (the buffer is pre-filled with the default color at alpha=0; dilation
+    # propagates paint colors to adjacent seam pixels; the final pass makes
+    # every remaining transparent pixel opaque with the default color).
+    # Rendering them individually was O(total_faces) — very expensive for
+    # large meshes where most faces are unsegmented.
 
-        loop_indices = list(poly.loop_indices)
-        uv0 = all_uvs[loop_indices[0]]
-        uv1 = all_uvs[loop_indices[1]]
-        uv2 = all_uvs[loop_indices[2]]
-        render_triangle_to_image(
-            buf, texture_size, texture_size, uv0, uv1, uv2, default_color,
-            expand_px=fill_expand,
-        )
+    debug(f"[TIMING]         seg_decode_loop: {_time.perf_counter() - _t_seg:.3f}s  ({len(seg_strings)} painted faces)")
 
     if decode_failures > 0 or subdivision_failures > 0:
         debug(
@@ -504,10 +562,24 @@ def render_segmentation_to_texture(
             f"{subdivision_failures} subdivision failures"
         )
 
-    buf = close_gaps_in_texture(buf, texture_size, texture_size, uv_method=uv_method)
+    _t_gaps = _time.perf_counter()
+    # island_margin = 4/texture_size → 4px gap between islands.
+    # 2 rounds fills exactly 2px from each island edge, meeting at the gap centre.
+    buf = close_gaps_in_texture(buf, texture_size, texture_size, uv_method=uv_method,
+                                dilation_rounds=2)
+    debug(f"[TIMING]         close_gaps:      {_time.perf_counter() - _t_gaps:.3f}s")
 
-    # Bulk-write pixels to Blender image.
+    # Fill any pixels that are still transparent (unreachable UV space) with
+    # the opaque default color.  This is safe because all real UV island pixels
+    # were rendered with alpha=1.0 and only truly empty regions remain here.
+    still_transparent = buf[:, :, 3] < 0.5
+    if np.any(still_transparent):
+        opaque_default = np.array([*default_color[:3], 1.0], dtype=np.float32)
+        buf[still_transparent] = opaque_default
+
+    _t_write = _time.perf_counter()
     image.pixels.foreach_set(buf.ravel())
     image.pack()
+    debug(f"[TIMING]         pixel_write:     {_time.perf_counter() - _t_write:.3f}s")
 
     return image

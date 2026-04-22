@@ -33,6 +33,8 @@ from __future__ import annotations
 
 from typing import List, Tuple
 
+import numpy as np
+
 __all__ = [
     "filament_mixer_lerp",
     "blend_two",
@@ -41,22 +43,25 @@ __all__ = [
 
 
 # ---------------------------------------------------------------------------
-# Lazy-load the coefficient tables (avoids import cost at addon startup)
+# Lazy-load the coefficient tables as numpy arrays (avoids import cost at
+# addon startup and converts once from Python lists to np arrays)
 # ---------------------------------------------------------------------------
 
-_POWERS = None  # List[List[int]], shape (330, 7)
-_COEF = None    # List[List[float]], shape (330, 3)
-_INTERCEPT = None  # List[float], length 3
+_NP_POWERS: "np.ndarray | None" = None     # shape (330, 7), float64
+_NP_COEF: "np.ndarray | None" = None       # shape (330, 3), float64
+_NP_INTERCEPT: "np.ndarray | None" = None  # shape (3,), float64
 
 
 def _ensure_loaded() -> None:
-    global _POWERS, _COEF, _INTERCEPT
-    if _POWERS is not None:
+    global _NP_POWERS, _NP_COEF, _NP_INTERCEPT
+    if _NP_POWERS is not None:
         return
     from . import _filament_mixer_data as _d
-    _POWERS = _d.POWERS
-    _COEF = _d.COEF
-    _INTERCEPT = _d.INTERCEPT
+    # Convert Python lists to numpy arrays once; float64 throughout to avoid
+    # any dtype-promotion surprises during vectorised ** operations.
+    _NP_POWERS = np.array(_d.POWERS, dtype=np.float64)      # (330, 7)
+    _NP_COEF = np.array(_d.COEF, dtype=np.float64)          # (330, 3)
+    _NP_INTERCEPT = np.array(_d.INTERCEPT, dtype=np.float64)  # (3,)
 
 
 # ---------------------------------------------------------------------------
@@ -71,6 +76,8 @@ def filament_mixer_lerp(
     """Blend two sRGB colors using the FilamentMixer pigment model.
 
     Port of ``filament_mixer::lerp()`` from ``filament_mixer_model.h`` (L766-812).
+    Evaluates a degree-4 polynomial regression with 330 features over 7 inputs
+    using numpy for vectorised computation.
 
     :param r1, g1, b1: First color, sRGB 0-255.
     :param r2, g2, b2: Second color, sRGB 0-255.
@@ -84,35 +91,21 @@ def filament_mixer_lerp(
 
     _ensure_loaded()
 
-    # 7 inputs: r1, g1, b1, r2, g2, b2, t
-    x = (float(r1), float(g1), float(b1), float(r2), float(g2), float(b2), float(t))
+    # Input vector: RGB as 0-255 floats, t as 0.0-1.0 float (matches C++ source)
+    x = np.array([r1, g1, b1, r2, g2, b2, t], dtype=np.float64)  # (7,)
 
-    # Compute 330 polynomial features (all monomials up to degree 4 in 7 vars)
-    features = [0.0] * 330
-    for i, exponents in enumerate(_POWERS):
-        val = 1.0
-        for j, exp in enumerate(exponents):
-            if exp == 0:
-                continue
-            base = x[j]
-            p = 1.0
-            for _ in range(exp):
-                p *= base
-            val *= p
-        features[i] = val
+    # Polynomial features: features[i] = prod_j  x[j] ** POWERS[i, j]
+    # _NP_POWERS is (330, 7); broadcasting x to (1, 7) makes x**_NP_POWERS
+    # produce (330, 7), then prod over axis=1 collapses to (330,).
+    # numpy handles 0.0**0.0 == 1.0, which is correct for the constant term.
+    features = np.prod(x[np.newaxis, :] ** _NP_POWERS, axis=1)  # (330,)
 
-    # Dot product with coefficient matrix + intercept → output R, G, B
-    coef = _COEF
-    intercept = _INTERCEPT
-    result = []
-    for c in range(3):
-        s = intercept[c]
-        col = [coef[i][c] for i in range(330)]
-        for i in range(330):
-            s += features[i] * col[i]
-        result.append(max(0, min(255, int(s))))
+    # Dot product + intercept → (3,)
+    # Clamp to [0, 255] then truncate to int (matches C++ static_cast<int>
+    # after clamp; values are ≥ 0 after clip so trunc == floor).
+    result = np.clip(features @ _NP_COEF + _NP_INTERCEPT, 0, 255).astype(int)
 
-    return (result[0], result[1], result[2])
+    return (int(result[0]), int(result[1]), int(result[2]))
 
 
 def _parse_hex(hex_color: str) -> Tuple[int, int, int]:

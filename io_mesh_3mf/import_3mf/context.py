@@ -57,6 +57,7 @@ class ImportOptions:
     auto_smooth_angle: float = 0.5236  # 30 degrees in radians
     paint_uv_method: str = "SMART"  # "SMART" | "LIGHTMAP"
     paint_texture_size: int = 0  # 0 = auto
+    shared_paint_texture: bool = True  # Pack all solid-paint parts into one shared UV texture
 
 
 # ---------------------------------------------------------------------------
@@ -107,6 +108,9 @@ class ImportContext:
     object_default_extruders: Dict[str, int] = field(default_factory=dict)
     part_subtypes: Dict[Tuple[str, str], str] = field(default_factory=dict)
     part_groups: Dict[str, Dict] = field(default_factory=dict)
+    # Per-part extruder assignments from model_settings.config (Orca/BambuStudio/FullSpectrum).
+    # Keyed by (wrapper_id, part_id), values are 1-based extruder indices.
+    part_extruders: Dict[Tuple[str, str], int] = field(default_factory=dict)
     # Per-part slicer setting overrides from model_settings.config.
     # Keyed by (wrapper_id, part_id), values are {setting_key: value}.
     part_metadata: Dict[Tuple[str, str], Dict[str, str]] = field(default_factory=dict)
@@ -125,6 +129,19 @@ class ImportContext:
     imported_objects: List[object] = field(default_factory=list)  # bpy.types.Object list
     _paint_object_names: List[str] = field(default_factory=list)
     current_archive_path: Optional[str] = None
+    # Number of physical (non-virtual) filament slots.  Set by read_orca_filament_colors
+    # so render_paint_texture / create_solid_paint_texture can tag meshes with the correct
+    # boundary between physical and virtual extruder indices.
+    num_physical_filaments: int = 0
+
+    # Deferred solid-paint parts: collected during build_object so all parts from
+    # a single archive can be baked into ONE shared texture instead of N separate ones.
+    # Each entry is (mesh: bpy.types.Mesh, extruder_1based: int).
+    pending_solid_paint_parts: List[Tuple[object, int]] = field(default_factory=list)
+
+    # Cache of external model paths already loaded — prevents re-opening the ZIP
+    # and re-parsing the same file when multiple components share one path.
+    loaded_external_paths: Set[str] = field(default_factory=set)
 
     # --- Helpers ------------------------------------------------------------
 

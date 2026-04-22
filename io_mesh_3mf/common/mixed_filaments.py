@@ -35,6 +35,7 @@ __all__ = [
     "parse_mixed_filament_definitions",
     "serialize_mixed_filament_definitions",
     "compute_display_color",
+    "populate_display_colors",
     "resolve_virtual_filament_index",
     "virtual_filament_id_to_index",
     "normalize_manual_pattern",

@@ -34,6 +34,7 @@ from .helpers import (
     _configure_paint_brush,
     _set_brush_color,
     _has_vertex_colors,
+    _refresh_virtual_slots_in_palette,
 )
 from .color_detection import (
     _collect_material_colors,
@@ -1053,4 +1054,211 @@ class MMU_OT_switch_aux_brush(bpy.types.Operator):
             _set_brush_color(context, enforce)
         else:
             _set_brush_color(context, block)
+        return {"FINISHED"}
+
+
+# ===================================================================
+#  Mixed filament operators (OrcaSlicer-FullSpectrum)
+# ===================================================================
+
+
+def _next_stable_id(settings) -> int:
+    """Return the next unused stable_id (max existing + 1, minimum 1)."""
+    if not settings.mixed_filaments:
+        return 1
+    return max((m.stable_id for m in settings.mixed_filaments), default=0) + 1
+
+
+def _next_unused_pair(settings) -> tuple:
+    """Return the first C(N,2) pair not already defined (1-based).
+
+    Falls back to (1, 2) if all pairs are taken.
+    """
+    existing = {
+        (m.component_a, m.component_b)
+        for m in settings.mixed_filaments
+        if not m.deleted
+    }
+    num_physical = max(
+        (item.index + 1 for item in settings.filaments
+         if item.index < len(settings.filaments) and not settings.has_mixed_filaments),
+        default=len(settings.filaments),
+    )
+    # Simple heuristic: count physical slots by those not added as virtuals
+    num_virt = sum(1 for m in settings.mixed_filaments if m.enabled and not m.deleted)
+    num_physical = max(len(settings.filaments) - num_virt, 1)
+
+    for a in range(1, num_physical + 1):
+        for b in range(a + 1, num_physical + 1):
+            if (a, b) not in existing:
+                return (a, b)
+    return (1, 2)
+
+
+def _recompute_display_color_for_item(item, settings) -> None:
+    """Recompute ``item.display_color`` from physical palette + mix ratio."""
+    from ..common.mixed_filaments import compute_display_color, MixedFilament
+    from ..common.colors import rgb_to_hex
+
+    # Build physical color list from the live palette
+    physical = []
+    num_virt = sum(1 for m in settings.mixed_filaments if m.enabled and not m.deleted)
+    num_physical = len(settings.filaments) - num_virt
+    for fi in settings.filaments[:num_physical]:
+        physical.append(rgb_to_hex(*fi.color))
+
+    if not physical:
+        return
+
+    mf = MixedFilament(
+        component_a=item.component_a,
+        component_b=item.component_b,
+        mix_b_percent=item.mix_b_percent,
+        distribution_mode=int(item.distribution_mode),
+        manual_pattern=item.manual_pattern,
+    )
+    hex_color = compute_display_color(mf, physical)
+    try:
+        from ..common.colors import hex_to_rgb
+        r, g, b = hex_to_rgb(hex_color)
+        item.display_color = (r, g, b)
+    except Exception:
+        pass
+
+
+class MMU_OT_add_mixed_filament(bpy.types.Operator):
+    """Add a new virtual mixed filament entry to the palette."""
+
+    bl_idname = "mmu.add_mixed_filament"
+    bl_label = "Add Mix"
+    bl_description = "Add a new virtual mixed filament (OrcaSlicer-FullSpectrum)"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.mmu_paint is not None
+
+    def execute(self, context):
+        settings = context.scene.mmu_paint
+        a, b = _next_unused_pair(settings)
+
+        item = settings.mixed_filaments.add()
+        item.component_a = a
+        item.component_b = b
+        item.mix_b_percent = 50
+        item.distribution_mode = "2"
+        item.ui_type = "gradient"
+        item.enabled = True
+        item.deleted = False
+        item.stable_id = _next_stable_id(settings)
+
+        _recompute_display_color_for_item(item, settings)
+        settings.has_mixed_filaments = True
+        settings.active_mixed_filament_index = len(settings.mixed_filaments) - 1
+
+        _refresh_virtual_slots_in_palette(settings)
+        return {"FINISHED"}
+
+
+class MMU_OT_remove_mixed_filament(bpy.types.Operator):
+    """Remove the active virtual mixed filament entry."""
+
+    bl_idname = "mmu.remove_mixed_filament"
+    bl_label = "Remove Mix"
+    bl_description = "Remove the selected virtual mixed filament"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        settings = context.scene.mmu_paint
+        return (
+            settings is not None
+            and settings.has_mixed_filaments
+            and len(settings.mixed_filaments) > 0
+        )
+
+    def execute(self, context):
+        settings = context.scene.mmu_paint
+        idx = settings.active_mixed_filament_index
+        if 0 <= idx < len(settings.mixed_filaments):
+            # Soft-delete: mark deleted so stable_id gap is preserved for round-trip
+            settings.mixed_filaments[idx].deleted = True
+            settings.mixed_filaments[idx].enabled = False
+            # Clamp active index
+            settings.active_mixed_filament_index = max(0, idx - 1)
+
+        _refresh_virtual_slots_in_palette(settings)
+        return {"FINISHED"}
+
+
+class MMU_OT_recompute_mix_color(bpy.types.Operator):
+    """Recompute the display color for the active mixed filament entry."""
+
+    bl_idname = "mmu.recompute_mix_color"
+    bl_label = "Update Color"
+    bl_description = "Recompute the blended swatch color from current component settings"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        settings = context.scene.mmu_paint
+        return (
+            settings is not None
+            and settings.has_mixed_filaments
+            and len(settings.mixed_filaments) > 0
+        )
+
+    def execute(self, context):
+        import numpy as np
+        settings = context.scene.mmu_paint
+        idx = settings.active_mixed_filament_index
+        if not (0 <= idx < len(settings.mixed_filaments)):
+            return {"FINISHED"}
+
+        item = settings.mixed_filaments[idx]
+
+        # Capture old display color before recompute (for pixel replacement)
+        palette_idx = getattr(item, "palette_index", -1)
+        old_rgb = None
+        if 0 <= palette_idx < len(settings.filaments):
+            old_rgb = tuple(settings.filaments[palette_idx].color[:3])
+
+        # Recompute display color
+        _recompute_display_color_for_item(item, settings)
+        _refresh_virtual_slots_in_palette(settings)
+
+        new_rgb = tuple(item.display_color[:])
+
+        # Update the palette entry's stored color
+        if 0 <= palette_idx < len(settings.filaments):
+            settings.filaments[palette_idx].color = new_rgb[:3]
+            _write_colors_to_mesh(context)
+
+        # Update brush to the new color
+        _set_brush_color(context, new_rgb)
+
+        # Reassign pixels in the paint texture (old color → new color)
+        if old_rgb is not None and any(abs(o - n) > 0.002 for o, n in zip(old_rgb, new_rgb)):
+            obj = context.active_object
+            image = _get_paint_image(obj)
+            if image is not None:
+                w, h = image.size
+                pixels_flat = np.empty(w * h * 4, dtype=np.float32)
+                image.pixels.foreach_get(pixels_flat)
+                pixels = pixels_flat.reshape(h, w, 4)
+
+                old_arr = np.array(old_rgb, dtype=np.float32)
+                new_arr = np.array(new_rgb, dtype=np.float32)
+                tolerance = 3.0 / 255.0
+                mask = np.all(np.abs(pixels[:, :, :3] - old_arr) < tolerance, axis=2)
+                num_changed = int(np.count_nonzero(mask))
+                if num_changed > 0:
+                    pixels[mask, 0] = new_arr[0]
+                    pixels[mask, 1] = new_arr[1]
+                    pixels[mask, 2] = new_arr[2]
+                    image.pixels.foreach_set(pixels.ravel())
+                    image.update()
+                    self.report({"INFO"}, f"Updated mix color; reassigned {num_changed} pixels")
+                    return {"FINISHED"}
+
         return {"FINISHED"}

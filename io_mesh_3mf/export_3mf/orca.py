@@ -129,6 +129,32 @@ class OrcaExporter(BaseExporter):
         # Collect face colors for Orca export
         ctx.safe_report({"INFO"}, "Collecting face colors for Orca export...")
 
+        # Sync mixed filament definitions from UI collection if user has edited them.
+        settings = getattr(context.scene, "mmu_paint", None)
+        if settings and settings.has_mixed_filaments and settings.mixed_filaments:
+            from ..common.mixed_filaments import MixedFilament, serialize_mixed_filament_definitions
+            from ..common.colors import rgb_to_hex
+            entries = []
+            for item in settings.mixed_filaments:
+                # Copy the already-computed display color from the UI item so
+                # filament_colour gets accurate swatches without needing to
+                # re-derive physical colors at this point in the pipeline.
+                disp = rgb_to_hex(*item.display_color[:]) if item.display_color else ""
+                entries.append(MixedFilament(
+                    component_a=item.component_a,
+                    component_b=item.component_b,
+                    enabled=item.enabled,
+                    deleted=item.deleted,
+                    custom=True,
+                    mix_b_percent=item.mix_b_percent,
+                    distribution_mode=int(item.distribution_mode),
+                    manual_pattern=item.manual_pattern,
+                    stable_id=item.stable_id,
+                    display_color=disp,
+                ))
+            ctx.mixed_filament_definitions_raw = serialize_mixed_filament_definitions(entries)
+            debug(f"Synced {len(entries)} mixed filament entries from UI to raw string")
+
         # Read mixed filament definitions from scene custom property (set on import).
         if not ctx.mixed_filament_definitions_raw:
             scene_defs = context.scene.get("3mf_mixed_filament_definitions", "")
@@ -996,23 +1022,48 @@ class OrcaExporter(BaseExporter):
             else:
                 raise
 
-        sorted_colors = sorted(ctx.vertex_colors.items(), key=lambda x: x[1])
-        color_list = [color_hex for color_hex, _ in sorted_colors]
-
-        if not color_list:
-            color_list = ["#FFFFFF"]
-
-        # Append virtual (mixed) filament display colors after the physical ones.
-        # This extends the filament_colour array so the slicer can display blended
-        # swatches for each virtual filament slot.
+        # Check for FullSpectrum mixed filament definitions up front so we can
+        # choose how to build color_list correctly.
         mixed_defs_to_write = ""
         if hasattr(ctx, "mixed_filament_definitions_raw") and ctx.mixed_filament_definitions_raw:
             mixed_defs_to_write = ctx.mixed_filament_definitions_raw
-            from ..common.mixed_filaments import parse_mixed_filament_definitions
+
+        if mixed_defs_to_write:
+            # For FullSpectrum files filament_colour must be exactly:
+            #   [physical colors] + [virtual display colors for enabled entries]
+            # ctx.vertex_colors has one entry per unique part material (one per
+            # virtual slot) so using it directly inflates the list to 40+ "physical"
+            # entries.  Instead we use the physical colors already present in the
+            # stashed settings (correct from the original import) and append only
+            # the virtual display colors.
+            import bpy as _bpy
+            num_physical = int(_bpy.context.scene.get("3mf_num_physical_filaments", 0))
+            stashed_colours = settings.get("filament_colour", [])
+            if num_physical > 0 and len(stashed_colours) >= num_physical:
+                color_list = list(stashed_colours[:num_physical])
+            else:
+                # Fall back: take only entries whose index < num_physical from ctx.vertex_colors.
+                sorted_colors = sorted(ctx.vertex_colors.items(), key=lambda x: x[1])
+                if num_physical > 0:
+                    color_list = [c for c, i in sorted_colors if i < num_physical]
+                else:
+                    color_list = [c for c, _ in sorted_colors]
+            if not color_list:
+                color_list = ["#FFFFFF"]
+
+            from ..common.mixed_filaments import parse_mixed_filament_definitions, populate_display_colors
             entries = parse_mixed_filament_definitions(mixed_defs_to_write)
+            missing = [mf for mf in entries if not mf.display_color]
+            if missing:
+                populate_display_colors(entries, color_list)
             for mf in entries:
                 if mf.enabled and not mf.deleted and mf.display_color:
                     color_list.append(mf.display_color)
+        else:
+            sorted_colors = sorted(ctx.vertex_colors.items(), key=lambda x: x[1])
+            color_list = [color_hex for color_hex, _ in sorted_colors]
+            if not color_list:
+                color_list = ["#FFFFFF"]
 
         num_colors = len(color_list)
         settings["filament_colour"] = color_list

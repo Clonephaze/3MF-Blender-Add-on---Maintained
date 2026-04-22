@@ -44,7 +44,7 @@ from .helpers import (  # noqa: F401
 
 import bpy
 
-from .properties import MMUFilamentItem, MMUInitFilamentItem, MMUPaintSettings
+from .properties import MMUMixedFilamentItem, MMUFilamentItem, MMUInitFilamentItem, MMUPaintSettings
 from .operators import (
     MMU_OT_initialize,
     MMU_OT_add_init_filament,
@@ -61,17 +61,23 @@ from .operators import (
     MMU_OT_init_auxiliary_paint,
     MMU_OT_switch_paint_layer,
     MMU_OT_switch_aux_brush,
+    MMU_OT_add_mixed_filament,
+    MMU_OT_remove_mixed_filament,
+    MMU_OT_recompute_mix_color,
 )
 from .mmu_panel import (
     MMU_UL_init_filaments,
     MMU_UL_filaments,
+    MMU_UL_mixed_filaments,
     VIEW3D_PT_mmu_paint,
+    VIEW3D_PT_mmu_mix_colors,
     _on_depsgraph_update,
 )
 
 
 # All classes to register, in dependency order (PropertyGroups first).
 _paint_classes = (
+    MMUMixedFilamentItem,
     MMUFilamentItem,
     MMUInitFilamentItem,
     MMUPaintSettings,
@@ -90,9 +96,14 @@ _paint_classes = (
     MMU_OT_init_auxiliary_paint,
     MMU_OT_switch_paint_layer,
     MMU_OT_switch_aux_brush,
+    MMU_OT_add_mixed_filament,
+    MMU_OT_remove_mixed_filament,
+    MMU_OT_recompute_mix_color,
     MMU_UL_init_filaments,
     MMU_UL_filaments,
+    MMU_UL_mixed_filaments,
     VIEW3D_PT_mmu_paint,
+    VIEW3D_PT_mmu_mix_colors,
 )
 
 

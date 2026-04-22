@@ -27,7 +27,7 @@ Usage::
 __all__ = ["DEBUG_MODE", "debug", "warn", "error", "safe_report"]
 
 
-DEBUG_MODE = False
+DEBUG_MODE = True
 """Set to True to enable verbose console output for development/debugging."""
 
 

@@ -1,3 +1,20 @@
+ Unreleased — Import Performance & Paint Palette Fix
+====
+
+Performance
+----
+* **Dramatically faster import of files with many components** — Files where multiple objects reference the same external `.model` file (e.g. multi-part assemblies) now load the external file only once and reuse it for all references, instead of re-opening and re-parsing the ZIP archive for every component.
+* **Dramatically faster MMU paint texture rendering** — Single-color (leaf) triangle segmentation strings are now decoded with an O(1) fast-path instead of running the full recursive decoder. For models where most triangles have a uniform color assignment, this is a major speedup.
+* **Seam/Support texture UV layout reuse** — When rendering Seam and Support paint textures, the UV layout computed for the Color paint layer is now reused directly instead of re-running Smart UV Project. This avoids redundant UV unwrapping for those auxiliary layers.
+* **Reduced UV island margin** — The island margin used during Smart UV Project now scales with texture resolution (`4 / texture_size`) instead of using a fixed value, giving tighter packing and smaller inter-island gaps at higher resolutions. Dilation fill is sized to match, closing the gaps correctly without over-rendering.
+* **Eliminated per-face render loop for unsegmented triangles** — Triangles with no paint assignment are now handled by the gap-fill pass rather than individually rasterized, removing an O(face count) loop that dominated import time on large meshes.
+
+Bug Fixes
+----
+* **MMU filament palette empty after shared-texture import** — When importing files in PAINT mode with the "Shared Paint Texture" option (e.g. PeggyPalette), the physical filament list (CMYK colors) appeared empty in the MMU Paint panel. This occurred because the deferred texture creation runs after objects are added to the scene, so the depsgraph palette sync saw incomplete mesh state. The palette is now explicitly synced at the end of the import operator once all mesh properties and mixed filament data are fully set.
+
+----
+
 2.5.1 — Rating Nudge
 ====
 

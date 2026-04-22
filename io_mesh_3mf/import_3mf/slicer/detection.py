@@ -22,7 +22,7 @@ from typing import Optional
 
 from ...common import debug, MODEL_NAMESPACES
 
-__all__ = ["detect_vendor"]
+__all__ = ["detect_vendor", "detect_fullspectrum"]
 
 
 def detect_vendor(
@@ -58,3 +58,19 @@ def detect_vendor(
             return "orca"
 
     return None
+
+
+def detect_fullspectrum(project_settings: dict) -> bool:
+    """Return True if this is an OrcaSlicer-FullSpectrum file.
+
+    FullSpectrum files are Orca-format 3MF files that include a
+    ``mixed_filament_definitions`` key in their ``project_settings.config``.
+    Detection is based on the presence of non-empty definitions in the JSON
+    config, not the model XML, so this must be called after the config is
+    parsed (see ``import_3mf/slicer/colors.py``).
+
+    :param project_settings: Parsed JSON dict from ``project_settings.config``.
+    :return: ``True`` if FullSpectrum mixed-filament definitions are present.
+    """
+    defs = project_settings.get("mixed_filament_definitions", "")
+    return bool(defs and str(defs).strip())

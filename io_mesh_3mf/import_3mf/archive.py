@@ -353,6 +353,11 @@ def load_external_model(
 
     archive_path = model_path.lstrip("/")
 
+    if archive_path in ctx.loaded_external_paths:
+        debug(f"External model already loaded, skipping: {archive_path}")
+        return
+    ctx.loaded_external_paths.add(archive_path)
+
     try:
         with zipfile.ZipFile(ctx.current_archive_path, "r") as archive:
             if archive_path not in archive.namelist():

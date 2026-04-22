@@ -71,6 +71,9 @@ def build_items(
     build_items_list = list(root.iterfind("./3mf:build/3mf:item", MODEL_NAMESPACES))
     total_items = len(build_items_list)
 
+    import time as _time
+    _t0 = _time.perf_counter()
+
     for idx, build_item in enumerate(build_items_list):
         if progress_callback and total_items > 0:
             progress = 60 + int(((idx + 1) / total_items) * 35)
@@ -97,7 +100,15 @@ def build_items(
         transform = mathutils.Matrix.Scale(scale_unit, 4)
         transform @= parse_transformation(build_item.attrib.get("transform", ""))
 
+        _t_obj = _time.perf_counter()
         build_object(ctx, resource_object, transform, metadata, [objectid])
+        _obj_elapsed = _time.perf_counter() - _t_obj
+        tris = len(resource_object.triangles) if resource_object.triangles else 0
+        debug(
+            f"[TIMING]     build obj {objectid}: {tris}t  {_obj_elapsed:.3f}s"
+        )
+
+    debug(f"[TIMING]   build_items total: {_time.perf_counter() - _t0:.3f}s")
 
 
 # ---------------------------------------------------------------------------
@@ -193,6 +204,40 @@ def build_object(
             part_subtype = ctx.part_subtypes[subtype_key]
             blender_object["3mf_part_subtype"] = part_subtype
             apply_subtype_material(blender_object, part_subtype)
+
+        # Apply per-part filament color (Orca/FullSpectrum per-part extruder mode).
+        # Only applied when no materials were created by the 3MF spec or paint pipeline
+        # (e.g. a PeggyPalette file where each sphere has extruder= but no paint_color).
+        if (
+            ctx.options.import_materials != "NONE"
+            and subtype_key
+            and subtype_key in ctx.part_extruders
+            and not mesh.materials
+            and ctx.orca_filament_colors
+        ):
+            extruder_1based = ctx.part_extruders[subtype_key]
+            hex_color = ctx.orca_filament_colors.get(extruder_1based - 1, "#808080")
+            if ctx.options.import_materials == "PAINT":
+                # Defer: collect all solid-paint parts so they can share one texture.
+                ctx.pending_solid_paint_parts.append((mesh, extruder_1based))
+            else:
+                _apply_extruder_material(mesh, extruder_1based, hex_color)
+        elif (
+            ctx.options.import_materials != "NONE"
+            and not mesh.materials
+            and ctx.orca_filament_colors
+            and wrapper_id
+            and ctx.vendor_format in ("orca", "orca_fullspectrum")
+            and wrapper_id in ctx.object_default_extruders
+        ):
+            # Base body of a wrapper object: no explicit per-part extruder override,
+            # so fall back to the wrapper-level default extruder from model_settings.config.
+            extruder_1based = ctx.object_default_extruders[wrapper_id]
+            hex_color = ctx.orca_filament_colors.get(extruder_1based - 1, "#808080")
+            if ctx.options.import_materials == "PAINT":
+                ctx.pending_solid_paint_parts.append((mesh, extruder_1based))
+            else:
+                _apply_extruder_material(mesh, extruder_1based, hex_color)
 
         # Stash per-part slicer setting overrides for round-trip export.
         if subtype_key and subtype_key in ctx.part_metadata:
@@ -328,9 +373,13 @@ def _build_mesh(
     objectid_stack_trace: List[str],
 ) -> Optional[bpy.types.Mesh]:
     """Create mesh with all attributes (materials, UVs, triangle sets, paint)."""
+    import time as _time
+    _t = _time.perf_counter()
+
     mesh = create_mesh_from_data(resource_object)
     if mesh is None:
         return None
+    debug(f"[TIMING]       from_pydata:     {_time.perf_counter() - _t:.3f}s"); _t = _time.perf_counter()
 
     # Store passthrough multiproperties pid
     current_objectid = objectid_stack_trace[0] if objectid_stack_trace else None
@@ -340,18 +389,61 @@ def _build_mesh(
 
     # Paint texture (if PAINT mode) — skip standard material assignment if rendered
     paint_rendered = render_paint_texture(ctx, mesh, resource_object)
+    debug(f"[TIMING]       render_paint:    {_time.perf_counter() - _t:.3f}s"); _t = _time.perf_counter()
 
     if not paint_rendered:
         assign_materials_to_mesh(ctx, mesh, resource_object)
 
     # Seam / support paint textures (independent of color paint)
     render_seam_support_texture(ctx, mesh, resource_object.seam_strings or {}, "SEAM")
+    debug(f"[TIMING]       render_seam:     {_time.perf_counter() - _t:.3f}s"); _t = _time.perf_counter()
     render_seam_support_texture(ctx, mesh, resource_object.support_strings or {}, "SUPPORT")
+    debug(f"[TIMING]       render_support:  {_time.perf_counter() - _t:.3f}s"); _t = _time.perf_counter()
 
     apply_triangle_sets(mesh, resource_object)
     apply_uv_coordinates(mesh, resource_object)
+    debug(f"[TIMING]       uv+trisets:      {_time.perf_counter() - _t:.3f}s")
 
     return mesh
+
+
+def _apply_extruder_material(mesh: bpy.types.Mesh, extruder_1based: int, hex_color: str) -> None:
+    """Create or reuse a simple solid-color material for a per-part extruder assignment.
+
+    Used for Orca/FullSpectrum files that assign filament via ``extruder=`` metadata in
+    ``model_settings.config`` (per-part mode, e.g. PeggyPalette) rather than per-triangle
+    segmentation strings.  The material is named ``3MF_Extruder_N`` so it is shared across
+    parts that use the same extruder.
+
+    :param mesh: Blender mesh data to append the material to.
+    :param extruder_1based: 1-based extruder index.
+    :param hex_color: Hex color string (``#RRGGBB``).
+    """
+    import bpy as _bpy
+    mat_name = f"3MF_Extruder_{extruder_1based}"
+    mat = _bpy.data.materials.get(mat_name)
+    if mat is None:
+        mat = _bpy.data.materials.new(mat_name)
+        mat.use_nodes = True
+        nodes = mat.node_tree.nodes
+        links = mat.node_tree.links
+        nodes.clear()
+        bsdf = nodes.new("ShaderNodeBsdfPrincipled")
+        bsdf.location = (0, 0)
+        out = nodes.new("ShaderNodeOutputMaterial")
+        out.location = (300, 0)
+        links.new(bsdf.outputs["BSDF"], out.inputs["Surface"])
+        # Apply color
+        if hex_color.startswith("#") and len(hex_color) == 7:
+            r = int(hex_color[1:3], 16) / 255.0
+            g = int(hex_color[3:5], 16) / 255.0
+            b = int(hex_color[5:7], 16) / 255.0
+        else:
+            r, g, b = 0.5, 0.5, 0.5
+        bsdf.inputs["Base Color"].default_value = (r, g, b, 1.0)
+        mat.diffuse_color = (r, g, b, 1.0)
+        debug(f"Created material {mat_name!r} for extruder {extruder_1based} ({hex_color})")
+    mesh.materials.append(mat)
 
 
 def _apply_auto_smooth(
