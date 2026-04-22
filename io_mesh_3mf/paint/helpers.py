@@ -242,15 +242,29 @@ def _sync_filaments_from_mesh(context):
 
 
 def _write_colors_to_mesh(context):
-    """Write the current filament palette back to the mesh custom property."""
+    """Write the physical filament palette back to the mesh custom properties.
+
+    Only physical (non-virtual) entries are written so round-tripped files
+    do not accidentally re-import mixed-filament display colours as real slots.
+    ``3mf_num_physical_filaments`` is also kept in sync so
+    ``_sync_filaments_from_mesh`` can restore the physical/virtual boundary.
+    """
     mesh = _get_paint_mesh(context)
     if mesh is None:
         return
     settings = context.scene.mmu_paint
+    num_physical = (
+        settings.num_physical_filaments
+        if settings.num_physical_filaments > 0
+        else sum(1 for f in settings.filaments if not f.is_virtual)
+    )
     colors_dict = {}
-    for item in settings.filaments:
+    for i, item in enumerate(settings.filaments):
+        if i >= num_physical:
+            break
         colors_dict[item.index] = _hex_from_rgb(*item.color)
     mesh["3mf_paint_extruder_colors"] = str(colors_dict)
+    mesh["3mf_num_physical_filaments"] = num_physical
 
 
 def _refresh_virtual_slots_in_palette(settings) -> None:
