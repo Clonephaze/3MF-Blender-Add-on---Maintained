@@ -30,14 +30,14 @@ from .helpers import _on_active_filament_changed, _on_active_mix_filament_change
 # for dynamic enum callbacks to avoid garbage-collection crashes.
 _UI_TYPE_ITEMS_BASE = [
     ("gradient", "Gradient", "Blend component A and B by a factor"),
-    ("pattern",  "Pattern",  "Multi-filament manual pattern string"),
+    ("pattern", "Pattern", "Multi-filament manual pattern string"),
 ]
 # Imported-only modes — only appear in the dropdown when the entry already uses them
-_UI_TYPE_ITEMS_LAYER_CYCLE   = _UI_TYPE_ITEMS_BASE + [("layer_cycle",  "Layer Cycle (Imported)",  "Round-trip only")]
-_UI_TYPE_ITEMS_POINTILLISM   = _UI_TYPE_ITEMS_BASE + [("pointillism",  "Pointillism (Imported)",  "Round-trip only")]
+_UI_TYPE_ITEMS_LAYER_CYCLE = _UI_TYPE_ITEMS_BASE + [("layer_cycle", "Layer Cycle (Imported)", "Round-trip only")]
+_UI_TYPE_ITEMS_POINTILLISM = _UI_TYPE_ITEMS_BASE + [("pointillism", "Pointillism (Imported)", "Round-trip only")]
 _UI_TYPE_ITEMS_BOTH_IMPORTED = _UI_TYPE_ITEMS_BASE + [
-    ("layer_cycle", "Layer Cycle (Imported)",  "Round-trip only"),
-    ("pointillism", "Pointillism (Imported)",  "Round-trip only"),
+    ("layer_cycle", "Layer Cycle (Imported)", "Round-trip only"),
+    ("pointillism", "Pointillism (Imported)", "Round-trip only"),
 ]
 
 

@@ -368,7 +368,8 @@ def _build_mesh(
     mesh = create_mesh_from_data(resource_object)
     if mesh is None:
         return None
-    debug(f"[TIMING]       from_pydata:     {_time.perf_counter() - _t:.3f}s"); _t = _time.perf_counter()
+    debug(f"[TIMING]       from_pydata:     {_time.perf_counter() - _t:.3f}s")
+    _t = _time.perf_counter()
 
     # Store passthrough multiproperties pid
     current_objectid = objectid_stack_trace[0] if objectid_stack_trace else None
@@ -378,16 +379,19 @@ def _build_mesh(
 
     # Paint texture (if PAINT mode) — skip standard material assignment if rendered
     paint_rendered = render_paint_texture(ctx, mesh, resource_object)
-    debug(f"[TIMING]       render_paint:    {_time.perf_counter() - _t:.3f}s"); _t = _time.perf_counter()
+    debug(f"[TIMING]       render_paint:    {_time.perf_counter() - _t:.3f}s")
+    _t = _time.perf_counter()
 
     if not paint_rendered:
         assign_materials_to_mesh(ctx, mesh, resource_object)
 
     # Seam / support paint textures (independent of color paint)
     render_seam_support_texture(ctx, mesh, resource_object.seam_strings or {}, "SEAM")
-    debug(f"[TIMING]       render_seam:     {_time.perf_counter() - _t:.3f}s"); _t = _time.perf_counter()
+    debug(f"[TIMING]       render_seam:     {_time.perf_counter() - _t:.3f}s")
+    _t = _time.perf_counter()
     render_seam_support_texture(ctx, mesh, resource_object.support_strings or {}, "SUPPORT")
-    debug(f"[TIMING]       render_support:  {_time.perf_counter() - _t:.3f}s"); _t = _time.perf_counter()
+    debug(f"[TIMING]       render_support:  {_time.perf_counter() - _t:.3f}s")
+    _t = _time.perf_counter()
 
     apply_triangle_sets(mesh, resource_object)
     apply_uv_coordinates(mesh, resource_object)

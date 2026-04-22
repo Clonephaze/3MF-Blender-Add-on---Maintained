@@ -352,7 +352,8 @@ class MMU_UL_mixed_filaments(bpy.types.UIList):
                 filament_str = "+".join(f"F{c}" for c in ids_seen)
                 row.label(text=f"{filament_str}  (Pattern)")
             else:
-                row.label(text=f"F{item.component_a} + F{item.component_b}  {100 - item.mix_b_percent}/{item.mix_b_percent}%")
+                pct_a = 100 - item.mix_b_percent
+                row.label(text=f"F{item.component_a} + F{item.component_b}  {pct_a}/{item.mix_b_percent}%")
         elif self.layout_type == "GRID":
             layout.alignment = "CENTER"
             layout.prop(item, "display_color", text="")
