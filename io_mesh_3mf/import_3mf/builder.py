@@ -208,33 +208,22 @@ def build_object(
         # Apply per-part filament color (Orca/FullSpectrum per-part extruder mode).
         # Only applied when no materials were created by the 3MF spec or paint pipeline
         # (e.g. a PeggyPalette file where each sphere has extruder= but no paint_color).
+        # Parts with no explicit extruder= metadata fall back to their wrapper
+        # object's extruder (object_default_extruders), which is the pattern used by
+        # the Base part in PeggyPalette and any other part that inherits from the object.
+        _part_extruder = ctx.part_extruders.get(subtype_key) if subtype_key else None
+        if _part_extruder is None and wrapper_id:
+            _part_extruder = ctx.object_default_extruders.get(wrapper_id)
         if (
             ctx.options.import_materials != "NONE"
-            and subtype_key
-            and subtype_key in ctx.part_extruders
+            and _part_extruder is not None
             and not mesh.materials
             and ctx.orca_filament_colors
         ):
-            extruder_1based = ctx.part_extruders[subtype_key]
+            extruder_1based = _part_extruder
             hex_color = ctx.orca_filament_colors.get(extruder_1based - 1, "#808080")
             if ctx.options.import_materials == "PAINT":
                 # Defer: collect all solid-paint parts so they can share one texture.
-                ctx.pending_solid_paint_parts.append((mesh, extruder_1based))
-            else:
-                _apply_extruder_material(mesh, extruder_1based, hex_color)
-        elif (
-            ctx.options.import_materials != "NONE"
-            and not mesh.materials
-            and ctx.orca_filament_colors
-            and wrapper_id
-            and ctx.vendor_format in ("orca", "orca_fullspectrum")
-            and wrapper_id in ctx.object_default_extruders
-        ):
-            # Base body of a wrapper object: no explicit per-part extruder override,
-            # so fall back to the wrapper-level default extruder from model_settings.config.
-            extruder_1based = ctx.object_default_extruders[wrapper_id]
-            hex_color = ctx.orca_filament_colors.get(extruder_1based - 1, "#808080")
-            if ctx.options.import_materials == "PAINT":
                 ctx.pending_solid_paint_parts.append((mesh, extruder_1based))
             else:
                 _apply_extruder_material(mesh, extruder_1based, hex_color)

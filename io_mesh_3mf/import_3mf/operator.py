@@ -378,7 +378,6 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         if ctx.mixed_filament_definitions_raw:
             context.scene["3mf_mixed_filament_definitions"] = ctx.mixed_filament_definitions_raw
             context.scene["3mf_has_mixed_filaments"] = True
-            context.scene["3mf_num_physical_filaments"] = ctx.num_physical_filaments
             debug("Stored mixed filament definitions on scene")
 
             # Populate the UI collection for the Mix Colors panel.

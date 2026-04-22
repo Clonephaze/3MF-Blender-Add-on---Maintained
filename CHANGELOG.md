@@ -1,17 +1,21 @@
- Unreleased — Import Performance & Paint Palette Fix
+2.6.0 — FullSpectrum Round-Trip & Import Performance
 ====
+
+FullSpectrum Multi-Material Support
+----
+* **FullSpectrum 3MF import** — Added complete import support for OrcaSlicer-FullSpectrum files, including part hierarchy reconstruction from wrapper/part metadata.
+* **Per-part extruder inheritance** — Part colors now resolve correctly from `extruder=N` metadata using part-level values first, then wrapper defaults (fixes missing color on inherited parts like Base).
+* **Virtual filament swatches** — Virtual mixed filament slots (5-44) are computed via FilamentMixer and shown in the MMU Paint panel next to the 4 physical filaments.
+* **Correct FullSpectrum export format** — FullSpectrum round-trips now export in parts mode: per-part `extruder=N` metadata is preserved (including virtual slots), `mixed_filament_definitions` are retained, `filament_colour` contains only physical colors, and no triangle `paint_color` segmentation is written.
+* **Mixed filament UI editing** — MMU Paint exposes mixed filament settings (components, mix %, distribution mode, manual pattern) with live display swatches.
 
 Performance
 ----
-* **Dramatically faster import of files with many components** — Files where multiple objects reference the same external `.model` file (e.g. multi-part assemblies) now load the external file only once and reuse it for all references, instead of re-opening and re-parsing the ZIP archive for every component.
-* **Dramatically faster MMU paint texture rendering** — Single-color (leaf) triangle segmentation strings are now decoded with an O(1) fast-path instead of running the full recursive decoder. For models where most triangles have a uniform color assignment, this is a major speedup.
+* **Faster multi-component import** — External `.model` references are cached and reused, avoiding repeated archive opens/parses for assemblies that share component sources.
+* **Faster MMU paint decode** — Single-color (leaf) segmentation strings now use an O(1) fast path instead of full recursive decoding.
 * **Seam/Support texture UV layout reuse** — When rendering Seam and Support paint textures, the UV layout computed for the Color paint layer is now reused directly instead of re-running Smart UV Project. This avoids redundant UV unwrapping for those auxiliary layers.
-* **Reduced UV island margin** — The island margin used during Smart UV Project now scales with texture resolution (`4 / texture_size`) instead of using a fixed value, giving tighter packing and smaller inter-island gaps at higher resolutions. Dilation fill is sized to match, closing the gaps correctly without over-rendering.
-* **Eliminated per-face render loop for unsegmented triangles** — Triangles with no paint assignment are now handled by the gap-fill pass rather than individually rasterized, removing an O(face count) loop that dominated import time on large meshes.
-
-Bug Fixes
-----
-* **MMU filament palette empty after shared-texture import** — When importing files in PAINT mode with the "Shared Paint Texture" option (e.g. PeggyPalette), the physical filament list (CMYK colors) appeared empty in the MMU Paint panel. This occurred because the deferred texture creation runs after objects are added to the scene, so the depsgraph palette sync saw incomplete mesh state. The palette is now explicitly synced at the end of the import operator once all mesh properties and mixed filament data are fully set.
+* **Resolution-scaled UV island margin** — Smart UV margin now scales with texture size (`4 / texture_size`) for tighter packing and cleaner gap fill at high resolutions.
+* **Removed per-face unsegmented raster loop** — Unassigned triangles are now handled by gap fill, eliminating a major O(face count) import bottleneck.
 
 ----
 
