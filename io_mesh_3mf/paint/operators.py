@@ -34,6 +34,7 @@ from .helpers import (
     _configure_paint_brush,
     _set_brush_color,
     _has_vertex_colors,
+    _refresh_virtual_slots_in_palette,
 )
 from .color_detection import (
     _collect_material_colors,
@@ -475,34 +476,48 @@ class MMU_OT_add_filament(bpy.types.Operator):
         if mesh is None:
             return False
         settings = context.scene.mmu_paint
-        return len(settings.filaments) < 16
+        num_physical = (
+            settings.num_physical_filaments
+            if settings.num_physical_filaments > 0
+            else sum(1 for f in settings.filaments if not f.is_virtual)
+        )
+        return num_physical < 16
 
     def execute(self, context):
         settings = context.scene.mmu_paint
-        count = len(settings.filaments)
+        num_physical = (
+            settings.num_physical_filaments
+            if settings.num_physical_filaments > 0
+            else sum(1 for f in settings.filaments if not f.is_virtual)
+        )
 
-        if count >= 16:
+        if num_physical >= 16:
             self.report({"ERROR"}, "Maximum 16 filaments supported")
             return {"CANCELLED"}
 
-        # Pick a default color from the palette
-        new_index = count
-        if new_index < len(DEFAULT_PALETTE):
-            new_color = DEFAULT_PALETTE[new_index]
-        else:
-            new_color = DEFAULT_PALETTE[new_index % len(DEFAULT_PALETTE)]
+        # Trim any virtual slots off the end so the new physical item can be
+        # appended cleanly at position num_physical.  _refresh_virtual_slots_in_palette
+        # will re-append them correctly afterward.
+        while len(settings.filaments) > num_physical:
+            settings.filaments.remove(len(settings.filaments) - 1)
+
+        new_index = num_physical
+        new_color = DEFAULT_PALETTE[new_index % len(DEFAULT_PALETTE)]
 
         item = settings.filaments.add()
         item.index = new_index
         item.name = f"Filament {new_index + 1}"
         item.color = new_color
+        item.is_virtual = False
 
+        settings.num_physical_filaments = num_physical + 1
         _write_colors_to_mesh(context)
+        _refresh_virtual_slots_in_palette(settings)
 
         self.report(
             {"WARNING"},
             f"Added filament {new_index + 1}. "
-            f"Ensure your printer profile supports {count + 1} filaments.",
+            f"Ensure your printer profile supports {num_physical + 1} filaments.",
         )
         return {"FINISHED"}
 
@@ -520,7 +535,12 @@ class MMU_OT_remove_filament(bpy.types.Operator):
         if mesh is None:
             return False
         settings = context.scene.mmu_paint
-        return len(settings.filaments) > 2
+        num_physical = (
+            settings.num_physical_filaments
+            if settings.num_physical_filaments > 0
+            else sum(1 for f in settings.filaments if not f.is_virtual)
+        )
+        return num_physical > 2
 
     def execute(self, context):
         settings = context.scene.mmu_paint
@@ -528,8 +548,19 @@ class MMU_OT_remove_filament(bpy.types.Operator):
         if idx < 0 or idx >= len(settings.filaments):
             return {"CANCELLED"}
 
-        if len(settings.filaments) <= 2:
+        num_physical = (
+            settings.num_physical_filaments
+            if settings.num_physical_filaments > 0
+            else sum(1 for f in settings.filaments if not f.is_virtual)
+        )
+
+        if num_physical <= 2:
             self.report({"ERROR"}, "Minimum 2 filaments required")
+            return {"CANCELLED"}
+
+        # Guard: only allow removing physical filaments from this operator.
+        if idx >= num_physical:
+            self.report({"WARNING"}, "Select a physical filament to remove")
             return {"CANCELLED"}
 
         removed = settings.filaments[idx]
@@ -569,26 +600,22 @@ class MMU_OT_remove_filament(bpy.types.Operator):
                 image.update()
 
         settings.filaments.remove(idx)
+        num_physical_new = num_physical - 1
 
-        # Re-index remaining filaments
-        for i, item in enumerate(settings.filaments):
-            item.index = i
-            item.name = f"Filament {i + 1}"
+        # Re-index physical items only; virtual slots will be rebuilt below.
+        for i in range(min(num_physical_new, len(settings.filaments))):
+            settings.filaments[i].index = i
+            settings.filaments[i].name = f"Filament {i + 1}"
 
-        # Clamp selection
-        if settings.active_filament_index >= len(settings.filaments):
-            settings.active_filament_index = len(settings.filaments) - 1
+        # Clamp selection to physical range
+        if settings.active_filament_index >= num_physical_new:
+            settings.active_filament_index = max(0, num_physical_new - 1)
 
+        settings.num_physical_filaments = num_physical_new
         _write_colors_to_mesh(context)
+        _refresh_virtual_slots_in_palette(settings)
 
-        if replaced_count > 0:
-            self.report(
-                {"INFO"}, f"Removed filament and replaced {replaced_count} pixels"
-            )
-        else:
-            self.report({"INFO"}, "Removed filament")
-
-        msg = f"Removed filament. {len(settings.filaments)} remaining."
+        msg = f"Removed filament. {num_physical_new} remaining."
         if replaced_count > 0:
             msg += f" Replaced {replaced_count} painted pixels with base color."
         self.report({"INFO"}, msg)
@@ -1053,4 +1080,499 @@ class MMU_OT_switch_aux_brush(bpy.types.Operator):
             _set_brush_color(context, enforce)
         else:
             _set_brush_color(context, block)
+        return {"FINISHED"}
+
+
+# ===================================================================
+#  Mixed filament operators (OrcaSlicer-FullSpectrum)
+# ===================================================================
+
+
+def _physical_hex_colors(settings) -> list:
+    """Return a list of ``"#RRGGBB"`` strings for the physical filament palette.
+
+    Reads from ``settings.filaments`` (live paint palette) when populated,
+    otherwise falls back to ``settings.init_filaments`` (bake setup palette).
+    This allows the mix operators to work correctly both before baking
+    (where only init_filaments is populated) and during active painting
+    (where filaments holds the live palette).
+    """
+    from ..common.colors import rgb_to_hex
+
+    # Prefer the live palette when it has physical (non-virtual) entries.
+    num_virt = sum(1 for m in settings.mixed_filaments if m.enabled and not m.deleted)
+    num_physical_live = len(settings.filaments) - num_virt
+    if num_physical_live > 0:
+        return [rgb_to_hex(*fi.color[:3]) for fi in settings.filaments[:num_physical_live]]
+
+    # Fall back to the init palette used in the bake panel.
+    if settings.init_filaments:
+        return [rgb_to_hex(*fi.color[:3]) for fi in settings.init_filaments]
+
+    return []
+
+
+def _next_stable_id(settings) -> int:
+    """Return the next unused stable_id (max existing + 1, minimum 1)."""
+    if not settings.mixed_filaments:
+        return 1
+    return max((m.stable_id for m in settings.mixed_filaments), default=0) + 1
+
+
+def _next_unused_pair(settings) -> tuple:
+    """Return the first C(N,2) pair not already defined (1-based).
+
+    Falls back to (1, 2) if all pairs are taken.
+    """
+    existing = {
+        (m.component_a, m.component_b)
+        for m in settings.mixed_filaments
+        if not m.deleted
+    }
+    num_physical = max(len(_physical_hex_colors(settings)), 1)
+
+    for a in range(1, num_physical + 1):
+        for b in range(a + 1, num_physical + 1):
+            if (a, b) not in existing:
+                return (a, b)
+    return (1, 2)
+
+
+def _recompute_display_color_for_item(item, settings) -> None:
+    """Recompute ``item.display_color`` from physical palette + mix ratio."""
+    from ..common.mixed_filaments import compute_display_color, MixedFilament
+
+    physical = _physical_hex_colors(settings)
+    if not physical:
+        return
+
+    mf = MixedFilament(
+        component_a=item.component_a,
+        component_b=item.component_b,
+        mix_b_percent=item.mix_b_percent,
+        distribution_mode=int(item.distribution_mode),
+        manual_pattern=item.manual_pattern,
+    )
+    hex_color = compute_display_color(mf, physical)
+    try:
+        from ..common.colors import hex_to_rgb
+        r, g, b = hex_to_rgb(hex_color)
+        item.display_color = (r, g, b)
+    except Exception:
+        pass
+
+
+class MMU_OT_add_mixed_filament(bpy.types.Operator):
+    """Add a new virtual mixed filament entry to the palette."""
+
+    bl_idname = "mmu.add_mixed_filament"
+    bl_label = "Add Mix"
+    bl_description = "Add a new virtual mixed filament (OrcaSlicer-FullSpectrum)"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.mmu_paint is not None
+
+    def execute(self, context):
+        settings = context.scene.mmu_paint
+        a, b = _next_unused_pair(settings)
+
+        item = settings.mixed_filaments.add()
+        item.component_a = a
+        item.component_b = b
+        item.mix_b_percent = 50
+        item.distribution_mode = "2"
+        item.ui_type = "gradient"
+        item.enabled = True
+        item.deleted = False
+        item.stable_id = _next_stable_id(settings)
+
+        _recompute_display_color_for_item(item, settings)
+        settings.has_mixed_filaments = True
+        settings.active_mixed_filament_index = len(settings.mixed_filaments) - 1
+
+        _refresh_virtual_slots_in_palette(settings)
+        return {"FINISHED"}
+
+
+class MMU_OT_remove_mixed_filament(bpy.types.Operator):
+    """Remove the active virtual mixed filament entry."""
+
+    bl_idname = "mmu.remove_mixed_filament"
+    bl_label = "Remove Mix"
+    bl_description = "Remove the selected virtual mixed filament"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        settings = context.scene.mmu_paint
+        return (
+            settings is not None
+            and settings.has_mixed_filaments
+            and len(settings.mixed_filaments) > 0
+        )
+
+    def execute(self, context):
+        settings = context.scene.mmu_paint
+        idx = settings.active_mixed_filament_index
+        if 0 <= idx < len(settings.mixed_filaments):
+            # Soft-delete: mark deleted so stable_id gap is preserved for round-trip
+            settings.mixed_filaments[idx].deleted = True
+            settings.mixed_filaments[idx].enabled = False
+            # Clamp active index
+            settings.active_mixed_filament_index = max(0, idx - 1)
+
+        _refresh_virtual_slots_in_palette(settings)
+        return {"FINISHED"}
+
+
+class MMU_OT_recompute_mix_color(bpy.types.Operator):
+    """Recompute the display color for the active mixed filament entry."""
+
+    bl_idname = "mmu.recompute_mix_color"
+    bl_label = "Update Color"
+    bl_description = "Recompute the blended swatch color from current component settings"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        settings = context.scene.mmu_paint
+        return (
+            settings is not None
+            and settings.has_mixed_filaments
+            and len(settings.mixed_filaments) > 0
+        )
+
+    def execute(self, context):
+        import numpy as np
+        settings = context.scene.mmu_paint
+        idx = settings.active_mixed_filament_index
+        if not (0 <= idx < len(settings.mixed_filaments)):
+            return {"FINISHED"}
+
+        item = settings.mixed_filaments[idx]
+
+        # Capture old display color before recompute (for pixel replacement)
+        palette_idx = getattr(item, "palette_index", -1)
+        old_rgb = None
+        if 0 <= palette_idx < len(settings.filaments):
+            old_rgb = tuple(settings.filaments[palette_idx].color[:3])
+
+        # Recompute display color
+        _recompute_display_color_for_item(item, settings)
+        _refresh_virtual_slots_in_palette(settings)
+
+        new_rgb = tuple(item.display_color[:])
+
+        # Update the palette entry's stored color
+        if 0 <= palette_idx < len(settings.filaments):
+            settings.filaments[palette_idx].color = new_rgb[:3]
+            _write_colors_to_mesh(context)
+
+        # Update brush to the new color
+        _set_brush_color(context, new_rgb)
+
+        # Reassign pixels in the paint texture (old color → new color)
+        if old_rgb is not None and any(abs(o - n) > 0.002 for o, n in zip(old_rgb, new_rgb)):
+            obj = context.active_object
+            image = _get_paint_image(obj)
+            if image is not None:
+                w, h = image.size
+                pixels_flat = np.empty(w * h * 4, dtype=np.float32)
+                image.pixels.foreach_get(pixels_flat)
+                pixels = pixels_flat.reshape(h, w, 4)
+
+                old_arr = np.array(old_rgb, dtype=np.float32)
+                new_arr = np.array(new_rgb, dtype=np.float32)
+                tolerance = 3.0 / 255.0
+                mask = np.all(np.abs(pixels[:, :, :3] - old_arr) < tolerance, axis=2)
+                num_changed = int(np.count_nonzero(mask))
+                if num_changed > 0:
+                    pixels[mask, 0] = new_arr[0]
+                    pixels[mask, 1] = new_arr[1]
+                    pixels[mask, 2] = new_arr[2]
+                    image.pixels.foreach_set(pixels.ravel())
+                    image.update()
+                    self.report({"INFO"}, f"Updated mix color; reassigned {num_changed} pixels")
+                    return {"FINISHED"}
+
+        return {"FINISHED"}
+
+
+# ===================================================================
+#  Add-mix menu and three add-type operators
+# ===================================================================
+
+
+class MMU_MT_add_mix_menu(bpy.types.Menu):
+    """Popup menu offering three ways to add a virtual mixed filament."""
+
+    bl_idname = "MMU_MT_add_mix_menu"
+    bl_label = "Add Mix"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator("mmu.add_mix_by_color", icon="EYEDROPPER", text="Add: Color")
+        layout.operator("mmu.add_mix_gradient", icon="IPO_LINEAR", text="Add: Gradient")
+        layout.operator("mmu.add_mix_pattern", icon="TEXTURE", text="Add: Pattern")
+
+
+class MMU_OT_add_mix_gradient(bpy.types.Operator):
+    """Add a new gradient-type virtual mixed filament."""
+
+    bl_idname = "mmu.add_mix_gradient"
+    bl_label = "Add: Gradient"
+    bl_description = "Add a new gradient virtual mixed filament (blend ratio between two filaments)"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.mmu_paint is not None
+
+    def execute(self, context):
+        settings = context.scene.mmu_paint
+        a, b = _next_unused_pair(settings)
+
+        item = settings.mixed_filaments.add()
+        item.component_a = a
+        item.component_b = b
+        item.mix_b_percent = 50
+        item.distribution_mode = "2"
+        item.ui_type = "gradient"
+        item.enabled = True
+        item.deleted = False
+        item.stable_id = _next_stable_id(settings)
+
+        _recompute_display_color_for_item(item, settings)
+        settings.has_mixed_filaments = True
+        settings.active_mixed_filament_index = len(settings.mixed_filaments) - 1
+        _refresh_virtual_slots_in_palette(settings)
+        return {"FINISHED"}
+
+
+class MMU_OT_add_mix_pattern(bpy.types.Operator):
+    """Add a new pattern-type virtual mixed filament."""
+
+    bl_idname = "mmu.add_mix_pattern"
+    bl_label = "Add: Pattern"
+    bl_description = "Add a new pattern virtual mixed filament (repeating layer sequence)"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.mmu_paint is not None
+
+    def execute(self, context):
+        settings = context.scene.mmu_paint
+        a, b = _next_unused_pair(settings)
+
+        item = settings.mixed_filaments.add()
+        item.component_a = a
+        item.component_b = b
+        item.mix_b_percent = 50
+        item.distribution_mode = "2"
+        item.ui_type = "pattern"
+        item.manual_pattern = "12"
+        item.enabled = True
+        item.deleted = False
+        item.stable_id = _next_stable_id(settings)
+
+        _recompute_display_color_for_item(item, settings)
+        settings.has_mixed_filaments = True
+        settings.active_mixed_filament_index = len(settings.mixed_filaments) - 1
+        _refresh_virtual_slots_in_palette(settings)
+        return {"FINISHED"}
+
+
+class MMU_OT_add_mix_by_color(bpy.types.Operator):
+    """Find the best filament blend matching the target color set in the panel."""
+
+    bl_idname = "mmu.add_mix_by_color"
+    bl_label = "Add: Color"
+    bl_description = (
+        "Search all filament pairs and three-way patterns to find the best pigment "
+        "blend matching the Target Color shown in the panel"
+    )
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.mmu_paint is not None
+
+    def execute(self, context):
+        from ..common.mixed_filaments import MixedFilament, compute_display_color, DIST_SIMPLE
+        from ..common.colors import hex_to_rgb
+
+        settings = context.scene.mmu_paint
+        physical_hexes = _physical_hex_colors(settings)
+
+        if not physical_hexes:
+            self.report({'WARNING'}, "No filaments in palette — add filaments first")
+            return {'CANCELLED'}
+
+        # Target colour in 0-255 space for distance comparisons.
+        tr = settings.mix_target_color[0] * 255.0
+        tg = settings.mix_target_color[1] * 255.0
+        tb = settings.mix_target_color[2] * 255.0
+
+        best_dist = float("inf")
+        best_a = 1
+        best_b = min(2, len(physical_hexes))
+        best_mix = 50
+        best_pattern = ""
+        best_ui_type = "gradient"
+
+        def _dist(hex_color):
+            r, g, b = hex_to_rgb(hex_color)
+            return (r * 255.0 - tr) ** 2 + (g * 255.0 - tg) ** 2 + (b * 255.0 - tb) ** 2
+
+        n = len(physical_hexes)
+
+        # --- 2-way gradient search: all ordered pairs × mix ratios ---
+        for i in range(n):
+            for j in range(n):
+                if i == j:
+                    continue
+                for mix_b in range(0, 101, 5):
+                    mf = MixedFilament(
+                        component_a=i + 1,
+                        component_b=j + 1,
+                        mix_b_percent=mix_b,
+                        distribution_mode=DIST_SIMPLE,
+                    )
+                    d = _dist(compute_display_color(mf, physical_hexes))
+                    if d < best_dist:
+                        best_dist = d
+                        best_a, best_b, best_mix = i + 1, j + 1, mix_b
+                        best_pattern = ""
+                        best_ui_type = "gradient"
+
+        # --- 3-way pattern search: all triples (A < B < C), four proportion variants ---
+        # Since k >= 2 (0-based), the direct digit str(k+1) >= '3' so it never
+        # conflicts with the reserved '1' (component_a) and '2' (component_b) tokens.
+        for i in range(n):
+            for j in range(i + 1, n):
+                for k in range(j + 1, n):
+                    c_digit = str(k + 1)
+                    # Try equal and skewed proportions to cover the triangle interior.
+                    for pat in (
+                        "12" + c_digit,          # 1:1:1
+                        "112" + c_digit,          # 2:1:1 (A-heavy)
+                        "122" + c_digit,          # 1:2:1 (B-heavy)
+                        "12" + c_digit * 2,       # 1:1:2 (C-heavy)
+                    ):
+                        mf = MixedFilament(
+                            component_a=i + 1,
+                            component_b=j + 1,
+                            mix_b_percent=50,
+                            manual_pattern=pat,
+                            distribution_mode=DIST_SIMPLE,
+                        )
+                        d = _dist(compute_display_color(mf, physical_hexes))
+                        if d < best_dist:
+                            best_dist = d
+                            best_a, best_b, best_mix = i + 1, j + 1, 50
+                            best_pattern = pat
+                            best_ui_type = "pattern"
+
+        item = settings.mixed_filaments.add()
+        item.component_a = best_a
+        item.component_b = best_b
+        item.mix_b_percent = best_mix
+        item.distribution_mode = "2"
+        item.ui_type = best_ui_type
+        item.manual_pattern = best_pattern
+        item.enabled = True
+        item.deleted = False
+        item.stable_id = _next_stable_id(settings)
+
+        _recompute_display_color_for_item(item, settings)
+        settings.has_mixed_filaments = True
+        settings.active_mixed_filament_index = len(settings.mixed_filaments) - 1
+        _refresh_virtual_slots_in_palette(settings)
+        return {"FINISHED"}
+
+
+class MMU_OT_add_mix_confirm(bpy.types.Operator):
+    """Confirm the inline add-mix form and create the new mixed filament."""
+
+    bl_idname = "mmu.add_mix_confirm"
+    bl_label = "Add"
+    bl_description = "Create a new mixed filament using the settings shown above"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.mmu_paint is not None
+
+    def execute(self, context):
+        settings = context.scene.mmu_paint
+        mode = settings.add_mix_mode
+
+        if mode == 'COLOR':
+            # Delegate to the existing color-solver operator.
+            result = bpy.ops.mmu.add_mix_by_color('EXEC_DEFAULT')
+            if result != {'FINISHED'}:
+                return result
+        elif mode == 'GRADIENT':
+            physical_hexes = _physical_hex_colors(settings)
+            if not physical_hexes:
+                self.report({'WARNING'}, "No filaments in palette — add filaments first")
+                return {'CANCELLED'}
+            item = settings.mixed_filaments.add()
+            item.component_a = settings.add_mix_component_a
+            item.component_b = settings.add_mix_component_b
+            item.mix_b_percent = settings.add_mix_mix_b_percent
+            item.distribution_mode = "2"
+            item.ui_type = "gradient"
+            item.manual_pattern = ""
+            item.enabled = True
+            item.deleted = False
+            item.stable_id = _next_stable_id(settings)
+            _recompute_display_color_for_item(item, settings)
+            settings.has_mixed_filaments = True
+            settings.active_mixed_filament_index = len(settings.mixed_filaments) - 1
+            _refresh_virtual_slots_in_palette(settings)
+        elif mode == 'PATTERN':
+            physical_hexes = _physical_hex_colors(settings)
+            if not physical_hexes:
+                self.report({'WARNING'}, "No filaments in palette — add filaments first")
+                return {'CANCELLED'}
+            pat = settings.add_mix_manual_pattern.strip()
+            if not pat or not all(c.isdigit() and c != '0' for c in pat):
+                self.report({'WARNING'}, "Invalid pattern — use digits 1–9, e.g. '12' or '112'")
+                return {'CANCELLED'}
+            item = settings.mixed_filaments.add()
+            item.component_a = settings.add_mix_component_a
+            item.component_b = settings.add_mix_component_b
+            item.mix_b_percent = 50
+            item.distribution_mode = "2"
+            item.ui_type = "pattern"
+            item.manual_pattern = pat
+            item.enabled = True
+            item.deleted = False
+            item.stable_id = _next_stable_id(settings)
+            _recompute_display_color_for_item(item, settings)
+            settings.has_mixed_filaments = True
+            settings.active_mixed_filament_index = len(settings.mixed_filaments) - 1
+            _refresh_virtual_slots_in_palette(settings)
+
+        settings.show_add_mix_section = False
+        return {"FINISHED"}
+
+
+class MMU_OT_cancel_add_mix(bpy.types.Operator):
+    """Hide the inline add-mix form without creating anything."""
+
+    bl_idname = "mmu.cancel_add_mix"
+    bl_label = "Cancel"
+    bl_options = {'INTERNAL'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.mmu_paint is not None
+
+    def execute(self, context):
+        context.scene.mmu_paint.show_add_mix_section = False
         return {"FINISHED"}

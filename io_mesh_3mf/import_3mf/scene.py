@@ -37,6 +37,8 @@ __all__ = [
     "assign_materials_to_mesh",
     "render_paint_texture",
     "render_seam_support_texture",
+    "create_solid_paint_texture",
+    "finalize_shared_solid_texture",
     "apply_triangle_sets",
     "apply_uv_coordinates",
     "set_object_origin",
@@ -168,6 +170,8 @@ def render_paint_texture(
         mesh["3mf_paint_extruder_colors"] = str(extruder_colors_hex)
         mesh["3mf_paint_default_extruder"] = resource_object.default_extruder
         mesh["3mf_is_paint_texture"] = True
+        if ctx.num_physical_filaments > 0:
+            mesh["3mf_num_physical_filaments"] = ctx.num_physical_filaments
 
         ctx._paint_object_names.append(mesh.name)
         debug("Successfully rendered MMU paint data to UV texture")
@@ -180,6 +184,317 @@ def render_paint_texture(
 # ---------------------------------------------------------------------------
 # render_seam_support_texture
 # ---------------------------------------------------------------------------
+
+def create_solid_paint_texture(
+    ctx: "ImportContext",
+    mesh: bpy.types.Mesh,
+    extruder_1based: int,
+) -> bool:
+    """Create a solid-color UV paint texture for a per-part extruder assignment.
+
+    Used when importing in PAINT mode for files (e.g. PeggyPalette) where each
+    part carries ``extruder=N`` metadata but no per-triangle segmentation data.
+    UV-unwraps the mesh and fills every texel with the part's filament color so
+    the result is indistinguishable from a normally-imported paint object and
+    the user can begin painting immediately.
+
+    :param ctx: Import context.
+    :param mesh: The Blender mesh to apply the texture to.
+    :param extruder_1based: 1-based extruder index for this part.
+    :return: ``True`` if the texture was successfully created.
+    """
+    from .segmentation import render_segmentation_to_texture
+
+    extruder_colors_hex = dict(ctx.orca_filament_colors) if ctx.orca_filament_colors else {0: "#808080"}
+
+    # For PARTS-type files (e.g. PeggyPalette) all virtual filaments may be
+    # marked deleted, so orca_filament_colors only contains physical entries.
+    # Re-populate virtual slots positionally from ctx.mixed_filament_entries so
+    # that extruder=N assignments resolve to the correct display color.
+    num_physical = ctx.num_physical_filaments or len(extruder_colors_hex)
+    if ctx.mixed_filament_entries:
+        for pos_idx, mf in enumerate(ctx.mixed_filament_entries):
+            slot_idx = num_physical + pos_idx
+            if slot_idx not in extruder_colors_hex:
+                extruder_colors_hex[slot_idx] = mf.display_color
+
+    # Convert hex colors → RGBA float lists for the renderer.
+    extruder_colors: Dict[int, list] = {}
+    for idx, hex_color in extruder_colors_hex.items():
+        if isinstance(hex_color, str) and hex_color.startswith("#") and len(hex_color) == 7:
+            r = int(hex_color[1:3], 16) / 255.0
+            g = int(hex_color[3:5], 16) / 255.0
+            b = int(hex_color[5:7], 16) / 255.0
+            extruder_colors[idx] = [r, g, b, 1.0]
+        else:
+            extruder_colors[idx] = [0.5, 0.5, 0.5, 1.0]
+
+    temp_obj = bpy.data.objects.new("_temp_solid_uv", mesh)
+    bpy.context.collection.objects.link(temp_obj)
+
+    try:
+        override_size = ctx.options.paint_texture_size
+        tri_count = len(mesh.polygons)
+        if override_size > 0:
+            texture_size = override_size
+        elif tri_count < 5000:
+            texture_size = 2048
+        elif tri_count < 20000:
+            texture_size = 4096
+        else:
+            texture_size = 8192
+
+        debug(
+            f"Creating solid paint texture ({texture_size}px) for "
+            f"extruder {extruder_1based} on {mesh.name!r}"
+        )
+
+        # Empty seg_strings → every face is filled with default_color
+        # (the fallback loop in render_segmentation_to_texture covers all faces).
+        image = render_segmentation_to_texture(
+            temp_obj,
+            {},
+            extruder_colors,
+            texture_size=texture_size,
+            default_extruder=extruder_1based,
+            uv_method=ctx.options.paint_uv_method,
+        )
+
+        mat = bpy.data.materials.new(name=f"{mesh.name}_MMU_Paint")
+        mat.use_nodes = True
+        nodes = mat.node_tree.nodes
+        links = mat.node_tree.links
+        nodes.clear()
+
+        tex_node = nodes.new("ShaderNodeTexImage")
+        tex_node.image = image
+        tex_node.location = (-300, 0)
+
+        bsdf = nodes.new("ShaderNodeBsdfPrincipled")
+        bsdf.location = (100, 0)
+
+        output = nodes.new("ShaderNodeOutputMaterial")
+        output.location = (400, 0)
+
+        links.new(tex_node.outputs["Color"], bsdf.inputs["Base Color"])
+        links.new(bsdf.outputs["BSDF"], output.inputs["Surface"])
+
+        mesh.materials.append(mat)
+
+        num_faces = len(mesh.polygons)
+        mesh.polygons.foreach_set("material_index", [0] * num_faces)
+
+        mesh["3mf_paint_extruder_colors"] = str(extruder_colors_hex)
+        mesh["3mf_paint_default_extruder"] = extruder_1based
+        mesh["3mf_is_paint_texture"] = True
+        if ctx.num_physical_filaments > 0:
+            mesh["3mf_num_physical_filaments"] = ctx.num_physical_filaments
+
+        ctx._paint_object_names.append(mesh.name)
+        return True
+
+    finally:
+        bpy.data.objects.remove(temp_obj, do_unlink=True)
+
+
+# ---------------------------------------------------------------------------
+# finalize_shared_solid_texture
+# ---------------------------------------------------------------------------
+
+def finalize_shared_solid_texture(ctx: "ImportContext") -> None:
+    """Batch all deferred solid-paint parts into a single shared texture.
+
+    Called once after all objects in an archive are built.  Instead of N
+    individual textures (one per part), this creates ONE shared image:
+
+    1. Create a temporary Blender object for every mesh.
+    2. In **multi-object edit mode** (all objects selected at once):
+       - Smart UV Project → every mesh gets non-overlapping islands in [0,1].
+       - Pack Islands → all islands across all objects are repacked together
+         into [0,1] without overlapping each other.
+    3. Read back the final UV coordinates per mesh.
+    4. Rasterize each mesh's triangles into a shared numpy buffer, filled
+       with the solid filament color for that part.  Same triangle-fill
+       and gap-close logic as ``render_segmentation_to_texture``.
+    5. Create one :class:`bpy.types.Image` from the buffer.
+    6. Assign one material per mesh, all pointing at the shared image.
+
+    If there is only one part fall back to ``create_solid_paint_texture``
+    (no sharing overhead).
+    """
+    import math
+    import numpy as np
+    from .segmentation import render_triangle_to_image, close_gaps_in_texture
+
+    parts = ctx.pending_solid_paint_parts
+    if not parts:
+        return
+
+    # --- Single-part fallback -----------------------------------------------
+    if len(parts) == 1:
+        mesh, extruder_1based = parts[0]
+        create_solid_paint_texture(ctx, mesh, extruder_1based)
+        ctx.pending_solid_paint_parts.clear()
+        return
+
+    # --- Build color lookup -------------------------------------------------
+    extruder_colors_hex = dict(ctx.orca_filament_colors) if ctx.orca_filament_colors else {0: "#808080"}
+    num_physical = ctx.num_physical_filaments or len(extruder_colors_hex)
+    if ctx.mixed_filament_entries:
+        for pos_idx, mf in enumerate(ctx.mixed_filament_entries):
+            slot_idx = num_physical + pos_idx
+            if slot_idx not in extruder_colors_hex:
+                extruder_colors_hex[slot_idx] = mf.display_color
+
+    def _hex_to_rgba(h: str):
+        if isinstance(h, str) and h.startswith("#") and len(h) == 7:
+            return np.array([int(h[1:3], 16) / 255.0,
+                             int(h[3:5], 16) / 255.0,
+                             int(h[5:7], 16) / 255.0, 1.0], dtype=np.float32)
+        return np.array([0.5, 0.5, 0.5, 1.0], dtype=np.float32)
+
+    # --- Texture size based on total triangle count -------------------------
+    n = len(parts)
+    total_tris = sum(len(mesh.polygons) for mesh, _ in parts)
+    if total_tris < 5000:
+        texture_size = 2048
+    elif total_tris < 20000:
+        texture_size = 4096
+    else:
+        texture_size = 8192
+    override = ctx.options.paint_texture_size
+    if override > 0:
+        texture_size = override
+
+    uv_layer_name = "MMU_Paint"
+
+    # --- Step 1: create temp objects and ensure UV layer --------------------
+    temp_objs = []
+    for mesh, _ext in parts:
+        uv_layer = mesh.uv_layers.get(uv_layer_name)
+        if uv_layer is None:
+            uv_layer = mesh.uv_layers.new(name=uv_layer_name)
+        mesh.uv_layers.active = uv_layer
+        uv_layer.active_render = True
+
+        obj = bpy.data.objects.new("_temp_shared_uv", mesh)
+        bpy.context.collection.objects.link(obj)
+        temp_objs.append(obj)
+
+    try:
+        # --- Step 2: multi-object Smart UV Project + Pack Islands -----------
+        # Deselect everything first, then select all temp objects.
+        bpy.ops.object.select_all(action="DESELECT")
+        for obj in temp_objs:
+            obj.select_set(True)
+        bpy.context.view_layer.objects.active = temp_objs[0]
+
+        # Enter multi-object edit mode (all selected objects participate).
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="SELECT")
+
+        # Smart UV Project across all selected objects simultaneously.
+        # island_margin targets ~4px gap regardless of texture resolution.
+        _island_margin = max(0.0002, 4.0 / texture_size)
+        bpy.ops.uv.smart_project(
+            angle_limit=1.15192,
+            margin_method="SCALED",
+            rotate_method="AXIS_ALIGNED",
+            island_margin=_island_margin,
+            area_weight=0.6,
+            correct_aspect=True,
+            scale_to_bounds=False,
+        )
+
+        # Pack all islands from all objects together into [0,1]×[0,1].
+        bpy.ops.uv.pack_islands(margin=_island_margin)
+
+        bpy.ops.object.mode_set(mode="OBJECT")
+
+        # --- Step 3: rasterize each mesh into shared buffer -----------------
+        buf = np.zeros((texture_size, texture_size, 4), dtype=np.float32)
+        # Pre-fill transparent so gap-close can propagate island-edge colors.
+        buf[:, :, 3] = 0.0
+
+        for obj, (mesh, extruder_1based) in zip(temp_objs, parts):
+            rgba = _hex_to_rgba(extruder_colors_hex.get(extruder_1based - 1, "#808080"))
+
+            uv_data = mesh.uv_layers.active.data
+            num_loops = len(uv_data)
+            uv_flat = np.zeros(num_loops * 2, dtype=np.float64)
+            uv_data.foreach_get("uv", uv_flat)
+            all_uvs = uv_flat.reshape(-1, 2)
+
+            for poly in mesh.polygons:
+                if len(poly.loop_indices) != 3:
+                    continue
+                li = list(poly.loop_indices)
+                uv0 = all_uvs[li[0]]
+                uv1 = all_uvs[li[1]]
+                uv2 = all_uvs[li[2]]
+                render_triangle_to_image(buf, texture_size, texture_size, uv0, uv1, uv2, rgba)
+
+        # Close seam gaps and fill any remaining transparent pixels.
+        # island_margin = 4/texture_size → 4px gap; 2 rounds fills it exactly.
+        buf = close_gaps_in_texture(buf, texture_size, texture_size, uv_method="SMART",
+                                    dilation_rounds=2)
+        still_transparent = buf[:, :, 3] < 0.5
+        if np.any(still_transparent):
+            buf[still_transparent] = np.array([0.5, 0.5, 0.5, 1.0], dtype=np.float32)
+
+    finally:
+        # Clean up temp objects regardless of errors.
+        for obj in temp_objs:
+            bpy.data.objects.remove(obj, do_unlink=True)
+
+    # --- Step 4: create one shared image ------------------------------------
+    image = bpy.data.images.new("Shared_MMU_Paint", width=texture_size, height=texture_size, alpha=True)
+    image.pixels.foreach_set(buf.ravel())
+    image.pack()
+
+    debug(
+        f"Shared solid texture: {n} parts, {total_tris} tris → "
+        f"{texture_size}px image"
+    )
+
+    # --- Step 5: assign materials (one per mesh, all share the image) -------
+    for mesh, extruder_1based in parts:
+        mat = bpy.data.materials.new(name=f"{mesh.name}_MMU_Paint")
+        mat.use_nodes = True
+        nodes = mat.node_tree.nodes
+        links = mat.node_tree.links
+        nodes.clear()
+
+        tex_node = nodes.new("ShaderNodeTexImage")
+        tex_node.image = image
+        tex_node.location = (-300, 0)
+
+        bsdf = nodes.new("ShaderNodeBsdfPrincipled")
+        bsdf.location = (100, 0)
+
+        output = nodes.new("ShaderNodeOutputMaterial")
+        output.location = (400, 0)
+
+        links.new(tex_node.outputs["Color"], bsdf.inputs["Base Color"])
+        links.new(bsdf.outputs["BSDF"], output.inputs["Surface"])
+
+        mesh.materials.append(mat)
+        mesh.polygons.foreach_set("material_index", [0] * len(mesh.polygons))
+
+        mesh["3mf_paint_extruder_colors"] = str(extruder_colors_hex)
+        mesh["3mf_paint_default_extruder"] = extruder_1based
+        mesh["3mf_is_paint_texture"] = True
+        if ctx.num_physical_filaments > 0:
+            mesh["3mf_num_physical_filaments"] = ctx.num_physical_filaments
+
+        ctx._paint_object_names.append(mesh.name)
+
+    ctx.safe_report(
+        {"INFO"},
+        f"Created shared MMU paint texture ({texture_size}px) for {n} parts",
+    )
+    ctx.pending_solid_paint_parts.clear()
+
 
 def render_seam_support_texture(
     ctx: "ImportContext",
@@ -260,6 +575,7 @@ def render_seam_support_texture(
             default_color_override=default_color,
             image_name_override=image_name,
             set_active_render=False,
+            source_uv_layer_name="MMU_Paint",
         )
 
         # Add the image as an unlinked TEX_IMAGE node in the paint material

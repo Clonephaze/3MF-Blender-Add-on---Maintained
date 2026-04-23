@@ -64,8 +64,8 @@ def read_vertices(
 ) -> List[Tuple[float, float, float]]:
     """Read vertices from an ``<object>`` element.
 
-    If any vertex is corrupt (missing or non-float coordinate) the default
-    of ``0`` is used to keep the index list consistent.
+    If any vertex is corrupt (missing or non-float coordinate) the vertex
+    is stored as ``(0, 0, 0)`` to keep the index list consistent.
 
     :param ctx: The import context (for ``safe_report``).
     :param object_node: An ``<object>`` element from the model file.
@@ -77,24 +77,15 @@ def read_vertices(
     ):
         attrib = vertex.attrib
         try:
-            x = float(attrib.get("x", 0))
-        except ValueError:
-            warn("Vertex missing X coordinate.")
-            ctx.safe_report({"WARNING"}, "Vertex missing X coordinate")
-            x = 0
-        try:
-            y = float(attrib.get("y", 0))
-        except ValueError:
-            warn("Vertex missing Y coordinate.")
-            ctx.safe_report({"WARNING"}, "Vertex missing Y coordinate")
-            y = 0
-        try:
-            z = float(attrib.get("z", 0))
-        except ValueError:
-            warn("Vertex missing Z coordinate.")
-            ctx.safe_report({"WARNING"}, "Vertex missing Z coordinate")
-            z = 0
-        result.append((x, y, z))
+            result.append((
+                float(attrib.get("x", 0)),
+                float(attrib.get("y", 0)),
+                float(attrib.get("z", 0)),
+            ))
+        except (ValueError, TypeError):
+            warn("Vertex has non-float coordinate — using 0.")
+            ctx.safe_report({"WARNING"}, "Vertex has non-float coordinate")
+            result.append((0.0, 0.0, 0.0))
     return result
 
 
@@ -163,6 +154,28 @@ def read_triangles(
         default_extruder = ctx.object_default_extruders.get(object_id, 1)
 
     import_materials = ctx.options.import_materials
+
+    # --- Fast path for geometry-only imports (no material / UV data needed) ---
+    if import_materials == "NONE":
+        _tri_path = "./3mf:mesh/3mf:triangles/3mf:triangle"
+        for triangle in object_node.iterfind(_tri_path, MODEL_NAMESPACES):
+            attrib = triangle.attrib
+            try:
+                v1 = int(attrib["v1"])
+                v2 = int(attrib["v2"])
+                v3 = int(attrib["v3"])
+            except (KeyError, ValueError) as e:
+                warn(f"Vertex reference error: {e}")
+                ctx.safe_report({"WARNING"}, f"Vertex reference error: {e}")
+                continue
+            if v1 < 0 or v2 < 0 or v3 < 0:
+                warn("Triangle containing negative index to vertex list.")
+                ctx.safe_report({"WARNING"}, "Triangle containing negative index to vertex list")
+                continue
+            vertices.append((v1, v2, v3))
+        return (
+            vertices, [], None, vertex_list, {}, {}, {}, default_extruder
+        )
 
     for tri_index, triangle in enumerate(
         object_node.iterfind(
@@ -620,6 +633,12 @@ def read_objects(
     from .archive import load_external_model
     from .triangle_sets import read_triangle_sets
 
+    import time as _time
+    _t0_all = _time.perf_counter()
+    _total_verts = 0
+    _total_tris = 0
+    _ext_load_time = 0.0
+
     for object_node in root.iterfind(
         "./3mf:resources/3mf:object", MODEL_NAMESPACES
     ):
@@ -670,6 +689,7 @@ def read_objects(
                     )
 
         verts = read_vertices(ctx, object_node)
+        _t_tri = _time.perf_counter()
         (
             triangles,
             mats,
@@ -680,9 +700,16 @@ def read_objects(
             support_strings,
             default_extruder,
         ) = read_triangles(ctx, object_node, material, pid, verts, objectid)
+        _tri_elapsed = _time.perf_counter() - _t_tri
+        _total_verts += len(verts)
+        _total_tris += len(triangles)
+        debug(
+            f"[TIMING]     obj {objectid}: {len(verts)}v {len(triangles)}t  "
+            f"parse={_tri_elapsed:.3f}s"
+        )
 
         # Detect multiproperties at triangle level for passthrough
-        if objectid not in ctx.object_passthrough_pids:
+        if objectid not in ctx.object_passthrough_pids and ctx.resource_multiproperties:
             for tri_node in object_node.iterfind(
                 "./3mf:mesh/3mf:triangles/3mf:triangle", MODEL_NAMESPACES
             ):
@@ -694,9 +721,11 @@ def read_objects(
 
         components = read_components(ctx, object_node)
 
+        _t_ext = _time.perf_counter()
         for component in components:
             if component.path:
                 load_external_model(ctx, component.path)
+        _ext_load_time += _time.perf_counter() - _t_ext
 
         metadata = Metadata()
         for metadata_node in object_node.iterfind(
@@ -743,6 +772,12 @@ def read_objects(
             support_strings=support_strings if support_strings else None,
             default_extruder=default_extruder,
         )
+
+    debug(
+        f"[TIMING]   read_objects total: {_time.perf_counter() - _t0_all:.3f}s  "
+        f"{len(ctx.resource_objects)} objects  {_total_verts}v {_total_tris}t  "
+        f"ext_load={_ext_load_time:.3f}s"
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -229,8 +229,8 @@ class ReadTrianglesMaterialTests(unittest.TestCase):
         tris, mats, uvs, verts, seg, seam, support, defext = read_triangles(
             ctx, node, default, "1"
         )
-        # Should use the default, not look up the material
-        self.assertIs(mats[0], default)
+        # NONE mode fast-path skips all material lookups — mats list is empty
+        self.assertEqual(len(mats), 0)
 
 
 class ReadTrianglesPaintCodeTests(unittest.TestCase):

@@ -34,43 +34,27 @@ from ...common import debug, warn
 from ...common.colors import linear_to_srgb
 from ..components import collect_mesh_objects
 
-# Orca Slicer paint_color encoding for filament IDs
-# This matches CONST_FILAMENTS in OrcaSlicer's Model.cpp
-# Index 0 = no color (base extruder), 1-32 = filament IDs
+# Orca Slicer paint_color encoding for filament IDs.
+# This matches CONST_FILAMENTS in OrcaSlicer's Model.cpp.
+# Index 0 = no color (base extruder); 1+ = filament IDs.
+# Extended through index 62 to cover OrcaSlicer-FullSpectrum virtual mixed filaments
+# (which can reach indices 5+ with 4 physical filaments and 40+ virtual definitions).
 ORCA_FILAMENT_CODES = [
     "",
     "4",
     "8",
-    "0C",
-    "1C",
-    "2C",
-    "3C",
-    "4C",
-    "5C",
-    "6C",
-    "7C",
-    "8C",
-    "9C",
-    "AC",
-    "BC",
-    "CC",
-    "DC",
-    "EC",
-    "0FC",
-    "1FC",
-    "2FC",
-    "3FC",
-    "4FC",
-    "5FC",
-    "6FC",
-    "7FC",
-    "8FC",
-    "9FC",
-    "AFC",
-    "BFC",
-    "CFC",
-    "DFC",
-    "EFC",
+    # Tier 2: 0C–EC (indices 3–17)
+    "0C", "1C", "2C", "3C", "4C", "5C", "6C", "7C",
+    "8C", "9C", "AC", "BC", "CC", "DC", "EC",
+    # Tier 3: 0FC–EFC (indices 18–32)
+    "0FC", "1FC", "2FC", "3FC", "4FC", "5FC", "6FC", "7FC",
+    "8FC", "9FC", "AFC", "BFC", "CFC", "DFC", "EFC",
+    # Tier 4: 0FFC–EFFC (indices 33–47)
+    "0FFC", "1FFC", "2FFC", "3FFC", "4FFC", "5FFC", "6FFC", "7FFC",
+    "8FFC", "9FFC", "AFFC", "BFFC", "CFFC", "DFFC", "EFFC",
+    # Tier 5: 0FFFC–EFFFC (indices 48–62)
+    "0FFFC", "1FFFC", "2FFFC", "3FFFC", "4FFFC", "5FFFC", "6FFFC", "7FFFC",
+    "8FFFC", "9FFFC", "AFFFC", "BFFFC", "CFFFC", "DFFFC", "EFFFC",
 ]
 
 

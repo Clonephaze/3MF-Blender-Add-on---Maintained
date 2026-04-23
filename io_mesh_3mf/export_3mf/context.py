@@ -96,6 +96,9 @@ class ExportContext:
     project_template_path: Optional[str] = None  # Custom JSON template path
     # Per-object Orca overrides (keyed by object name)
     object_settings: Dict[str, Dict[str, str]] = field(default_factory=dict)
+    # OrcaSlicer-FullSpectrum: raw mixed_filament_definitions string for round-trip.
+    # Populated from the scene custom property written on import.
+    mixed_filament_definitions_raw: str = ""
 
     # --- Extension tracking -------------------------------------------------
     extension_manager: ExtensionManager = field(default_factory=ExtensionManager)

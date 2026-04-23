@@ -19,12 +19,133 @@ import bpy
 import bpy.props
 import bpy.types
 
-from .helpers import _on_active_filament_changed
+from .helpers import _on_active_filament_changed, _on_active_mix_filament_changed
+
+
+# ===================================================================
+#  Mixed filament ui_type helpers
+# ===================================================================
+
+# Stable module-level tuples — Blender requires these to be kept alive
+# for dynamic enum callbacks to avoid garbage-collection crashes.
+_UI_TYPE_ITEMS_BASE = [
+    ("gradient", "Gradient", "Blend component A and B by a factor"),
+    ("pattern", "Pattern", "Multi-filament manual pattern string"),
+]
+# Imported-only modes — only appear in the dropdown when the entry already uses them
+_UI_TYPE_ITEMS_LAYER_CYCLE = _UI_TYPE_ITEMS_BASE + [("layer_cycle", "Layer Cycle (Imported)", "Round-trip only")]
+_UI_TYPE_ITEMS_POINTILLISM = _UI_TYPE_ITEMS_BASE + [("pointillism", "Pointillism (Imported)", "Round-trip only")]
+_UI_TYPE_ITEMS_BOTH_IMPORTED = _UI_TYPE_ITEMS_BASE + [
+    ("layer_cycle", "Layer Cycle (Imported)", "Round-trip only"),
+    ("pointillism", "Pointillism (Imported)", "Round-trip only"),
+]
+
+
+def _ui_type_items(self, context):
+    """Return enum items; expose imported-only modes only when the entry already uses one."""
+    ut = self.ui_type
+    if ut == "layer_cycle" and ut == "pointillism":
+        return _UI_TYPE_ITEMS_BOTH_IMPORTED
+    if ut == "layer_cycle":
+        return _UI_TYPE_ITEMS_LAYER_CYCLE
+    if ut == "pointillism":
+        return _UI_TYPE_ITEMS_POINTILLISM
+    return _UI_TYPE_ITEMS_BASE
+
+
+def _ui_type_update(self, context):
+    """Keep distribution_mode in sync and clear stale fields when the user changes the type."""
+    if self.ui_type == "layer_cycle":
+        self.distribution_mode = "0"
+    elif self.ui_type == "pointillism":
+        self.distribution_mode = "1"
+    else:  # gradient or pattern — both use mode 2
+        self.distribution_mode = "2"
+    # Switching to gradient removes any leftover pattern so it doesn't export
+    if self.ui_type == "gradient":
+        self.manual_pattern = ""
 
 
 # ===================================================================
 #  PropertyGroups
 # ===================================================================
+
+
+class MMUMixedFilamentItem(bpy.types.PropertyGroup):
+    """One virtual mixed filament entry (OrcaSlicer-FullSpectrum).
+
+    Mirrors the fields from :class:`~io_mesh_3mf.common.mixed_filaments.MixedFilament`
+    that are relevant to the UI.
+    """
+
+    component_a: bpy.props.IntProperty(
+        name="Component A",
+        description="1-based physical filament index for component A",
+        default=1,
+        min=1,
+        max=16,
+    )
+    component_b: bpy.props.IntProperty(
+        name="Component B",
+        description="1-based physical filament index for component B",
+        default=2,
+        min=1,
+        max=16,
+    )
+    mix_b_percent: bpy.props.IntProperty(
+        name="Mix B %",
+        description="Percentage of component B in the blend (0-100)",
+        default=50,
+        min=0,
+        max=100,
+        subtype="PERCENTAGE",
+    )
+    display_color: bpy.props.FloatVectorProperty(
+        name="Color",
+        subtype="COLOR_GAMMA",
+        size=3,
+        min=0.0,
+        max=1.0,
+        default=(0.15, 0.65, 0.6),  # Fallback teal #26A69A
+        description="Computed blended display color (sRGB)",
+    )
+    distribution_mode: bpy.props.StringProperty(
+        name="Distribution Mode (internal)",
+        description="Raw mode token for round-trip serialization (do not edit manually)",
+        default="2",
+    )
+    ui_type: bpy.props.EnumProperty(
+        name="Type",
+        description="How this virtual filament blends its components",
+        items=_ui_type_items,
+        update=_ui_type_update,
+        default=None,
+        options={"SKIP_SAVE"},
+    )
+    manual_pattern: bpy.props.StringProperty(
+        name="Pattern",
+        description="Manual layer pattern string (digits 1-9, commas for groups)",
+        default="",
+    )
+    stable_id: bpy.props.IntProperty(
+        name="Stable ID",
+        description="Persistent round-trip identity (do not edit manually)",
+        default=0,
+    )
+    enabled: bpy.props.BoolProperty(
+        name="Enabled",
+        default=True,
+    )
+    deleted: bpy.props.BoolProperty(
+        name="Deleted",
+        description="Soft-deleted (hidden but preserved for round-trip)",
+        default=False,
+    )
+    palette_index: bpy.props.IntProperty(
+        name="Palette Index",
+        description="Index of this mix entry in settings.filaments (-1 if not active)",
+        default=-1,
+    )
 
 
 class MMUFilamentItem(bpy.types.PropertyGroup):
@@ -43,6 +164,11 @@ class MMUFilamentItem(bpy.types.PropertyGroup):
         name="Extruder Index",
         description="0-based extruder index",
         default=0,
+    )
+    is_virtual: bpy.props.BoolProperty(
+        name="Is Virtual",
+        description="True for mixed-filament virtual slots (not shown in main palette)",
+        default=False,
     )
 
 
@@ -195,3 +321,73 @@ class MMUPaintSettings(bpy.types.PropertyGroup):
 
     # Internal: tracks which mesh the filament list was loaded from
     loaded_mesh_name: bpy.props.StringProperty(default="")
+
+    # --- Mixed filaments (OrcaSlicer-FullSpectrum) ---
+    has_mixed_filaments: bpy.props.BoolProperty(
+        name="Has Mixed Filaments",
+        description="True when mixed filament definitions are present (import or user-created)",
+        default=False,
+    )
+    mixed_filaments: bpy.props.CollectionProperty(type=MMUMixedFilamentItem)
+    active_mixed_filament_index: bpy.props.IntProperty(
+        name="Active Mixed Filament",
+        default=0,
+        update=lambda self, ctx: _on_active_mix_filament_changed(self, ctx),
+    )
+    num_physical_filaments: bpy.props.IntProperty(
+        name="Physical Filament Count",
+        description="Number of physical (non-virtual) filaments in the palette",
+        default=0,
+    )
+    mix_target_color: bpy.props.FloatVectorProperty(
+        name="Target Color",
+        subtype="COLOR_GAMMA",
+        size=3,
+        min=0.0,
+        max=1.0,
+        default=(0.5, 0.5, 0.5),
+        description="Target color used by 'Add: Color' to find the best filament blend",
+    )
+    # --- Inline add-mix form state ---
+    show_add_mix_section: bpy.props.BoolProperty(
+        name="Show Add Mix",
+        description="Show the inline form for adding a new mixed filament",
+        default=False,
+    )
+    add_mix_mode: bpy.props.EnumProperty(
+        name="Mode",
+        description="How to define the new mixed filament",
+        items=[
+            ('COLOR', "Target Color", "Find the best blend matching a chosen target color"),
+            ('GRADIENT', "Gradient", "Directly set a gradient blend between two filaments"),
+            ('PATTERN', "Pattern", "Directly set a repeating layer pattern"),
+        ],
+        default='COLOR',
+    )
+    add_mix_component_a: bpy.props.IntProperty(
+        name="Component A",
+        description="First physical filament (1-based)",
+        min=1,
+        max=16,
+        default=1,
+    )
+    add_mix_component_b: bpy.props.IntProperty(
+        name="Component B",
+        description="Second physical filament (1-based)",
+        min=1,
+        max=16,
+        default=2,
+    )
+    add_mix_mix_b_percent: bpy.props.IntProperty(
+        name="Mix B %",
+        description="Percentage of component B in the blend (0 = all A, 100 = all B)",
+        min=0,
+        max=100,
+        default=50,
+        subtype='PERCENTAGE',
+    )
+    add_mix_manual_pattern: bpy.props.StringProperty(
+        name="Pattern",
+        description="Repeating layer pattern digits (1=A, 2=B, 3–9=direct slot). E.g. '12', '112'",
+        default="12",
+    )

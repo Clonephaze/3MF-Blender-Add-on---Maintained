@@ -26,6 +26,7 @@ from .helpers import (
     _get_paint_mesh,
     _sync_filaments_from_mesh,
     _has_vertex_colors,
+    draw_add_mix_form,
 )
 
 
@@ -71,6 +72,22 @@ class MMU_UL_filaments(bpy.types.UIList):
         elif self.layout_type == "GRID":
             layout.alignment = "CENTER"
             layout.prop(item, "color", text="")
+
+    def filter_items(self, context, data, propname):
+        """Hide virtual (mix) filaments — they live in the Mix Colors sub-panel."""
+        items = getattr(data, propname)
+        settings = getattr(context.scene, "mmu_paint", None)
+        num_physical = getattr(settings, "num_physical_filaments", 0) if settings else 0
+        flt_flags = []
+        for idx, item in enumerate(items):
+            # Hide if explicitly marked virtual, OR if index is beyond the physical count
+            is_virt = getattr(item, "is_virtual", False)
+            beyond_physical = (num_physical > 0 and idx >= num_physical)
+            if is_virt or beyond_physical:
+                flt_flags.append(0)  # hidden
+            else:
+                flt_flags.append(self.bitflag_filter_item)
+        return flt_flags, []
 
 
 # ===================================================================
@@ -303,6 +320,171 @@ class VIEW3D_PT_mmu_paint(bpy.types.Panel):
             info.scale_y = 0.7
             info.label(text="Snap all pixels to the nearest")
             info.label(text="filament color to clean up edges")
+
+
+# ===================================================================
+#  Mixed filament UIList
+# ===================================================================
+
+
+class MMU_UL_mixed_filaments(bpy.types.UIList):
+    """List of virtual mixed filament definitions (OrcaSlicer-FullSpectrum)."""
+
+    def draw_item(
+        self, context, layout, data, item, icon, active_data, active_property, index
+    ):
+        if self.layout_type in {"DEFAULT", "COMPACT"}:
+            row = layout.row(align=True)
+
+            # Blended color swatch (read-only)
+            swatch = row.row()
+            swatch.ui_units_x = 1.5
+            swatch.enabled = False
+            swatch.prop(item, "display_color", text="")
+
+            # Component labels + ratio — show pattern summary when present
+            if item.manual_pattern:
+                # Count unique filament IDs in the pattern for a compact label
+                flat = item.manual_pattern.replace(",", "")
+                ids_seen = []
+                for ch in flat:
+                    if ch.isdigit() and ch not in ids_seen:
+                        ids_seen.append(ch)
+                filament_str = "+".join(f"F{c}" for c in ids_seen)
+                row.label(text=f"{filament_str}  (Pattern)")
+            else:
+                pct_a = 100 - item.mix_b_percent
+                row.label(text=f"F{item.component_a} + F{item.component_b}  {pct_a}/{item.mix_b_percent}%")
+        elif self.layout_type == "GRID":
+            layout.alignment = "CENTER"
+            layout.prop(item, "display_color", text="")
+
+    def filter_items(self, context, data, propname):
+        """Show only live (enabled, not deleted) mix entries."""
+        items = getattr(data, propname)
+        flt_flags = []
+        for item in items:
+            if not getattr(item, "enabled", True) or getattr(item, "deleted", False):
+                flt_flags.append(0)
+            else:
+                flt_flags.append(self.bitflag_filter_item)
+        return flt_flags, []
+
+
+# ===================================================================
+#  Mix Colors sub-panel
+# ===================================================================
+
+
+class VIEW3D_PT_mmu_mix_colors(bpy.types.Panel):
+    """Mix Colors sub-panel — virtual mixed filament palette (FullSpectrum).
+
+    Collapsed by default and only visible when:
+    - A FullSpectrum file has been imported (``scene.mmu_paint.has_mixed_filaments``), OR
+    - The user has enabled "Show Mixed Filaments" in addon Preferences.
+
+    Lives inside ``VIEW3D_PT_mmu_paint`` and only appears in Texture Paint mode
+    with an active paint mesh.
+    """
+
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "3MF"
+    bl_label = "Mix Colors"
+    bl_parent_id = "VIEW3D_PT_mmu_paint"
+    bl_options = {'DEFAULT_CLOSED'}
+    bl_context = "imagepaint"
+
+    @classmethod
+    def poll(cls, context):
+        # Must be in active paint state (mesh present)
+        from .helpers import _get_paint_mesh
+        if _get_paint_mesh(context) is None:
+            return False
+        # Visible when mixed filaments are present OR user has opted in via prefs
+        addon_pkg = __package__.rsplit(".", 1)[0]  # "io_mesh_3mf"
+        prefs_entry = context.preferences.addons.get(addon_pkg)
+        if prefs_entry and getattr(prefs_entry.preferences, "show_mixed_filaments", False):
+            return True
+        settings = getattr(context.scene, "mmu_paint", None)
+        return settings is not None and settings.has_mixed_filaments
+
+    def draw(self, context):
+        layout = self.layout
+        settings = context.scene.mmu_paint
+
+        # --- Mixed filament list (shown when any exist) ---
+        if settings.has_mixed_filaments and settings.mixed_filaments:
+            row = layout.row()
+            row.template_list(
+                "MMU_UL_mixed_filaments",
+                "",
+                settings,
+                "mixed_filaments",
+                settings,
+                "active_mixed_filament_index",
+                rows=3,
+                maxrows=8,
+            )
+
+            col = row.column(align=True)
+            col.prop(
+                settings,
+                "show_add_mix_section",
+                icon="ADD",
+                text="",
+                toggle=True,
+                emboss=True,
+            )
+            col.operator("mmu.remove_mixed_filament", icon="REMOVE", text="")
+        else:
+            row = layout.row()
+            row.label(text="No mixed filaments defined.", icon="INFO")
+            row.prop(
+                settings,
+                "show_add_mix_section",
+                icon="ADD",
+                text="",
+                toggle=True,
+                emboss=True,
+            )
+
+        # --- Inline add-mix form ---
+        if settings.show_add_mix_section:
+            box = layout.box()
+            box.label(text="Add Color", icon="ADD")
+            draw_add_mix_form(box, settings)
+
+        # --- Active entry detail ---
+        if settings.has_mixed_filaments and settings.mixed_filaments:
+            idx = settings.active_mixed_filament_index
+            if 0 <= idx < len(settings.mixed_filaments):
+                mf = settings.mixed_filaments[idx]
+                header, panel = layout.panel(f"mmu_mix_edit_{idx}", default_closed=False)
+                header.label(text="Edit Color", icon="COLORSET_13_VEC")
+                if panel:
+                    col = panel.column(align=True)
+                    col.prop(mf, "ui_type", text="Type")
+                    col.separator()
+                    ut = mf.ui_type
+                    if ut == "gradient":
+                        col.prop(mf, "component_a", text="Component A")
+                        col.prop(mf, "component_b", text="Component B")
+                        col.prop(mf, "mix_b_percent", slider=True)
+                    elif ut == "pattern":
+                        col.prop(mf, "component_a", text="Component A")
+                        col.prop(mf, "component_b", text="Component B")
+                        col.prop(mf, "manual_pattern")
+                    elif ut == "layer_cycle":
+                        col.prop(mf, "component_a", text="Component A")
+                        col.prop(mf, "component_b", text="Component B")
+                        col.label(text="Round-trip only — not editable in OrcaSlicer", icon="INFO")
+                    elif ut == "pointillism":
+                        col.prop(mf, "component_a", text="Component A")
+                        col.prop(mf, "component_b", text="Component B")
+                        col.prop(mf, "mix_b_percent", slider=True)
+                        col.label(text="Round-trip only — not editable in OrcaSlicer", icon="INFO")
+                    panel.operator("mmu.recompute_mix_color", icon="FILE_REFRESH", text="Update Color")
 
 
 # ===================================================================

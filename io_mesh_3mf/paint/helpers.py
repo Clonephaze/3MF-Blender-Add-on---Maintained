@@ -172,8 +172,18 @@ def _sync_filaments_from_mesh(context):
         settings.loaded_mesh_name = ""
         return
 
-    # Already in sync?
-    if settings.loaded_mesh_name == mesh.name and len(settings.filaments) > 0:
+    # Already in sync?  Also re-sync when the mixed filament count changes
+    # (e.g. after a FullSpectrum import that runs after initial palette load).
+    num_virtual = sum(
+        1 for m in getattr(settings, "mixed_filaments", [])
+        if m.enabled and not m.deleted
+    ) if getattr(settings, "has_mixed_filaments", False) else 0
+    physical_count_expected = len(settings.filaments) - num_virtual
+    if (
+        settings.loaded_mesh_name == mesh.name
+        and len(settings.filaments) > 0
+        and physical_count_expected >= 0
+    ):
         return
 
     colors_str = mesh.get("3mf_paint_extruder_colors", "")
@@ -190,13 +200,40 @@ def _sync_filaments_from_mesh(context):
         return
 
     settings.filaments.clear()
+    # If the mesh carries a stored physical-filament count, only load those
+    # entries from the colour dict.  Virtual (mix) entries are re-appended
+    # dynamically below from settings.mixed_filaments, which avoids duplicate
+    # slots and ensures num_physical_filaments is set correctly.
+    stored_num_physical = int(mesh.get("3mf_num_physical_filaments", 0))
     for idx in sorted(colors_dict.keys()):
+        if stored_num_physical > 0 and int(idx) >= stored_num_physical:
+            break  # Stop at the physical/virtual boundary
         item = settings.filaments.add()
         item.index = idx
         item.name = f"Filament {idx + 1}"
         hex_col = colors_dict[idx]
         rgb = _rgb_from_hex(hex_col)
         item.color = rgb
+
+    # Append virtual (mixed) filament slots after the physical ones.
+    # They are marked is_virtual=True so the main palette UIList can hide them;
+    # the Mix Colors sub-panel exposes them for selection.
+    num_physical = len(settings.filaments)
+    if hasattr(settings, "num_physical_filaments"):
+        settings.num_physical_filaments = num_physical
+    if getattr(settings, "has_mixed_filaments", False):
+        virt_idx = num_physical  # 0-based index continuing from physicals
+        for mf_item in settings.mixed_filaments:
+            mf_item.palette_index = -1  # reset; only set for active entries
+            if not mf_item.enabled or mf_item.deleted:
+                continue
+            item = settings.filaments.add()
+            item.index = virt_idx
+            item.name = f"Mix {mf_item.component_a}+{mf_item.component_b}"
+            item.color = tuple(mf_item.display_color)
+            item.is_virtual = True
+            mf_item.palette_index = virt_idx
+            virt_idx += 1
 
     settings.loaded_mesh_name = mesh.name
     # Clamp active index
@@ -205,15 +242,74 @@ def _sync_filaments_from_mesh(context):
 
 
 def _write_colors_to_mesh(context):
-    """Write the current filament palette back to the mesh custom property."""
+    """Write the physical filament palette back to the mesh custom properties.
+
+    Only physical (non-virtual) entries are written so round-tripped files
+    do not accidentally re-import mixed-filament display colours as real slots.
+    ``3mf_num_physical_filaments`` is also kept in sync so
+    ``_sync_filaments_from_mesh`` can restore the physical/virtual boundary.
+    """
     mesh = _get_paint_mesh(context)
     if mesh is None:
         return
     settings = context.scene.mmu_paint
+    num_physical = (
+        settings.num_physical_filaments
+        if settings.num_physical_filaments > 0
+        else sum(1 for f in settings.filaments if not f.is_virtual)
+    )
     colors_dict = {}
-    for item in settings.filaments:
+    for i, item in enumerate(settings.filaments):
+        if i >= num_physical:
+            break
         colors_dict[item.index] = _hex_from_rgb(*item.color)
     mesh["3mf_paint_extruder_colors"] = str(colors_dict)
+    mesh["3mf_num_physical_filaments"] = num_physical
+
+
+def _refresh_virtual_slots_in_palette(settings) -> None:
+    """Re-append virtual (mixed) filament slots into the live palette.
+
+    Removes any existing virtual entries (those beyond the physical count as
+    stored in the mesh property) and re-adds them from ``settings.mixed_filaments``.
+    Called after ``_populate_mixed_filaments_on_scene`` so the palette is
+    immediately correct without waiting for the depsgraph sync.
+
+    Safe to call even when ``has_mixed_filaments`` is False — it becomes a no-op.
+    """
+    if not getattr(settings, "has_mixed_filaments", False):
+        return
+
+    # Use num_physical_filaments if available (set during sync).  Fall back to
+    # counting by is_virtual flag, then the old heuristic for compatibility.
+    if getattr(settings, "num_physical_filaments", 0) > 0:
+        num_physical = settings.num_physical_filaments
+    else:
+        # Count non-virtual entries directly
+        non_virtual = [f for f in settings.filaments if not getattr(f, "is_virtual", False)]
+        num_physical = len(non_virtual)
+        if num_physical == 0:
+            return  # Palette not yet populated — sync will handle it
+
+    # Trim back to physical count (remove any virtual entries already there)
+    while len(settings.filaments) > num_physical:
+        settings.filaments.remove(len(settings.filaments) - 1)
+
+    num_physical = len(settings.filaments)
+    if hasattr(settings, "num_physical_filaments"):
+        settings.num_physical_filaments = num_physical
+    virt_idx = num_physical
+    for mf_item in settings.mixed_filaments:
+        mf_item.palette_index = -1
+        if not mf_item.enabled or mf_item.deleted:
+            continue
+        item = settings.filaments.add()
+        item.index = virt_idx
+        item.name = f"Mix {mf_item.component_a}+{mf_item.component_b}"
+        item.color = tuple(mf_item.display_color)
+        item.is_virtual = True
+        mf_item.palette_index = virt_idx
+        virt_idx += 1
 
 
 def _configure_paint_brush(context):
@@ -333,3 +429,55 @@ def _on_active_filament_changed(self, context):
             _set_brush_color(context, color)
     except Exception:
         pass  # Silently ignore context errors during undo/redo
+
+
+def _on_active_mix_filament_changed(self, context):
+    """When user clicks a mix filament row, auto-select it as the active brush color."""
+    try:
+        settings = context.scene.mmu_paint
+        idx = settings.active_mixed_filament_index
+        if 0 <= idx < len(settings.mixed_filaments):
+            mf = settings.mixed_filaments[idx]
+            if mf.enabled and not mf.deleted:
+                color = tuple(mf.display_color[:])
+                _set_brush_color(context, color)
+                # Also set active_filament_index to the virtual palette slot so
+                # export / bake tools see the right index.
+                if mf.palette_index >= 0:
+                    settings.active_filament_index = mf.palette_index
+    except Exception:
+        pass  # Silently ignore context errors during undo/redo
+
+
+# ---------------------------------------------------------------------------
+# Shared UI helpers
+# ---------------------------------------------------------------------------
+
+def draw_add_mix_form(layout, settings):
+    """Draw the inline add-mix form into *layout*.
+
+    Used by both VIEW3D_PT_mmu_mix_colors (mmu_panel.py) and the bake panel
+    (bake.py).  The box/panel wrapping is handled by the caller.
+    """
+    col = layout.column(align=True)
+    col.prop(settings, "add_mix_mode", text="")
+    col.separator()
+
+    mode = settings.add_mix_mode
+    if mode == 'COLOR':
+        row = col.row(align=True)
+        row.label(text="Target:", icon="EYEDROPPER")
+        row.prop(settings, "mix_target_color", text="")
+    elif mode == 'GRADIENT':
+        col.prop(settings, "add_mix_component_a", text="Component A")
+        col.prop(settings, "add_mix_component_b", text="Component B")
+        col.prop(settings, "add_mix_mix_b_percent", text="Mix B %", slider=True)
+    elif mode == 'PATTERN':
+        col.prop(settings, "add_mix_component_a", text="Component A")
+        col.prop(settings, "add_mix_component_b", text="Component B")
+        col.prop(settings, "add_mix_manual_pattern", text="Pattern")
+
+    col.separator()
+    row = col.row(align=True)
+    row.operator("mmu.add_mix_confirm", icon="ADD")
+    row.operator("mmu.cancel_add_mix", icon="X", text="")
