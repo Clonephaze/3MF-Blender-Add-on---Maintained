@@ -341,6 +341,24 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
                 swatch.enabled = False
                 swatch.prop(item, "color", text="")
 
+            # Show mixed (virtual) filaments that will also be included.
+            active_mixes = [
+                mf for mf in settings.mixed_filaments
+                if mf.enabled and not mf.deleted
+            ] if getattr(settings, "has_mixed_filaments", False) else []
+            if active_mixes:
+                pal_box.separator(factor=0.5)
+                pal_box.label(text="+ Mixed Filaments (included):", icon="IPO_LINEAR")
+                mix_flow = pal_box.grid_flow(
+                    row_major=True, columns=0, even_columns=True,
+                    even_rows=True, align=True,
+                )
+                for mf in active_mixes:
+                    swatch = mix_flow.row(align=True)
+                    swatch.ui_units_x = 1.2
+                    swatch.enabled = False
+                    swatch.prop(mf, "display_color", text="")
+
         # --- Bake Settings -------------------------------------------------
         settings_box = layout.box()
         settings_box.label(text="Bake Settings", icon="PREFERENCES")

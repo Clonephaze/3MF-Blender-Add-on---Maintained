@@ -1,21 +1,24 @@
-2.6.0 — FullSpectrum Round-Trip & Import Performance
+2.6.0 — FullSpectrum Round-Trip & MMU Mix Colors
 ====
 
-FullSpectrum Multi-Material Support
+Features
 ----
-* **FullSpectrum 3MF import** — Added complete import support for OrcaSlicer-FullSpectrum files, including part hierarchy reconstruction from wrapper/part metadata.
-* **Per-part extruder inheritance** — Part colors now resolve correctly from `extruder=N` metadata using part-level values first, then wrapper defaults (fixes missing color on inherited parts like Base).
-* **Virtual filament swatches** — Virtual mixed filament slots (5-44) are computed via FilamentMixer and shown in the MMU Paint panel next to the 4 physical filaments.
-* **Correct FullSpectrum export format** — FullSpectrum round-trips now export in parts mode: per-part `extruder=N` metadata is preserved (including virtual slots), `mixed_filament_definitions` are retained, `filament_colour` contains only physical colors, and no triangle `paint_color` segmentation is written.
-* **Mixed filament UI editing** — MMU Paint exposes mixed filament settings (components, mix %, distribution mode, manual pattern) with live display swatches.
+* **FullSpectrum 3MF import** — Full import support for OrcaSlicer-FullSpectrum files, with part hierarchy reconstruction, per-part extruder inheritance, and virtual mixed filament slots in the MMU Paint panel.
+* **FullSpectrum export** — Correct parts-mode export: per-part `extruder=N` metadata, `mixed_filament_definitions` retained, only physical colors in `filament_colour`.
+* **Mix Colors inline form** — The `+` button in the Mix Colors panel now opens an inline form instead of a popup menu. Choose a mode — **Target Color** (auto-finds the closest blend), **Gradient** (set components and mix ratio), or **Pattern** (set a repeating layer sequence) — then click **Add**.
+* **Bake panel mixed list** — The Mixed Filaments section in the Shader Editor bake panel is now hidden by default in a collapsible section.
+* **Bake confirmation shows mixed filaments** — The bake confirmation popup now shows your mixed filament colors alongside the physical palette so you can confirm they will be included.
+
+Bug Fixes
+----
+* **Mixed filaments included in bake quantization** — Baking and re-quantizing now use the full palette including mixed virtual slots, so painted mixed-color regions are no longer snapped back to the nearest physical color.
+* **Filament add/remove in paint panel** — Adding a filament now immediately appears in the list; removing one no longer corrupts the virtual slot order.
 
 Performance
 ----
-* **Faster multi-component import** — External `.model` references are cached and reused, avoiding repeated archive opens/parses for assemblies that share component sources.
-* **Faster MMU paint decode** — Single-color (leaf) segmentation strings now use an O(1) fast path instead of full recursive decoding.
-* **Seam/Support texture UV layout reuse** — When rendering Seam and Support paint textures, the UV layout computed for the Color paint layer is now reused directly instead of re-running Smart UV Project. This avoids redundant UV unwrapping for those auxiliary layers.
-* **Resolution-scaled UV island margin** — Smart UV margin now scales with texture size (`4 / texture_size`) for tighter packing and cleaner gap fill at high resolutions.
-* **Removed per-face unsegmented raster loop** — Unassigned triangles are now handled by gap fill, eliminating a major O(face count) import bottleneck.
+* **Faster multi-component import** — External `.model` references are cached so assemblies that share component sources only parse them once.
+* **Faster MMU paint decode** — Single-color segmentation strings use an O(1) fast path.
+* **Seam/Support UV reuse** — UV layout is computed once for the Color layer and reused for Seam and Support layers.
 
 ----
 
