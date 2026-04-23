@@ -447,3 +447,37 @@ def _on_active_mix_filament_changed(self, context):
                     settings.active_filament_index = mf.palette_index
     except Exception:
         pass  # Silently ignore context errors during undo/redo
+
+
+# ---------------------------------------------------------------------------
+# Shared UI helpers
+# ---------------------------------------------------------------------------
+
+def draw_add_mix_form(layout, settings):
+    """Draw the inline add-mix form into *layout*.
+
+    Used by both VIEW3D_PT_mmu_mix_colors (mmu_panel.py) and the bake panel
+    (bake.py).  The box/panel wrapping is handled by the caller.
+    """
+    col = layout.column(align=True)
+    col.prop(settings, "add_mix_mode", text="")
+    col.separator()
+
+    mode = settings.add_mix_mode
+    if mode == 'COLOR':
+        row = col.row(align=True)
+        row.label(text="Target:", icon="EYEDROPPER")
+        row.prop(settings, "mix_target_color", text="")
+    elif mode == 'GRADIENT':
+        col.prop(settings, "add_mix_component_a", text="Component A")
+        col.prop(settings, "add_mix_component_b", text="Component B")
+        col.prop(settings, "add_mix_mix_b_percent", text="Mix B %", slider=True)
+    elif mode == 'PATTERN':
+        col.prop(settings, "add_mix_component_a", text="Component A")
+        col.prop(settings, "add_mix_component_b", text="Component B")
+        col.prop(settings, "add_mix_manual_pattern", text="Pattern")
+
+    col.separator()
+    row = col.row(align=True)
+    row.operator("mmu.add_mix_confirm", icon="ADD")
+    row.operator("mmu.cancel_add_mix", icon="X", text="")

@@ -842,13 +842,19 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
             mesh.polygons.foreach_set("material_index", material_indices)
 
         # --- Set up 3mf custom properties ---
+        # Write ONLY the physical filament colors to the mesh palette.  Mixed
+        # filament display colors are virtual and must NOT be stored as physical
+        # entries — _sync_filaments_from_mesh re-appends them from
+        # settings.mixed_filaments, but only when it knows the physical boundary.
+        num_physical = len(settings.init_filaments)
         colors_dict = {}
-        for i, color in enumerate(filament_colors):
-            colors_dict[i] = _hex_from_rgb(*color)
+        for i in range(num_physical):
+            colors_dict[i] = _hex_from_rgb(*filament_colors[i])
 
         mesh["3mf_is_paint_texture"] = True
         mesh["3mf_paint_default_extruder"] = 1  # 1-based
         mesh["3mf_paint_extruder_colors"] = str(colors_dict)
+        mesh["3mf_num_physical_filaments"] = num_physical
 
         # --- Sync the paint panel ---
         settings.loaded_mesh_name = ""  # Force reload
@@ -911,26 +917,24 @@ class MMU_OT_quantize_texture(bpy.types.Operator):
             self.report({"ERROR"}, "No paint texture found")
             return {"CANCELLED"}
 
-        # Get filament colors from mesh properties
-        colors_str = mesh.get("3mf_paint_extruder_colors", "")
-        if not colors_str:
-            self.report({"ERROR"}, "No filament colors stored on mesh")
-            return {"CANCELLED"}
-
-        try:
-            colors_dict = ast.literal_eval(colors_str)
-        except (ValueError, SyntaxError):
-            self.report({"ERROR"}, "Failed to parse filament colors")
-            return {"CANCELLED"}
-
-        filament_colors = []
-        for idx in sorted(colors_dict.keys()):
-            rgb = _rgb_from_hex(colors_dict[idx])
-            filament_colors.append(rgb)
-
+        # Get filament colors — include mixed virtual slots so that pixels
+        # painted with a mixed color are preserved (not snapped back to physical).
+        filament_colors = _get_filament_colors_from_settings(context)
         if len(filament_colors) < 2:
-            self.report({"ERROR"}, "Need at least 2 filament colors")
-            return {"CANCELLED"}
+            # Fall back to reading from mesh if settings are unavailable
+            colors_str = mesh.get("3mf_paint_extruder_colors", "")
+            if not colors_str:
+                self.report({"ERROR"}, "No filament colors stored on mesh")
+                return {"CANCELLED"}
+            try:
+                colors_dict = ast.literal_eval(colors_str)
+            except (ValueError, SyntaxError):
+                self.report({"ERROR"}, "Failed to parse filament colors")
+                return {"CANCELLED"}
+            filament_colors = [_rgb_from_hex(colors_dict[idx]) for idx in sorted(colors_dict.keys())]
+            if len(filament_colors) < 2:
+                self.report({"ERROR"}, "Need at least 2 filament colors")
+                return {"CANCELLED"}
 
         # Quantize
         w, h = image.size
@@ -1080,6 +1084,51 @@ def _draw_bake_panel(layout, context):
                 "mmu.detect_material_colors", icon="MATERIAL",
             )
             util_row.operator("mmu.reset_init_filaments", icon="FILE_REFRESH")
+
+        # Mixed filaments section — collapsible, hidden by default.  Users can
+        # define blended virtual slots before baking; the bake pipeline includes
+        # these colors automatically via _get_filament_colors_from_settings().
+        mix_header, mix_body = layout.panel("mmu_bake_mixed_filaments", default_closed=True)
+        mix_header.label(text="Mixed Filaments", icon="IPO_LINEAR")
+        if mix_body:
+            from .helpers import draw_add_mix_form
+            if settings.has_mixed_filaments and settings.mixed_filaments:
+                row = mix_body.row()
+                row.template_list(
+                    "MMU_UL_mixed_filaments",
+                    "bake_mixed",
+                    settings,
+                    "mixed_filaments",
+                    settings,
+                    "active_mixed_filament_index",
+                    rows=2,
+                    maxrows=6,
+                )
+                col = row.column(align=True)
+                col.prop(
+                    settings,
+                    "show_add_mix_section",
+                    icon="ADD",
+                    text="",
+                    toggle=True,
+                    emboss=True,
+                )
+                col.operator("mmu.remove_mixed_filament", icon="REMOVE", text="")
+            else:
+                row = mix_body.row()
+                row.label(text="No mixed filaments defined.", icon="INFO")
+                row.prop(
+                    settings,
+                    "show_add_mix_section",
+                    icon="ADD",
+                    text="",
+                    toggle=True,
+                    emboss=True,
+                )
+            if settings.show_add_mix_section:
+                box = mix_body.box()
+                box.label(text="Add Color", icon="ADD")
+                draw_add_mix_form(box, settings)
 
         # Options
         opts_box = layout.box()

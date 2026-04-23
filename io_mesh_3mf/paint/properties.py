@@ -339,3 +339,55 @@ class MMUPaintSettings(bpy.types.PropertyGroup):
         description="Number of physical (non-virtual) filaments in the palette",
         default=0,
     )
+    mix_target_color: bpy.props.FloatVectorProperty(
+        name="Target Color",
+        subtype="COLOR_GAMMA",
+        size=3,
+        min=0.0,
+        max=1.0,
+        default=(0.5, 0.5, 0.5),
+        description="Target color used by 'Add: Color' to find the best filament blend",
+    )
+    # --- Inline add-mix form state ---
+    show_add_mix_section: bpy.props.BoolProperty(
+        name="Show Add Mix",
+        description="Show the inline form for adding a new mixed filament",
+        default=False,
+    )
+    add_mix_mode: bpy.props.EnumProperty(
+        name="Mode",
+        description="How to define the new mixed filament",
+        items=[
+            ('COLOR', "Target Color", "Find the best blend matching a chosen target color"),
+            ('GRADIENT', "Gradient", "Directly set a gradient blend between two filaments"),
+            ('PATTERN', "Pattern", "Directly set a repeating layer pattern"),
+        ],
+        default='COLOR',
+    )
+    add_mix_component_a: bpy.props.IntProperty(
+        name="Component A",
+        description="First physical filament (1-based)",
+        min=1,
+        max=16,
+        default=1,
+    )
+    add_mix_component_b: bpy.props.IntProperty(
+        name="Component B",
+        description="Second physical filament (1-based)",
+        min=1,
+        max=16,
+        default=2,
+    )
+    add_mix_mix_b_percent: bpy.props.IntProperty(
+        name="Mix B %",
+        description="Percentage of component B in the blend (0 = all A, 100 = all B)",
+        min=0,
+        max=100,
+        default=50,
+        subtype='PERCENTAGE',
+    )
+    add_mix_manual_pattern: bpy.props.StringProperty(
+        name="Pattern",
+        description="Repeating layer pattern digits (1=A, 2=B, 3–9=direct slot). E.g. '12', '112'",
+        default="12",
+    )

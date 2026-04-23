@@ -68,6 +68,8 @@ from .operators import (
     MMU_OT_add_mix_gradient,
     MMU_OT_add_mix_pattern,
     MMU_OT_add_mix_by_color,
+    MMU_OT_add_mix_confirm,
+    MMU_OT_cancel_add_mix,
 )
 from .mmu_panel import (
     MMU_UL_init_filaments,
@@ -107,6 +109,8 @@ _paint_classes = (
     MMU_OT_add_mix_gradient,
     MMU_OT_add_mix_pattern,
     MMU_OT_add_mix_by_color,
+    MMU_OT_add_mix_confirm,
+    MMU_OT_cancel_add_mix,
     MMU_UL_init_filaments,
     MMU_UL_filaments,
     MMU_UL_mixed_filaments,

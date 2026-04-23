@@ -26,6 +26,7 @@ from .helpers import (
     _get_paint_mesh,
     _sync_filaments_from_mesh,
     _has_vertex_colors,
+    draw_add_mix_form,
 )
 
 
@@ -412,59 +413,78 @@ class VIEW3D_PT_mmu_mix_colors(bpy.types.Panel):
         layout = self.layout
         settings = context.scene.mmu_paint
 
-        if not settings.has_mixed_filaments and not settings.mixed_filaments:
-            col = layout.column()
-            col.label(text="No mixed filaments defined.", icon="INFO")
-            col.label(text="Add a mix below to get started.")
-            layout.menu("MMU_MT_add_mix_menu", icon="ADD")
-            return
+        # --- Mixed filament list (shown when any exist) ---
+        if settings.has_mixed_filaments and settings.mixed_filaments:
+            row = layout.row()
+            row.template_list(
+                "MMU_UL_mixed_filaments",
+                "",
+                settings,
+                "mixed_filaments",
+                settings,
+                "active_mixed_filament_index",
+                rows=3,
+                maxrows=8,
+            )
 
-        # List
-        row = layout.row()
-        row.template_list(
-            "MMU_UL_mixed_filaments",
-            "",
-            settings,
-            "mixed_filaments",
-            settings,
-            "active_mixed_filament_index",
-            rows=3,
-            maxrows=8,
-        )
+            col = row.column(align=True)
+            col.prop(
+                settings,
+                "show_add_mix_section",
+                icon="ADD",
+                text="",
+                toggle=True,
+                emboss=True,
+            )
+            col.operator("mmu.remove_mixed_filament", icon="REMOVE", text="")
+        else:
+            row = layout.row()
+            row.label(text="No mixed filaments defined.", icon="INFO")
+            row.prop(
+                settings,
+                "show_add_mix_section",
+                icon="ADD",
+                text="",
+                toggle=True,
+                emboss=True,
+            )
 
-        col = row.column(align=True)
-        col.menu("MMU_MT_add_mix_menu", icon="ADD", text="")
-        col.operator("mmu.remove_mixed_filament", icon="REMOVE", text="")
+        # --- Inline add-mix form ---
+        if settings.show_add_mix_section:
+            box = layout.box()
+            box.label(text="Add Color", icon="ADD")
+            draw_add_mix_form(box, settings)
 
-        # Active entry detail
-        idx = settings.active_mixed_filament_index
-        if 0 <= idx < len(settings.mixed_filaments):
-            mf = settings.mixed_filaments[idx]
-            header, panel = layout.panel(f"mmu_mix_edit_{idx}", default_closed=False)
-            header.label(text="Edit Color", icon="COLORSET_13_VEC")
-            if panel:
-                col = panel.column(align=True)
-                col.prop(mf, "ui_type", text="Type")
-                col.separator()
-                ut = mf.ui_type
-                if ut == "gradient":
-                    col.prop(mf, "component_a", text="Component A")
-                    col.prop(mf, "component_b", text="Component B")
-                    col.prop(mf, "mix_b_percent", slider=True)
-                elif ut == "pattern":
-                    col.prop(mf, "component_a", text="Component A")
-                    col.prop(mf, "component_b", text="Component B")
-                    col.prop(mf, "manual_pattern")
-                elif ut == "layer_cycle":
-                    col.prop(mf, "component_a", text="Component A")
-                    col.prop(mf, "component_b", text="Component B")
-                    col.label(text="Round-trip only — not editable in OrcaSlicer", icon="INFO")
-                elif ut == "pointillism":
-                    col.prop(mf, "component_a", text="Component A")
-                    col.prop(mf, "component_b", text="Component B")
-                    col.prop(mf, "mix_b_percent", slider=True)
-                    col.label(text="Round-trip only — not editable in OrcaSlicer", icon="INFO")
-                panel.operator("mmu.recompute_mix_color", icon="FILE_REFRESH", text="Update Color")
+        # --- Active entry detail ---
+        if settings.has_mixed_filaments and settings.mixed_filaments:
+            idx = settings.active_mixed_filament_index
+            if 0 <= idx < len(settings.mixed_filaments):
+                mf = settings.mixed_filaments[idx]
+                header, panel = layout.panel(f"mmu_mix_edit_{idx}", default_closed=False)
+                header.label(text="Edit Color", icon="COLORSET_13_VEC")
+                if panel:
+                    col = panel.column(align=True)
+                    col.prop(mf, "ui_type", text="Type")
+                    col.separator()
+                    ut = mf.ui_type
+                    if ut == "gradient":
+                        col.prop(mf, "component_a", text="Component A")
+                        col.prop(mf, "component_b", text="Component B")
+                        col.prop(mf, "mix_b_percent", slider=True)
+                    elif ut == "pattern":
+                        col.prop(mf, "component_a", text="Component A")
+                        col.prop(mf, "component_b", text="Component B")
+                        col.prop(mf, "manual_pattern")
+                    elif ut == "layer_cycle":
+                        col.prop(mf, "component_a", text="Component A")
+                        col.prop(mf, "component_b", text="Component B")
+                        col.label(text="Round-trip only — not editable in OrcaSlicer", icon="INFO")
+                    elif ut == "pointillism":
+                        col.prop(mf, "component_a", text="Component A")
+                        col.prop(mf, "component_b", text="Component B")
+                        col.prop(mf, "mix_b_percent", slider=True)
+                        col.label(text="Round-trip only — not editable in OrcaSlicer", icon="INFO")
+                    panel.operator("mmu.recompute_mix_color", icon="FILE_REFRESH", text="Update Color")
 
 
 # ===================================================================
