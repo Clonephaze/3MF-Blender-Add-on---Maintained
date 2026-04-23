@@ -68,6 +68,25 @@ from .materials import (
 
 __all__ = ["Import3MF"]
 
+# Mapping from 3MF unit names to Blender length_unit identifiers.
+_THREEMF_TO_BLENDER_UNIT = {
+    "micron": "MICROMETERS",
+    "millimeter": "MILLIMETERS",
+    "centimeter": "CENTIMETERS",
+    "inch": "INCHES",
+    "foot": "FEET",
+    "meter": "METERS",
+}
+
+# Blender length_unit → unit system.
+_BLENDER_UNIT_SYSTEM = {
+    "MICROMETERS": "METRIC", "MILLIMETERS": "METRIC", "CENTIMETERS": "METRIC",
+    "DECIMETERS": "METRIC", "METERS": "METRIC", "DEKAMETERS": "METRIC",
+    "HECTOMETERS": "METRIC", "KILOMETERS": "METRIC",
+    "THOU": "IMPERIAL", "INCHES": "IMPERIAL", "FEET": "IMPERIAL",
+    "YARDS": "IMPERIAL", "CHAINS": "IMPERIAL", "FURLONGS": "IMPERIAL", "MILES": "IMPERIAL",
+}
+
 
 class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
     """Operator that imports a 3MF file into Blender."""
@@ -84,8 +103,28 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
     filter_glob: bpy.props.StringProperty(default="*.3mf", options={"HIDDEN"})
     files: bpy.props.CollectionProperty(name="File Path", type=bpy.types.OperatorFileListElement)
     directory: bpy.props.StringProperty(subtype="DIR_PATH")
+    scene_unit: bpy.props.EnumProperty(
+        name="Scene Unit",
+        description="Set the Blender scene unit after import. Geometry is always scaled correctly "
+                    "regardless of which unit is chosen",
+        items=[
+            ("KEEP", "Keep Current", "Leave the Blender scene unit unchanged"),
+            ("FILE", "From File", "Set scene units to match the unit declared in the 3MF file"),
+            ("MILLIMETERS", "Millimeters", "Set scene to millimeters"),
+            ("CENTIMETERS", "Centimeters", "Set scene to centimeters"),
+            ("METERS", "Meters", "Set scene to meters"),
+            ("INCHES", "Inches", "Set scene to inches"),
+            ("FEET", "Feet", "Set scene to feet"),
+            ("MICROMETERS", "Micrometers", "Set scene to micrometers"),
+            ("KILOMETERS", "Kilometers", "Set scene to kilometers"),
+        ],
+        default="KEEP",
+    )
     global_scale: bpy.props.FloatProperty(
-        name="Scale", default=1.0, soft_min=0.001, soft_max=1000.0, min=1e-6, max=1e6,
+        name="Scale Multiplier",
+        description="Additional scale factor applied on top of automatic unit conversion. "
+                    "1.0 imports at the correct physical size for the chosen scene unit",
+        default=1.0, soft_min=0.001, soft_max=1000.0, min=1e-6, max=1e6,
     )
     import_materials: bpy.props.EnumProperty(
         name="Material Mode",
@@ -205,6 +244,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             info_box = layout.box()
             info_box.label(text=f"Importing {file_count} files", icon="FILE_FOLDER")
 
+        layout.prop(self, "scene_unit")
         layout.prop(self, "global_scale")
         layout.separator()
 
@@ -252,12 +292,20 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             self.reuse_materials = prefs.preferences.default_reuse_materials
             self.import_location = prefs.preferences.default_import_location
             self.origin_to_geometry = prefs.preferences.default_origin_to_geometry
+            if hasattr(prefs.preferences, "default_scene_unit"):
+                self.scene_unit = prefs.preferences.default_scene_unit
             if hasattr(prefs.preferences, "default_grid_spacing"):
                 self.grid_spacing = prefs.preferences.default_grid_spacing
             if hasattr(prefs.preferences, "default_auto_smooth"):
                 self.auto_smooth = prefs.preferences.default_auto_smooth
             if hasattr(prefs.preferences, "default_auto_smooth_angle"):
                 self.auto_smooth_angle = prefs.preferences.default_auto_smooth_angle
+            if hasattr(prefs.preferences, "default_paint_uv_method"):
+                self.paint_uv_method = prefs.preferences.default_paint_uv_method
+            if hasattr(prefs.preferences, "default_paint_texture_size"):
+                self.paint_texture_size = prefs.preferences.default_paint_texture_size
+            if hasattr(prefs.preferences, "default_shared_paint_texture"):
+                self.shared_paint_texture = prefs.preferences.default_shared_paint_texture
 
         # If files are already provided (drag-drop), show popup instead of file browser
         if getattr(self, "directory", "") and getattr(self, "files", None):
@@ -515,6 +563,9 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         # Extension activation.
         self._activate_extensions(ctx, root, path)
 
+        # Apply requested scene unit before computing scale (may update context.scene.unit_settings).
+        self._apply_scene_unit(context, root)
+
         # Unit scale.
         scale_unit = self._unit_scale(context, root)
 
@@ -703,6 +754,24 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         return extensions <= SUPPORTED_EXTENSIONS
 
     # ----- Unit scale -------------------------------------------------------
+
+    def _apply_scene_unit(
+        self, context: bpy.types.Context, root: xml.etree.ElementTree.Element
+    ) -> None:
+        """Set context.scene.unit_settings to match the requested scene_unit option."""
+        if self.scene_unit == "KEEP":
+            return
+        from ..common.constants import MODEL_DEFAULT_UNIT
+        if self.scene_unit == "FILE":
+            threemf_unit = root.attrib.get("unit", MODEL_DEFAULT_UNIT)
+            target = _THREEMF_TO_BLENDER_UNIT.get(threemf_unit, "MILLIMETERS")
+        else:
+            target = self.scene_unit
+        system = _BLENDER_UNIT_SYSTEM.get(target, "METRIC")
+        context.scene.unit_settings.system = system
+        context.scene.unit_settings.length_unit = target
+        context.scene.unit_settings.scale_length = 1.0
+        debug(f"Scene units set to {target} ({system})")
 
     def _unit_scale(self, context: bpy.types.Context, root: xml.etree.ElementTree.Element) -> float:
         """Calculate the scale factor for the 3MF document's units (including global_scale)."""

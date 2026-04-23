@@ -616,6 +616,7 @@ def import_3mf(
     auto_smooth_angle: float = 0.5236,
     paint_uv_method: str = "SMART",
     paint_texture_size: int = 0,
+    scene_unit: str = "KEEP",
     target_collection: Optional[str] = None,
     on_progress: Optional[ProgressCallback] = None,
     on_warning: Optional[WarningCallback] = None,
@@ -640,6 +641,10 @@ def import_3mf(
     :param paint_uv_method: ``"SMART"`` (default) or ``"LIGHTMAP"``.
         Smart UV groups adjacent faces; Lightmap gives each face unique space.
     :param paint_texture_size: Override texture resolution (0 = auto).
+    :param scene_unit: Set the Blender scene unit after import.
+        ``"KEEP"`` (default) leaves scene units unchanged.
+        ``"FILE"`` sets units to match the unit declared in the 3MF file.
+        Any Blender length unit identifier (e.g. ``"MILLIMETERS"``, ``"INCHES"``) sets it directly.
     :param target_collection: Name of an existing Blender collection to place
         imported objects into.  If *None*, objects are added to the active
         collection.  If the named collection does not exist it will be created
@@ -788,8 +793,11 @@ def import_3mf(
         # Extension activation.
         _activate_extensions_api(ctx, root)
 
-        # Unit scale.
+        # Apply requested scene unit before computing scale.
         context = bpy.context
+        _apply_scene_unit_api(context, root, scene_unit)
+
+        # Unit scale.
         scale_unit = _import_unit_scale(context, root, global_scale)
 
         # Reset per-model resource dictionaries.
@@ -1426,6 +1434,28 @@ def _inspect_textures(root, result: InspectResult) -> None:
             "path": tex_node.attrib.get("path", ""),
             "contenttype": tex_node.attrib.get("contenttype", ""),
         })
+
+
+def _apply_scene_unit_api(
+    context: bpy.types.Context,
+    root: xml.etree.ElementTree.Element,
+    scene_unit: str,
+) -> None:
+    """Apply the scene_unit setting to context.scene.unit_settings."""
+    from .import_3mf.operator import _THREEMF_TO_BLENDER_UNIT, _BLENDER_UNIT_SYSTEM
+    if scene_unit == "KEEP":
+        return
+    from .common.constants import MODEL_DEFAULT_UNIT
+    if scene_unit == "FILE":
+        threemf_unit = root.attrib.get("unit", MODEL_DEFAULT_UNIT)
+        target = _THREEMF_TO_BLENDER_UNIT.get(threemf_unit, "MILLIMETERS")
+    else:
+        target = scene_unit
+    system = _BLENDER_UNIT_SYSTEM.get(target, "METRIC")
+    context.scene.unit_settings.system = system
+    context.scene.unit_settings.length_unit = target
+    context.scene.unit_settings.scale_length = 1.0
+    debug(f"API: Scene units set to {target} ({system})")
 
 
 def _import_unit_scale(

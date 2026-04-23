@@ -247,6 +247,55 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         subtype="ANGLE",
     )
 
+    default_scene_unit: bpy.props.EnumProperty(
+        name="Scene Unit",
+        description="Set the Blender scene unit after import. Geometry is always scaled correctly "
+                    "regardless of which unit is chosen",
+        items=[
+            ("KEEP", "Keep Current", "Leave the Blender scene unit unchanged"),
+            ("FILE", "From File", "Set scene units to match the unit declared in the 3MF file"),
+            ("MILLIMETERS", "Millimeters", "Set scene to millimeters"),
+            ("CENTIMETERS", "Centimeters", "Set scene to centimeters"),
+            ("METERS", "Meters", "Set scene to meters"),
+            ("INCHES", "Inches", "Set scene to inches"),
+            ("FEET", "Feet", "Set scene to feet"),
+            ("MICROMETERS", "Micrometers", "Set scene to micrometers"),
+            ("KILOMETERS", "Kilometers", "Set scene to kilometers"),
+        ],
+        default="KEEP",
+    )
+
+    default_paint_uv_method: bpy.props.EnumProperty(
+        name="UV Method",
+        description="UV unwrap method for MMU paint texture rendering",
+        items=[
+            ("SMART", "Smart UV Project", "Groups coplanar faces into islands (best for most models)"),
+            ("LIGHTMAP", "Lightmap Pack", "Every face gets unique UV space (higher fidelity, may show edge gaps)"),
+        ],
+        default="SMART",
+    )
+
+    default_paint_texture_size: bpy.props.EnumProperty(
+        name="Texture Size",
+        description="Resolution of the MMU paint texture",
+        items=[
+            ("0", "Auto", "Automatic based on triangle count (2K / 4K / 8K)"),
+            ("1024", "1024", "1024\u00d71024 (fast, lower detail)"),
+            ("2048", "2048", "2048\u00d72048 (good for simple models)"),
+            ("4096", "4096", "4096\u00d74096 (recommended for most models)"),
+            ("8192", "8192", "8192\u00d78192 (high detail, uses more memory)"),
+            ("16384", "16384", "16384\u00d716384 (very high detail, slow)"),
+        ],
+        default="0",
+    )
+
+    default_shared_paint_texture: bpy.props.BoolProperty(
+        name="Shared UV Texture",
+        description="Pack all solid-color parts into one shared UV texture. "
+                    "Saves memory and lets you paint across all parts at once",
+        default=True,
+    )
+
     default_multi_material_export: bpy.props.EnumProperty(
         name="Material Export Mode",
         description="How to export material and color data to 3MF",
@@ -366,6 +415,9 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
 
     def _draw_import(self, layout):
         col = layout.column(align=True)
+        col.label(text="Scene Unit:", icon="DRIVER_DISTANCE")
+        col.prop(self, "default_scene_unit", text="")
+        col.separator()
         col.prop(self, "default_import_materials", icon="MATERIAL")
         col.prop(self, "default_reuse_materials", icon="LINKED")
         col.separator()
@@ -379,6 +431,12 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         col.prop(self, "default_auto_smooth")
         if self.default_auto_smooth:
             col.prop(self, "default_auto_smooth_angle")
+        if self.default_import_materials == "PAINT":
+            col.separator()
+            col.label(text="MMU Paint:", icon="BRUSH_DATA")
+            col.prop(self, "default_paint_uv_method")
+            col.prop(self, "default_paint_texture_size")
+            col.prop(self, "default_shared_paint_texture")
 
     def _draw_advanced(self, layout):
         from .slicer_profiles import list_profiles
