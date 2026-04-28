@@ -1,0 +1,9 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: Usage Guide
+    url: https://www.clonecore.net/docs/3mf-guide/getting-started
+    about: Import/export walkthrough and slicer-specific setup.
+  - name: API Guide
+    url: https://www.clonecore.net/docs/3mf/guide
+    about: Headless and scripting usage via the public API.

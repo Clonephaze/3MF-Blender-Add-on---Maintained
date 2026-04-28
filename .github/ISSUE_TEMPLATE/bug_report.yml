@@ -1,0 +1,87 @@
+name: Bug Report
+description: Something isn't working right
+labels: ["bug", "needs triage"]
+assignees: ["Clonephaze"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill this out! The more detail you provide, the faster it can be fixed.
+
+  - type: input
+    id: addon-version
+    attributes:
+      label: Addon Version
+      description: Found in Edit → Preferences → Add-ons → 3MF Format
+      placeholder: "e.g. 2.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: blender-version
+    attributes:
+      label: Blender Version
+      placeholder: "e.g. 5.0"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      placeholder: "e.g. Windows 11, macOS 14, Ubuntu 24.04"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area does this relate to?
+      options:
+        - Import
+        - Export — Standard
+        - Export — Orca / BambuStudio
+        - Export — PrusaSlicer
+        - Multi-Material Paint
+        - UI / Preferences
+        - Performance
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe what went wrong. Include any error messages from the Blender console (Window → Toggle System Console).
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Walk through exactly what you did before hitting the bug.
+      placeholder: |
+        1. Opened a .3mf file with '...'
+        2. Clicked Export with settings '...'
+        3. Opened the result in OrcaSlicer
+        4. Saw '...'
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Attach screenshots, your .3mf file, or anything else that might help.
+    validations:
+      required: false
