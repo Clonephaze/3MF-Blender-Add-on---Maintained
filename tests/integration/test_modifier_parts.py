@@ -32,11 +32,13 @@ class ModifierPartImportTests(Blender3mfTestCase):
         self.assertIn("FINISHED", result)
 
         modifier_objs = [
-            obj for obj in bpy.data.objects
+            obj
+            for obj in bpy.data.objects
             if obj.get("3mf_part_subtype") == "modifier_part"
         ]
         self.assertGreater(
-            len(modifier_objs), 0,
+            len(modifier_objs),
+            0,
             "Expected at least one object with 3mf_part_subtype='modifier_part'",
         )
 
@@ -49,11 +51,13 @@ class ModifierPartImportTests(Blender3mfTestCase):
         bpy.ops.import_mesh.threemf(filepath=str(test_file))
 
         normal_objs = [
-            obj for obj in bpy.data.objects
+            obj
+            for obj in bpy.data.objects
             if obj.type == "MESH" and "3mf_part_subtype" not in obj
         ]
         self.assertGreater(
-            len(normal_objs), 0,
+            len(normal_objs),
+            0,
             "Expected at least one object without 3mf_part_subtype (normal part)",
         )
 
@@ -67,7 +71,8 @@ class ModifierPartImportTests(Blender3mfTestCase):
 
         empties = [obj for obj in bpy.data.objects if obj.type == "EMPTY"]
         self.assertGreater(
-            len(empties), 0,
+            len(empties),
+            0,
             "Expected a parent Empty for the multi-part assembly",
         )
 
@@ -80,7 +85,8 @@ class ModifierPartImportTests(Blender3mfTestCase):
         bpy.ops.import_mesh.threemf(filepath=str(test_file))
 
         modifier_objs = [
-            obj for obj in bpy.data.objects
+            obj
+            for obj in bpy.data.objects
             if obj.get("3mf_part_subtype") == "modifier_part"
         ]
         self.assertGreater(len(modifier_objs), 0)
@@ -90,7 +96,8 @@ class ModifierPartImportTests(Blender3mfTestCase):
                 f"Modifier '{obj.name}' should have a parent Empty",
             )
             self.assertEqual(
-                obj.parent.type, "EMPTY",
+                obj.parent.type,
+                "EMPTY",
                 f"Modifier '{obj.name}' parent should be an Empty, got {obj.parent.type}",
             )
 
@@ -103,13 +110,15 @@ class ModifierPartImportTests(Blender3mfTestCase):
         bpy.ops.import_mesh.threemf(filepath=str(test_file))
 
         modifier_objs = [
-            obj for obj in bpy.data.objects
+            obj
+            for obj in bpy.data.objects
             if obj.get("3mf_part_subtype") == "modifier_part"
         ]
         self.assertGreater(len(modifier_objs), 0)
         for obj in modifier_objs:
             self.assertGreater(
-                len(obj.data.materials), 0,
+                len(obj.data.materials),
+                0,
                 f"Modifier '{obj.name}' should have a viewport material",
             )
             mat = obj.data.materials[0]
@@ -137,9 +146,15 @@ class ModifierPartAllSubtypesTests(Blender3mfTestCase):
             if subtype:
                 found.add(subtype)
 
-        for expected in ("modifier_part", "support_enforcer", "support_blocker", "negative_part"):
+        for expected in (
+            "modifier_part",
+            "support_enforcer",
+            "support_blocker",
+            "negative_part",
+        ):
             self.assertIn(
-                expected, found,
+                expected,
+                found,
                 f"Expected subtype '{expected}' in imported objects, found: {found}",
             )
 
@@ -148,22 +163,30 @@ class ModifierPartAllSubtypesTests(Blender3mfTestCase):
         self._import_all5()
         empties = [obj for obj in bpy.data.objects if obj.type == "EMPTY"]
         self.assertEqual(
-            len(empties), 5,
+            len(empties),
+            5,
             f"Expected 5 parent Empties, got {len(empties)}",
         )
 
     def test_each_subtype_has_material(self):
         """Each non-normal modifier object should have a viewport material."""
         self._import_all5()
-        for subtype in ("modifier_part", "support_enforcer", "support_blocker", "negative_part"):
+        for subtype in (
+            "modifier_part",
+            "support_enforcer",
+            "support_blocker",
+            "negative_part",
+        ):
             objs = [
-                obj for obj in bpy.data.objects
+                obj
+                for obj in bpy.data.objects
                 if obj.get("3mf_part_subtype") == subtype
             ]
             self.assertGreater(len(objs), 0, f"No objects with subtype {subtype}")
             for obj in objs:
                 self.assertGreater(
-                    len(obj.data.materials), 0,
+                    len(obj.data.materials),
+                    0,
                     f"Object with subtype '{subtype}' should have a material",
                 )
 
@@ -177,9 +200,15 @@ class ModifierPartAllSubtypesTests(Blender3mfTestCase):
             if subtype:
                 type_counts[subtype] = type_counts.get(subtype, 0) + 1
 
-        for subtype in ("modifier_part", "support_enforcer", "support_blocker", "negative_part"):
+        for subtype in (
+            "modifier_part",
+            "support_enforcer",
+            "support_blocker",
+            "negative_part",
+        ):
             self.assertEqual(
-                type_counts.get(subtype, 0), 1,
+                type_counts.get(subtype, 0),
+                1,
                 f"Expected exactly 1 '{subtype}', got {type_counts.get(subtype, 0)}",
             )
 
@@ -236,7 +265,8 @@ class ModifierPartExportTests(Blender3mfTestCase):
                 subtypes.append(part.get("subtype", ""))
 
             self.assertIn(
-                "modifier_part", subtypes,
+                "modifier_part",
+                subtypes,
                 f"Expected 'modifier_part' in config subtypes, got {subtypes}",
             )
 
@@ -259,7 +289,8 @@ class ModifierPartExportTests(Blender3mfTestCase):
 
             for part in root.findall(".//part"):
                 self.assertEqual(
-                    part.get("subtype"), "normal_part",
+                    part.get("subtype"),
+                    "normal_part",
                     "Parts without property should be 'normal_part'",
                 )
 
@@ -333,11 +364,13 @@ class ModifierPartRoundtripTests(Blender3mfTestCase):
         bpy.ops.import_mesh.threemf(filepath=str(self.temp_file))
 
         modifier_objs = [
-            obj for obj in bpy.data.objects
+            obj
+            for obj in bpy.data.objects
             if obj.get("3mf_part_subtype") == "modifier_part"
         ]
         self.assertGreater(
-            len(modifier_objs), 0,
+            len(modifier_objs),
+            0,
             "Round-trip should preserve modifier_part subtype",
         )
 
@@ -363,7 +396,8 @@ class ModifierPartInspectTests(Blender3mfTestCase):
         info = inspect_3mf(str(test_file))
         self.assertEqual(info.status, "OK")
         self.assertGreater(
-            len(info.part_subtypes), 0,
+            len(info.part_subtypes),
+            0,
             "Expected part_subtypes from modifierGroup.3mf",
         )
 
@@ -372,7 +406,8 @@ class ModifierPartInspectTests(Blender3mfTestCase):
             p for p in info.part_subtypes if p["subtype"] == "modifier_part"
         ]
         self.assertGreater(
-            len(modifier_entries), 0,
+            len(modifier_entries),
+            0,
             "Expected at least one modifier_part in inspect result",
         )
 

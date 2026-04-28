@@ -23,6 +23,7 @@ from io_mesh_3mf.export_3mf.geometry import (
 # write_vertices
 # ============================================================================
 
+
 class TestWriteVertices(Blender3mfTestCase):
     """write_vertices() with real Blender mesh data."""
 
@@ -96,6 +97,7 @@ class TestWriteVertices(Blender3mfTestCase):
 # ============================================================================
 # check_non_manifold_geometry
 # ============================================================================
+
 
 class TestCheckNonManifoldGeometry(Blender3mfTestCase):
     """check_non_manifold_geometry() with real Blender meshes."""

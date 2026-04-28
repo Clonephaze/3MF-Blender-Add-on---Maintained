@@ -30,6 +30,7 @@ from io_mesh_3mf.api import (
 # inspect_3mf
 # ============================================================================
 
+
 class TestInspect3MF(Blender3mfTestCase):
     """inspect_3mf() — read-only archive inspection."""
 
@@ -80,6 +81,7 @@ class TestInspect3MF(Blender3mfTestCase):
 # ============================================================================
 # import_3mf
 # ============================================================================
+
 
 class TestImport3MF(Blender3mfTestCase):
     """import_3mf() — programmatic import into Blender."""
@@ -157,6 +159,7 @@ class TestImport3MF(Blender3mfTestCase):
 # export_3mf
 # ============================================================================
 
+
 class TestExport3MF(Blender3mfTestCase):
     """export_3mf() — programmatic export from Blender."""
 
@@ -192,6 +195,7 @@ class TestExport3MF(Blender3mfTestCase):
 # export_3mf — AUTO / STANDARD / PAINT dispatch
 # ============================================================================
 
+
 class TestExportDispatch(Blender3mfTestCase):
     """Verify the API use_orca_format dispatch routes to the correct exporter."""
 
@@ -218,7 +222,8 @@ class TestExportDispatch(Blender3mfTestCase):
             # Orca format produces individual object files under 3D/Objects/
             object_files = [n for n in names if n.startswith("3D/Objects/")]
             self.assertGreater(
-                len(object_files), 0,
+                len(object_files),
+                0,
                 "AUTO + materials should route to OrcaExporter (3D/Objects/ files)",
             )
 
@@ -233,7 +238,8 @@ class TestExportDispatch(Blender3mfTestCase):
             # Standard format has NO 3D/Objects/ — just 3D/3dmodel.model
             object_files = [n for n in names if n.startswith("3D/Objects/")]
             self.assertEqual(
-                len(object_files), 0,
+                len(object_files),
+                0,
                 "AUTO without materials should use StandardExporter (no 3D/Objects/)",
             )
             self.assertIn("3D/3dmodel.model", names)
@@ -249,7 +255,8 @@ class TestExportDispatch(Blender3mfTestCase):
             # Standard exporter writes only 3D/3dmodel.model — NO 3D/Objects/
             object_files = [n for n in names if n.startswith("3D/Objects/")]
             self.assertEqual(
-                len(object_files), 0,
+                len(object_files),
+                0,
                 "STANDARD mode should force StandardExporter even with materials "
                 "(no 3D/Objects/ files)",
             )
@@ -288,6 +295,7 @@ class TestExportDispatch(Blender3mfTestCase):
 
         import uuid
         from test_base import get_temp_test_dir
+
         path_default = str(get_temp_test_dir() / f"default_{uuid.uuid4().hex[:8]}.3mf")
         path_auto = str(get_temp_test_dir() / f"auto_{uuid.uuid4().hex[:8]}.3mf")
 
@@ -297,8 +305,10 @@ class TestExportDispatch(Blender3mfTestCase):
         self.assertEqual(result_default.status, result_auto.status)
 
         # Both should produce the same archive structure
-        with zipfile.ZipFile(path_default, "r") as zf1, \
-             zipfile.ZipFile(path_auto, "r") as zf2:
+        with (
+            zipfile.ZipFile(path_default, "r") as zf1,
+            zipfile.ZipFile(path_auto, "r") as zf2,
+        ):
             # Same set of file types (object files vs single model)
             obj1 = [n for n in zf1.namelist() if n.startswith("3D/Objects/")]
             obj2 = [n for n in zf2.namelist() if n.startswith("3D/Objects/")]
@@ -308,6 +318,7 @@ class TestExportDispatch(Blender3mfTestCase):
 # ============================================================================
 # Round-trip
 # ============================================================================
+
 
 class TestRoundTrip(Blender3mfTestCase):
     """export → import round-trip preserves geometry."""
@@ -335,6 +346,7 @@ class TestRoundTrip(Blender3mfTestCase):
 # ============================================================================
 # batch_import / batch_export
 # ============================================================================
+
 
 class TestBatchOperations(Blender3mfTestCase):
     """batch_import() and batch_export()."""
@@ -371,26 +383,31 @@ class TestBatchOperations(Blender3mfTestCase):
 # Building-block re-exports
 # ============================================================================
 
+
 class TestBuildingBlocks(unittest.TestCase):
     """API re-exports sub-namespaces for custom workflows."""
 
     def test_colors_module(self):
         from io_mesh_3mf.api import colors
+
         self.assertTrue(hasattr(colors, "hex_to_rgb"))
         self.assertTrue(hasattr(colors, "rgb_to_hex"))
 
     def test_types_module(self):
         from io_mesh_3mf.api import types
+
         self.assertTrue(hasattr(types, "ResourceObject"))
         self.assertTrue(hasattr(types, "ResourceMaterial"))
 
     def test_segmentation_module(self):
         from io_mesh_3mf.api import segmentation
+
         self.assertTrue(hasattr(segmentation, "SegmentationDecoder"))
         self.assertTrue(hasattr(segmentation, "SegmentationEncoder"))
 
     def test_units_module(self):
         from io_mesh_3mf.api import units
+
         self.assertTrue(hasattr(units, "blender_to_metre"))
         self.assertTrue(hasattr(units, "threemf_to_metre"))
 

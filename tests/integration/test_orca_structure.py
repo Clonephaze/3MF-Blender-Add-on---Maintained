@@ -28,7 +28,10 @@ class OrcaExportStructureTests(Blender3mfTestCase):
             p = mat.node_tree.nodes.get("Principled BSDF")
             if p:
                 p.inputs["Base Color"].default_value = (
-                    float(i % 2), float((i + 1) % 2), 0.0, 1.0
+                    float(i % 2),
+                    float((i + 1) % 2),
+                    0.0,
+                    1.0,
                 )
             cube.data.materials.append(mat)
 
@@ -48,7 +51,8 @@ class OrcaExportStructureTests(Blender3mfTestCase):
                 n for n in archive.namelist() if n.startswith("3D/Objects/")
             ]
             self.assertEqual(
-                len(object_files), 2,
+                len(object_files),
+                2,
                 f"Expected 2 object files, got {object_files}",
             )
 
@@ -60,13 +64,17 @@ class OrcaExportStructureTests(Blender3mfTestCase):
             root = ET.fromstring(model_data)
 
             # Find component elements (any namespace prefix)
-            components = root.findall(".//{http://schemas.microsoft.com/3dmanufacturing/core/2015/02}component")
+            components = root.findall(
+                ".//{http://schemas.microsoft.com/3dmanufacturing/core/2015/02}component"
+            )
             if not components:
                 # Try without namespace (Orca may drop prefix for component)
                 components = root.findall(".//component")
 
             # Should have at least one component
-            self.assertGreater(len(components), 0, "Main model should contain component refs")
+            self.assertGreater(
+                len(components), 0, "Main model should contain component refs"
+            )
 
     def test_orca_relationships_file_exists(self):
         """3D/_rels/3dmodel.model.rels is present."""
@@ -74,7 +82,8 @@ class OrcaExportStructureTests(Blender3mfTestCase):
         with zipfile.ZipFile(str(self.temp_file), "r") as archive:
             rels_files = [n for n in archive.namelist() if "3dmodel.model.rels" in n]
             self.assertGreater(
-                len(rels_files), 0,
+                len(rels_files),
+                0,
                 "Should have 3D/_rels/3dmodel.model.rels",
             )
 
@@ -195,6 +204,7 @@ class OrcaRoundtripTests(Blender3mfTestCase):
 
         # Assign different materials to faces
         import bmesh
+
         mesh = cube.data
         bm = bmesh.new()
         bm.from_mesh(mesh)
@@ -229,17 +239,18 @@ class OrcaProjectMetadataTests(Blender3mfTestCase):
 
         with zipfile.ZipFile(str(self.temp_file), "r") as archive:
             config_files = [
-                n for n in archive.namelist()
-                if "project_settings" in n.lower()
+                n for n in archive.namelist() if "project_settings" in n.lower()
             ]
             self.assertGreater(
-                len(config_files), 0,
+                len(config_files),
+                0,
                 "Orca export should include project_settings.config",
             )
 
     def test_project_settings_valid_json(self):
         """project_settings.config is valid JSON."""
         import json
+
         bpy.ops.mesh.primitive_cube_add(location=(0, 0, 0))
         mat = bpy.data.materials.new("JsonMat")
         mat.use_nodes = True
@@ -251,8 +262,7 @@ class OrcaProjectMetadataTests(Blender3mfTestCase):
 
         with zipfile.ZipFile(str(self.temp_file), "r") as archive:
             config_files = [
-                n for n in archive.namelist()
-                if "project_settings" in n.lower()
+                n for n in archive.namelist() if "project_settings" in n.lower()
             ]
             if config_files:
                 data = archive.read(config_files[0]).decode("utf-8")

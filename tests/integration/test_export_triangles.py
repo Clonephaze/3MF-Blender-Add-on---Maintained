@@ -103,7 +103,8 @@ class ExportTriangleMaterialTests(Blender3mfTestCase):
         # Should have more than one unique material reference
         total_refs = len(paint_colors) + len(pids)
         self.assertGreater(
-            total_refs, 0,
+            total_refs,
+            0,
             "Multi-material export should produce material references on triangles",
         )
 
@@ -168,9 +169,7 @@ class ExportPrusaTriangleTests(Blender3mfTestCase):
             # PAINT mode via PRUSA, which uses paint codes on triangles
             # This test verifies the export doesn't crash
             _ = "mmu_segmentation" in xml_text or "slic3rpe" in xml_text
-            self.assertTrue(
-                self.temp_file.exists(), "Export should produce a file"
-            )
+            self.assertTrue(self.temp_file.exists(), "Export should produce a file")
 
 
 class ExportMetadataTests(Blender3mfTestCase):
@@ -238,7 +237,8 @@ class ExportArchiveStructureTests(Blender3mfTestCase):
 
         # Low precision truncates, so "0.12" vs "0.12345679" — different text
         self.assertNotEqual(
-            data_low, data_high,
+            data_low,
+            data_high,
             "Different precision should produce different coordinate text",
         )
 
@@ -253,16 +253,15 @@ class ExportArchiveStructureTests(Blender3mfTestCase):
         hidden.name = "Hidden"
         hidden.hide_set(True)
 
-        bpy.ops.export_mesh.threemf(
-            filepath=str(self.temp_file), export_hidden=False
-        )
+        bpy.ops.export_mesh.threemf(filepath=str(self.temp_file), export_hidden=False)
 
         self.clean_scene()
         bpy.ops.import_mesh.threemf(filepath=str(self.temp_file))
 
         # Should have only the visible object
         self.assertEqual(
-            len(bpy.data.objects), 1,
+            len(bpy.data.objects),
+            1,
             "Only visible object should be exported when export_hidden=False",
         )
 
@@ -277,15 +276,14 @@ class ExportArchiveStructureTests(Blender3mfTestCase):
         hidden.name = "Hidden"
         hidden.hide_set(True)
 
-        bpy.ops.export_mesh.threemf(
-            filepath=str(self.temp_file), export_hidden=True
-        )
+        bpy.ops.export_mesh.threemf(filepath=str(self.temp_file), export_hidden=True)
 
         self.clean_scene()
         bpy.ops.import_mesh.threemf(filepath=str(self.temp_file))
 
         self.assertEqual(
-            len(bpy.data.objects), 2,
+            len(bpy.data.objects),
+            2,
             "Both objects should be exported when export_hidden=True",
         )
 

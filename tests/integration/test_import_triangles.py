@@ -146,7 +146,7 @@ class ReadTrianglesErrorHandlingTests(unittest.TestCase):
         """Valid triangles are still parsed after invalid ones."""
         tri_xml = (
             '<triangle v1="-1" v2="1" v3="2" />'  # invalid
-            '<triangle v1="0" v2="1" v3="2" />'   # valid
+            '<triangle v1="0" v2="1" v3="2" />'  # valid
         )
         node = _obj_node(vertices_xml=_QUAD_VERTS, triangles_xml=tri_xml)
         ctx = _ctx()
@@ -305,7 +305,9 @@ class ReadTrianglesPaintCodeTests(unittest.TestCase):
 
     def test_seam_support_without_paint(self):
         """Seam/support on triangles without paint_color in PAINT mode."""
-        tri_xml = '<triangle v1="0" v2="1" v3="2" paint_seam="CC" paint_supports="DD" />'
+        tri_xml = (
+            '<triangle v1="0" v2="1" v3="2" paint_seam="CC" paint_supports="DD" />'
+        )
         node = _obj_node(vertices_xml=_QUAD_VERTS, triangles_xml=tri_xml)
         ctx = _ctx(import_materials="PAINT")
         verts = [(0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1)]
@@ -339,7 +341,7 @@ class ReadTrianglesReturnStructureTests(unittest.TestCase):
         self.assertIsInstance(result[4], dict)  # segmentation_strings
         self.assertIsInstance(result[5], dict)  # seam_strings
         self.assertIsInstance(result[6], dict)  # support_strings
-        self.assertIsInstance(result[7], int)   # default_extruder
+        self.assertIsInstance(result[7], int)  # default_extruder
 
     def test_vertex_list_propagated(self):
         """Vertex coords passed in are returned (possibly extended)."""

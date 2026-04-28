@@ -28,8 +28,8 @@ from io_mesh_3mf.common.constants import (
 # parse_transformation
 # ============================================================================
 
-class TestParseTransformation(unittest.TestCase):
 
+class TestParseTransformation(unittest.TestCase):
     def test_empty_string(self):
         result = parse_transformation("")
         self.assertEqual(result, mathutils.Matrix.Identity(4))
@@ -68,8 +68,8 @@ class TestParseTransformation(unittest.TestCase):
 # format_transformation
 # ============================================================================
 
-class TestFormatTransformation(unittest.TestCase):
 
+class TestFormatTransformation(unittest.TestCase):
     def test_identity(self):
         result = format_transformation(mathutils.Matrix.Identity(4))
         parts = result.split()
@@ -101,8 +101,8 @@ class TestFormatTransformation(unittest.TestCase):
 # resolve_extension_prefixes
 # ============================================================================
 
-class TestResolveExtensionPrefixes(unittest.TestCase):
 
+class TestResolveExtensionPrefixes(unittest.TestCase):
     def _make_root(self, **xmlns_attrs):
         """Create a dummy XML root element with xmlns attributes."""
         xml_str = "<model"
@@ -137,8 +137,8 @@ class TestResolveExtensionPrefixes(unittest.TestCase):
 # is_supported
 # ============================================================================
 
-class TestIsSupported(unittest.TestCase):
 
+class TestIsSupported(unittest.TestCase):
     def test_no_required_extensions(self):
         self.assertTrue(is_supported(""))
 
@@ -154,8 +154,8 @@ class TestIsSupported(unittest.TestCase):
 # read_metadata
 # ============================================================================
 
-class TestReadMetadata(unittest.TestCase):
 
+class TestReadMetadata(unittest.TestCase):
     def _make_node_with_metadata(self, entries):
         """Create an XML node with <metadata> children."""
         ns = MODEL_NAMESPACE
@@ -177,17 +177,21 @@ class TestReadMetadata(unittest.TestCase):
         self.assertEqual(len(metadata), 0)
 
     def test_single_entry(self):
-        node = self._make_node_with_metadata([
-            {"name": "Title", "value": "Test Model"},
-        ])
+        node = self._make_node_with_metadata(
+            [
+                {"name": "Title", "value": "Test Model"},
+            ]
+        )
         metadata = read_metadata(node)
         self.assertIn("Title", metadata)
         self.assertEqual(metadata["Title"].value, "Test Model")
 
     def test_preserve_flag(self):
-        node = self._make_node_with_metadata([
-            {"name": "CustomKey", "preserve": "1", "value": "keep"},
-        ])
+        node = self._make_node_with_metadata(
+            [
+                {"name": "CustomKey", "preserve": "1", "value": "keep"},
+            ]
+        )
         metadata = read_metadata(node)
         self.assertTrue(metadata["CustomKey"].preserve)
 

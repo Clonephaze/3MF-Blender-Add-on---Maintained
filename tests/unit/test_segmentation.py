@@ -22,6 +22,7 @@ from io_mesh_3mf.common.segmentation import (
 # TriangleState enum
 # ============================================================================
 
+
 class TestTriangleState(unittest.TestCase):
     """TriangleState IntEnum values."""
 
@@ -39,6 +40,7 @@ class TestTriangleState(unittest.TestCase):
 # ============================================================================
 # SegmentationNode
 # ============================================================================
+
 
 class TestSegmentationNode(unittest.TestCase):
     """SegmentationNode dataclass and properties."""
@@ -66,6 +68,7 @@ class TestSegmentationNode(unittest.TestCase):
 # ============================================================================
 # SegmentationDecoder
 # ============================================================================
+
 
 class TestSegmentationDecoder(unittest.TestCase):
     """SegmentationDecoder.decode()."""
@@ -124,7 +127,9 @@ class TestSegmentationDecoder(unittest.TestCase):
         """Encode then decode a simple subdivision tree."""
         child_a = SegmentationNode(state=TriangleState.EXTRUDER_1)
         child_b = SegmentationNode(state=TriangleState.EXTRUDER_2)
-        tree = SegmentationNode(split_sides=1, special_side=0, children=[child_a, child_b])
+        tree = SegmentationNode(
+            split_sides=1, special_side=0, children=[child_a, child_b]
+        )
 
         encoder = SegmentationEncoder()
         hex_str = encoder.encode(tree)
@@ -144,6 +149,7 @@ class TestSegmentationDecoder(unittest.TestCase):
 # ============================================================================
 # SegmentationEncoder
 # ============================================================================
+
 
 class TestSegmentationEncoder(unittest.TestCase):
     """SegmentationEncoder.encode()."""
@@ -184,6 +190,7 @@ class TestSegmentationEncoder(unittest.TestCase):
 # Round-trip: Encode → Decode
 # ============================================================================
 
+
 class TestRoundTrip(unittest.TestCase):
     """Full encode → decode round-trip fidelity."""
 
@@ -194,15 +201,20 @@ class TestRoundTrip(unittest.TestCase):
         return decoder.decode(hex_str)
 
     def test_single_leaf(self):
-        for state in (TriangleState.DEFAULT, TriangleState.EXTRUDER_1,
-                       TriangleState.EXTRUDER_5, TriangleState.EXTRUDER_15):
+        for state in (
+            TriangleState.DEFAULT,
+            TriangleState.EXTRUDER_1,
+            TriangleState.EXTRUDER_5,
+            TriangleState.EXTRUDER_15,
+        ):
             with self.subTest(state=state):
                 result = self._round_trip(SegmentationNode(state=state))
                 self.assertEqual(result.state, state)
 
     def test_two_way_split(self):
         tree = SegmentationNode(
-            split_sides=1, special_side=0,
+            split_sides=1,
+            special_side=0,
             children=[
                 SegmentationNode(state=TriangleState.EXTRUDER_1),
                 SegmentationNode(state=TriangleState.EXTRUDER_2),
@@ -214,7 +226,8 @@ class TestRoundTrip(unittest.TestCase):
 
     def test_three_way_split(self):
         tree = SegmentationNode(
-            split_sides=2, special_side=1,
+            split_sides=2,
+            special_side=1,
             children=[
                 SegmentationNode(state=TriangleState.EXTRUDER_1),
                 SegmentationNode(state=TriangleState.EXTRUDER_2),
@@ -227,7 +240,8 @@ class TestRoundTrip(unittest.TestCase):
 
     def test_four_way_split(self):
         tree = SegmentationNode(
-            split_sides=3, special_side=0,
+            split_sides=3,
+            special_side=0,
             children=[
                 SegmentationNode(state=TriangleState.EXTRUDER_1),
                 SegmentationNode(state=TriangleState.DEFAULT),
@@ -242,14 +256,16 @@ class TestRoundTrip(unittest.TestCase):
     def test_nested_subdivision(self):
         """A tree with a subdivided child inside a subdivided parent."""
         inner = SegmentationNode(
-            split_sides=1, special_side=0,
+            split_sides=1,
+            special_side=0,
             children=[
                 SegmentationNode(state=TriangleState.EXTRUDER_1),
                 SegmentationNode(state=TriangleState.EXTRUDER_2),
             ],
         )
         tree = SegmentationNode(
-            split_sides=1, special_side=0,
+            split_sides=1,
+            special_side=0,
             children=[inner, SegmentationNode(state=TriangleState.EXTRUDER_3)],
         )
         result = self._round_trip(tree)
@@ -260,6 +276,7 @@ class TestRoundTrip(unittest.TestCase):
 # ============================================================================
 # TriangleSubdivider
 # ============================================================================
+
 
 class TestTriangleSubdivider(unittest.TestCase):
     """TriangleSubdivider.subdivide()."""
@@ -277,7 +294,8 @@ class TestTriangleSubdivider(unittest.TestCase):
     def test_one_split_produces_two_triangles(self):
         """split_sides=1 should produce 2 leaf triangles."""
         tree = SegmentationNode(
-            split_sides=1, special_side=0,
+            split_sides=1,
+            special_side=0,
             children=[
                 SegmentationNode(state=TriangleState.EXTRUDER_1),
                 SegmentationNode(state=TriangleState.EXTRUDER_2),
@@ -294,7 +312,8 @@ class TestTriangleSubdivider(unittest.TestCase):
     def test_four_way_split_produces_four_triangles(self):
         """split_sides=3 should produce 4 leaf triangles."""
         tree = SegmentationNode(
-            split_sides=3, special_side=0,
+            split_sides=3,
+            special_side=0,
             children=[SegmentationNode(state=TriangleState(i)) for i in range(4)],
         )
         sub = TriangleSubdivider()
@@ -308,7 +327,8 @@ class TestTriangleSubdivider(unittest.TestCase):
     def test_midpoint_accuracy(self):
         """Midpoints should be geometric averages."""
         tree = SegmentationNode(
-            split_sides=1, special_side=0,
+            split_sides=1,
+            special_side=0,
             children=[
                 SegmentationNode(state=TriangleState.DEFAULT),
                 SegmentationNode(state=TriangleState.DEFAULT),
@@ -325,6 +345,7 @@ class TestTriangleSubdivider(unittest.TestCase):
 # ============================================================================
 # Convenience functions
 # ============================================================================
+
 
 class TestDecodeSegmentationString(unittest.TestCase):
     """decode_segmentation_string() convenience wrapper."""

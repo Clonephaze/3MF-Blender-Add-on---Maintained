@@ -27,6 +27,7 @@ class SanitizeFilenameTests(unittest.TestCase):
 
     def setUp(self):
         from io_mesh_3mf.slicer_profiles.storage import _sanitize_filename
+
         self._sanitize_filename = _sanitize_filename
 
     def test_clean_name_unchanged(self):
@@ -36,21 +37,21 @@ class SanitizeFilenameTests(unittest.TestCase):
     def test_special_chars_replaced(self):
         """Characters <, >, :, \", /, \\, |, ?, * are replaced with _."""
         result = self._sanitize_filename('a<b>c:d"e/f\\g|h?i*j')
-        self.assertNotIn('<', result)
-        self.assertNotIn('>', result)
-        self.assertNotIn(':', result)
+        self.assertNotIn("<", result)
+        self.assertNotIn(">", result)
+        self.assertNotIn(":", result)
         self.assertNotIn('"', result)
-        self.assertNotIn('/', result)
-        self.assertNotIn('\\', result)
-        self.assertNotIn('|', result)
-        self.assertNotIn('?', result)
-        self.assertNotIn('*', result)
+        self.assertNotIn("/", result)
+        self.assertNotIn("\\", result)
+        self.assertNotIn("|", result)
+        self.assertNotIn("?", result)
+        self.assertNotIn("*", result)
 
     def test_dots_stripped(self):
         """Leading/trailing dots and spaces are stripped."""
         result = self._sanitize_filename("...profile...")
-        self.assertFalse(result.startswith('.'))
-        self.assertFalse(result.endswith('.'))
+        self.assertFalse(result.startswith("."))
+        self.assertFalse(result.endswith("."))
 
     def test_empty_returns_default(self):
         """Empty/all-special input returns 'profile'."""
@@ -63,6 +64,7 @@ class ExtractMachineNameTests(unittest.TestCase):
 
     def setUp(self):
         from io_mesh_3mf.slicer_profiles.storage import _extract_machine_name
+
         self._extract_machine_name = _extract_machine_name
 
     def test_orca_json(self):
@@ -117,6 +119,7 @@ class ProfileCRUDTests(unittest.TestCase):
         self._temp_dir = tempfile.mkdtemp(prefix="3mf_profiles_test_")
 
         import io_mesh_3mf.slicer_profiles.storage as storage_mod
+
         self._storage = storage_mod
         self._original_get_profiles_dir = storage_mod.get_profiles_dir
 
@@ -201,6 +204,7 @@ class GetProfileConfigTests(unittest.TestCase):
         self._temp_dir = tempfile.mkdtemp(prefix="3mf_profiles_test_")
 
         import io_mesh_3mf.slicer_profiles.storage as storage_mod
+
         self._storage = storage_mod
         self._original_get_profiles_dir = storage_mod.get_profiles_dir
         storage_mod.get_profiles_dir = lambda: self._temp_dir
@@ -215,7 +219,9 @@ class GetProfileConfigTests(unittest.TestCase):
         encoded = base64.b85encode(raw).decode("UTF-8")
 
         self._storage.save_profile(
-            "DecodeTest", "Prusa", "test.3mf",
+            "DecodeTest",
+            "Prusa",
+            "test.3mf",
             {"Metadata/Slic3r_PE.config": encoded},
         )
 
@@ -247,6 +253,7 @@ class ExtractFrom3mfTests(unittest.TestCase):
 
     def setUp(self):
         from io_mesh_3mf.slicer_profiles.storage import extract_from_3mf
+
         self._extract_from_3mf = extract_from_3mf
         self._temp_dir = tempfile.mkdtemp(prefix="3mf_extract_test_")
 
@@ -256,11 +263,11 @@ class ExtractFrom3mfTests(unittest.TestCase):
     def _make_3mf(self, configs=None, application=None):
         """Helper: create a minimal 3MF ZIP for testing."""
         path = os.path.join(self._temp_dir, "test.3mf")
-        with zipfile.ZipFile(path, 'w') as archive:
+        with zipfile.ZipFile(path, "w") as archive:
             # Write config files
             if configs:
                 for config_path, content in configs.items():
-                    with archive.open(config_path, 'w') as f:
+                    with archive.open(config_path, "w") as f:
                         f.write(content)
 
             # Write minimal model XML
@@ -272,7 +279,7 @@ class ExtractFrom3mfTests(unittest.TestCase):
                 meta.set("name", "Application")
                 meta.text = application
             tree = ET.ElementTree(root)
-            with archive.open('3D/3dmodel.model', 'w') as f:
+            with archive.open("3D/3dmodel.model", "w") as f:
                 tree.write(f, xml_declaration=True, encoding="UTF-8")
         return path
 
@@ -324,9 +331,7 @@ class ExtractFrom3mfTests(unittest.TestCase):
     def test_machine_extracted(self):
         """Machine name is extracted from config data."""
         config_data = json.dumps({"printer_model": "X1 Carbon"}).encode("utf-8")
-        path = self._make_3mf(
-            configs={"Metadata/project_settings.config": config_data}
-        )
+        path = self._make_3mf(configs={"Metadata/project_settings.config": config_data})
         vendor, machine, configs, labels = self._extract_from_3mf(path)
         self.assertEqual(machine, "X1 Carbon")
 

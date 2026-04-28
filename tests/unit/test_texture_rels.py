@@ -65,11 +65,13 @@ class TestWriteTextureRelationships(unittest.TestCase):
 
     def test_correct_relationship_count(self):
         """Should produce one Relationship element per texture."""
-        data = self._write_and_read_rels({
-            "img1": "/3D/Textures/a.png",
-            "img2": "/3D/Textures/b.png",
-            "img3": "/3D/Textures/c.png",
-        })
+        data = self._write_and_read_rels(
+            {
+                "img1": "/3D/Textures/a.png",
+                "img2": "/3D/Textures/b.png",
+                "img3": "/3D/Textures/c.png",
+            }
+        )
         root = ET.fromstring(data)
         rels = root.findall(f"{{{RELS_NAMESPACE}}}Relationship")
         self.assertEqual(len(rels), 3)
@@ -98,10 +100,12 @@ class TestWriteTextureRelationships(unittest.TestCase):
 
     def test_unique_ids(self):
         """Multiple relationships should have unique Id values."""
-        data = self._write_and_read_rels({
-            "img1": "/3D/Textures/a.png",
-            "img2": "/3D/Textures/b.png",
-        })
+        data = self._write_and_read_rels(
+            {
+                "img1": "/3D/Textures/a.png",
+                "img2": "/3D/Textures/b.png",
+            }
+        )
         root = ET.fromstring(data)
         rels = root.findall(f"{{{RELS_NAMESPACE}}}Relationship")
         ids = [r.get("Id") for r in rels]
@@ -156,8 +160,11 @@ class TestWriteTextureRelationships(unittest.TestCase):
 
         # Verify global state unchanged
         after = ET.tostring(test_elem, encoding="unicode")
-        self.assertEqual(before, after,
-                         "write_texture_relationships() corrupted the global ET namespace registry")
+        self.assertEqual(
+            before,
+            after,
+            "write_texture_relationships() corrupted the global ET namespace registry",
+        )
 
 
 if __name__ == "__main__":

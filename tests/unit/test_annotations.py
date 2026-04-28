@@ -107,7 +107,11 @@ class TestAddContentTypes(unittest.TestCase):
         f = _FakeFile("textures/logo.png")
         ann.add_content_types({"image/png": {f}})
         self.assertIn("textures/logo.png", ann.annotations)
-        types = [a for a in ann.annotations["textures/logo.png"] if isinstance(a, ContentType)]
+        types = [
+            a
+            for a in ann.annotations["textures/logo.png"]
+            if isinstance(a, ContentType)
+        ]
         self.assertEqual(len(types), 1)
         self.assertEqual(types[0].mime_type, "image/png")
 
@@ -178,9 +182,7 @@ class TestAddRels(unittest.TestCase):
         """MODEL_REL relationships are skipped."""
         from io_mesh_3mf.common.constants import MODEL_REL
 
-        stream = self._make_rels_stream(
-            [("/3D/3dmodel.model", MODEL_REL)]
-        )
+        stream = self._make_rels_stream([("/3D/3dmodel.model", MODEL_REL)])
         ann = Annotations()
         ann.add_rels(stream)
         self.assertNotIn("3D/3dmodel.model", ann.annotations)
@@ -189,9 +191,7 @@ class TestAddRels(unittest.TestCase):
         """TEXTURE_REL relationships are skipped."""
         from io_mesh_3mf.common.constants import TEXTURE_REL
 
-        stream = self._make_rels_stream(
-            [("/textures/tex.png", TEXTURE_REL)]
-        )
+        stream = self._make_rels_stream([("/textures/tex.png", TEXTURE_REL)])
         ann = Annotations()
         ann.add_rels(stream)
         self.assertNotIn("textures/tex.png", ann.annotations)
@@ -230,14 +230,10 @@ class TestWriteContentTypes(unittest.TestCase):
     def test_preserves_3mf_texture_content_type_for_png(self):
         """Annotations with the 3MF texture OPC type for .png should NOT be
         overridden by the image/png fallback."""
-        TEXTURE_OPC_TYPE = (
-            "application/vnd.ms-package.3dmanufacturing-3dmodeltexture"
-        )
+        TEXTURE_OPC_TYPE = "application/vnd.ms-package.3dmanufacturing-3dmodeltexture"
 
         ann = Annotations()
-        ann.annotations["3D/Textures/logo.png"] = {
-            ContentType(TEXTURE_OPC_TYPE)
-        }
+        ann.annotations["3D/Textures/logo.png"] = {ContentType(TEXTURE_OPC_TYPE)}
 
         content = self._write_and_read_content_types(ann)
 
@@ -261,9 +257,7 @@ class TestWriteContentTypes(unittest.TestCase):
     def test_write_content_types_produces_valid_xml(self):
         """write_content_types() should produce parseable XML."""
         ann = Annotations()
-        ann.annotations["some/file.bin"] = {
-            ContentType("application/octet-stream")
-        }
+        ann.annotations["some/file.bin"] = {ContentType("application/octet-stream")}
 
         content = self._write_and_read_content_types(ann)
         root = ET.fromstring(content)

@@ -59,21 +59,27 @@ class FullSpectrumDetectionTests(Blender3mfTestCase):
     def test_detect_fullspectrum_true(self):
         """detect_fullspectrum() returns True for a non-empty definitions string."""
         from io_mesh_3mf.import_3mf.slicer.detection import detect_fullspectrum
-        self.assertTrue(detect_fullspectrum({"mixed_filament_definitions": "1,2,1,1,50,0,g,w,m2"}))
+
+        self.assertTrue(
+            detect_fullspectrum({"mixed_filament_definitions": "1,2,1,1,50,0,g,w,m2"})
+        )
 
     def test_detect_fullspectrum_false_empty(self):
         """detect_fullspectrum() returns False when definitions is an empty string."""
         from io_mesh_3mf.import_3mf.slicer.detection import detect_fullspectrum
+
         self.assertFalse(detect_fullspectrum({"mixed_filament_definitions": ""}))
 
     def test_detect_fullspectrum_false_missing(self):
         """detect_fullspectrum() returns False when key is absent."""
         from io_mesh_3mf.import_3mf.slicer.detection import detect_fullspectrum
+
         self.assertFalse(detect_fullspectrum({}))
 
     def test_detect_fullspectrum_false_whitespace(self):
         """detect_fullspectrum() returns False for whitespace-only value."""
         from io_mesh_3mf.import_3mf.slicer.detection import detect_fullspectrum
+
         self.assertFalse(detect_fullspectrum({"mixed_filament_definitions": "   "}))
 
 
@@ -154,9 +160,16 @@ class PeggyPaletteRoundTripTests(Blender3mfTestCase):
         self.assertIn("mixed_filament_definitions", exported)
 
         from io_mesh_3mf.common.mixed_filaments import parse_mixed_filament_definitions
+
         orig_count = len(parse_mixed_filament_definitions(original_raw))
-        exp_count = len(parse_mixed_filament_definitions(exported["mixed_filament_definitions"]))
-        self.assertEqual(orig_count, exp_count, f"Entry count: imported {orig_count}, exported {exp_count}")
+        exp_count = len(
+            parse_mixed_filament_definitions(exported["mixed_filament_definitions"])
+        )
+        self.assertEqual(
+            orig_count,
+            exp_count,
+            f"Entry count: imported {orig_count}, exported {exp_count}",
+        )
 
     def test_roundtrip_stable_ids_preserved(self):
         """Stable IDs are unchanged through the export round-trip."""
@@ -164,10 +177,14 @@ class PeggyPaletteRoundTripTests(Blender3mfTestCase):
         exported = _read_project_settings(self.temp_file)
 
         from io_mesh_3mf.common.mixed_filaments import parse_mixed_filament_definitions
+
         orig_ids = {e.stable_id for e in parse_mixed_filament_definitions(original_raw)}
-        exp_ids = {e.stable_id for e in parse_mixed_filament_definitions(
-            exported.get("mixed_filament_definitions", "")
-        )}
+        exp_ids = {
+            e.stable_id
+            for e in parse_mixed_filament_definitions(
+                exported.get("mixed_filament_definitions", "")
+            )
+        }
         self.assertEqual(orig_ids, exp_ids, "Stable IDs changed during export")
 
     def test_roundtrip_patterns_preserved(self):
@@ -176,12 +193,19 @@ class PeggyPaletteRoundTripTests(Blender3mfTestCase):
         exported = _read_project_settings(self.temp_file)
 
         from io_mesh_3mf.common.mixed_filaments import parse_mixed_filament_definitions
-        orig = {e.stable_id: e.manual_pattern
-                for e in parse_mixed_filament_definitions(original_raw) if e.manual_pattern}
-        exp = {e.stable_id: e.manual_pattern
-               for e in parse_mixed_filament_definitions(
-                   exported.get("mixed_filament_definitions", "")
-               ) if e.manual_pattern}
+
+        orig = {
+            e.stable_id: e.manual_pattern
+            for e in parse_mixed_filament_definitions(original_raw)
+            if e.manual_pattern
+        }
+        exp = {
+            e.stable_id: e.manual_pattern
+            for e in parse_mixed_filament_definitions(
+                exported.get("mixed_filament_definitions", "")
+            )
+            if e.manual_pattern
+        }
         self.assertEqual(orig, exp, "Manual patterns changed during export")
 
     def test_roundtrip_fullspectrum_keys_present(self):
@@ -189,12 +213,16 @@ class PeggyPaletteRoundTripTests(Blender3mfTestCase):
         peggy = self._peggy_path()
         original = _read_project_settings(peggy)
         source_fs_keys = _FULLSPECTRUM_KEYS & set(original.keys())
-        self.assertGreater(len(source_fs_keys), 0, "Source file has no FullSpectrum keys")
+        self.assertGreater(
+            len(source_fs_keys), 0, "Source file has no FullSpectrum keys"
+        )
 
         self._import_and_export()
         exported = _read_project_settings(self.temp_file)
         for key in source_fs_keys:
-            self.assertIn(key, exported, f"FullSpectrum key '{key}' missing from export")
+            self.assertIn(
+                key, exported, f"FullSpectrum key '{key}' missing from export"
+            )
 
     def test_roundtrip_scalar_fullspectrum_keys_unchanged(self):
         """Scalar FullSpectrum config values are unchanged after export."""
@@ -213,7 +241,8 @@ class PeggyPaletteRoundTripTests(Blender3mfTestCase):
                 continue
             self.assertIn(key, exported, f"Key '{key}' missing from export")
             self.assertEqual(
-                str(exported[key]), str(orig_val),
+                str(exported[key]),
+                str(orig_val),
                 f"Key '{key}': {orig_val!r} → {exported[key]!r}",
             )
 
@@ -222,7 +251,11 @@ class PeggyPaletteRoundTripTests(Blender3mfTestCase):
         self._import_and_export()
         exported = _read_project_settings(self.temp_file)
         colours = exported.get("filament_colour", [])
-        self.assertGreaterEqual(len(colours), 4, f"Expected ≥4 filament_colour entries, got {len(colours)}")
+        self.assertGreaterEqual(
+            len(colours), 4, f"Expected ≥4 filament_colour entries, got {len(colours)}"
+        )
         physical = {"#0000FF", "#FF0000", "#FFFF00", "#FFFFFF"}
         exported_set = {c.upper() for c in colours[:4]}
-        self.assertEqual(exported_set, physical, f"Physical colors: {exported_set} vs {physical}")
+        self.assertEqual(
+            exported_set, physical, f"Physical colors: {exported_set} vs {physical}"
+        )

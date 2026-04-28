@@ -76,7 +76,7 @@ class ComputeWorldBboxTests(Blender3mfTestCase):
 
     def test_non_mesh_objects_skipped(self):
         """Non-mesh objects (lights, cameras) are skipped."""
-        bpy.ops.object.light_add(type='POINT', location=(0, 0, 0))
+        bpy.ops.object.light_add(type="POINT", location=(0, 0, 0))
         light = bpy.context.object
         bpy.ops.object.camera_add(location=(5, 5, 5))
         camera = bpy.context.object

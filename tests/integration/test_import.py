@@ -21,7 +21,7 @@ class ImportBasicTests(Blender3mfTestCase):
 
         result = bpy.ops.import_mesh.threemf(filepath=str(test_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
 
     def test_import_nonexistent_file(self):
         """Import a file that doesn't exist."""
@@ -52,7 +52,7 @@ class ImportBasicTests(Blender3mfTestCase):
         # Empty archives complete but import nothing
         result = bpy.ops.import_mesh.threemf(filepath=str(test_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
 
 
 class RoundtripTests(Blender3mfTestCase):
@@ -69,13 +69,13 @@ class RoundtripTests(Blender3mfTestCase):
         bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
         # Clear scene
-        bpy.ops.object.select_all(action='SELECT')
+        bpy.ops.object.select_all(action="SELECT")
         bpy.ops.object.delete()
 
         # Import back
         result = bpy.ops.import_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertGreater(len(bpy.data.objects), 0)
 
         # Verify geometry preserved
@@ -95,13 +95,13 @@ class RoundtripTests(Blender3mfTestCase):
         bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
         # Clear scene
-        bpy.ops.object.select_all(action='SELECT')
+        bpy.ops.object.select_all(action="SELECT")
         bpy.ops.object.delete()
 
         # Import back
         result = bpy.ops.import_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertGreater(len(bpy.data.objects), 0)
 
         # Verify material imported
@@ -120,13 +120,13 @@ class RoundtripTests(Blender3mfTestCase):
         bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
         # Clear scene
-        bpy.ops.object.select_all(action='SELECT')
+        bpy.ops.object.select_all(action="SELECT")
         bpy.ops.object.delete()
 
         # Import back
         result = bpy.ops.import_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertEqual(len(bpy.data.objects), original_count)
 
     def test_roundtrip_preserves_dimensions(self):
@@ -139,12 +139,12 @@ class RoundtripTests(Blender3mfTestCase):
         bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
         # Clear and reimport
-        bpy.ops.object.select_all(action='SELECT')
+        bpy.ops.object.select_all(action="SELECT")
         bpy.ops.object.delete()
 
         result = bpy.ops.import_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
 
         # Check dimensions (with tolerance for floating point)
         imported = bpy.data.objects[0]
@@ -153,7 +153,7 @@ class RoundtripTests(Blender3mfTestCase):
                 imported.dimensions[i],
                 original_dimensions[i],
                 places=2,
-                msg=f"Dimension {i} not preserved"
+                msg=f"Dimension {i} not preserved",
             )
 
     def test_roundtrip_preserves_dimensions_scale_units(self):
@@ -169,12 +169,12 @@ class RoundtripTests(Blender3mfTestCase):
         bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
         # Clear and reimport
-        bpy.ops.object.select_all(action='SELECT')
+        bpy.ops.object.select_all(action="SELECT")
         bpy.ops.object.delete()
 
         result = bpy.ops.import_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
 
         # Check dimensions (with tolerance for floating point)
         imported = bpy.data.objects[0]
@@ -183,7 +183,7 @@ class RoundtripTests(Blender3mfTestCase):
                 imported.dimensions[i],
                 original_dimensions[i],
                 places=2,
-                msg=f"Dimension {i} not preserved"
+                msg=f"Dimension {i} not preserved",
             )
 
 
@@ -223,5 +223,5 @@ class APICompatibilityTests(Blender3mfTestCase):
         self.assertEqual(len(mesh.loop_triangles), 12)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

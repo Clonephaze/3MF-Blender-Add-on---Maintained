@@ -18,11 +18,13 @@ from test_base import Blender3mfTestCase
 #  Metadata panel helpers
 # ===========================================================================
 
+
 class FormatCountTests(unittest.TestCase):
     """Tests for panels.metadata._format_count()."""
 
     def setUp(self):
         from io_mesh_3mf.panels.metadata import _format_count
+
         self._format_count = _format_count
 
     def test_small_number(self):
@@ -44,6 +46,7 @@ class GetMetadataValueTests(Blender3mfTestCase):
     def setUp(self):
         super().setUp()
         from io_mesh_3mf.panels.metadata import _get_metadata_value
+
         self._get_metadata_value = _get_metadata_value
 
     def test_title_returns_scene_name(self):
@@ -80,6 +83,7 @@ class DetectVendorFromSceneTests(Blender3mfTestCase):
     def setUp(self):
         super().setUp()
         from io_mesh_3mf.panels.metadata import _detect_vendor_from_scene
+
         self._detect_vendor_from_scene = _detect_vendor_from_scene
 
     def test_no_metadata_returns_none(self):
@@ -129,6 +133,7 @@ class ParsePaintColorsTests(Blender3mfTestCase):
     def setUp(self):
         super().setUp()
         from io_mesh_3mf.panels.metadata import _parse_paint_colors
+
         self._parse_paint_colors = _parse_paint_colors
 
     def test_valid_colors(self):
@@ -175,6 +180,7 @@ class GetTriangleSetCountsTests(Blender3mfTestCase):
     def setUp(self):
         super().setUp()
         from io_mesh_3mf.panels.metadata import _get_triangle_set_counts
+
         self._get_triangle_set_counts = _get_triangle_set_counts
 
     def test_no_attribute(self):
@@ -190,9 +196,7 @@ class GetTriangleSetCountsTests(Blender3mfTestCase):
         mesh = bpy.context.object.data
 
         # Create the attribute
-        attr = mesh.attributes.new(
-            name="3mf_triangle_set", type="INT", domain="FACE"
-        )
+        attr = mesh.attributes.new(name="3mf_triangle_set", type="INT", domain="FACE")
         num_faces = len(mesh.polygons)
         # Assign set 1 to first half, set 2 to rest
         values = [1 if i < num_faces // 2 else 2 for i in range(num_faces)]
@@ -208,11 +212,13 @@ class GetTriangleSetCountsTests(Blender3mfTestCase):
 #  Triangle sets panel helpers
 # ===========================================================================
 
+
 class TriangleSetFormatCountTests(unittest.TestCase):
     """Tests for panels.triangle_sets._format_count()."""
 
     def test_basic(self):
         from io_mesh_3mf.panels.triangle_sets import _format_count
+
         self.assertEqual(_format_count(12345), "12,345")
 
 
@@ -222,6 +228,7 @@ class LoadSetNamesTests(Blender3mfTestCase):
     def setUp(self):
         super().setUp()
         from io_mesh_3mf.panels.triangle_sets import _load_set_names
+
         self._load_set_names = _load_set_names
 
     def test_no_property(self):
@@ -265,6 +272,7 @@ class GetSetNameTests(Blender3mfTestCase):
     def setUp(self):
         super().setUp()
         from io_mesh_3mf.panels.triangle_sets import _get_set_name
+
         self._get_set_name = _get_set_name
 
     def test_valid_set_id(self):
@@ -297,6 +305,7 @@ class SetSetNameTests(Blender3mfTestCase):
     def setUp(self):
         super().setUp()
         from io_mesh_3mf.panels.triangle_sets import _set_set_name, _get_set_name
+
         self._set_set_name = _set_set_name
         self._get_set_name = _get_set_name
 

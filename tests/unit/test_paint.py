@@ -18,11 +18,13 @@ import numpy as np
 #  Bake module tests
 # ===========================================================================
 
+
 class RgbToHsvTests(unittest.TestCase):
     """Tests for paint.bake._rgb_to_hsv()."""
 
     def setUp(self):
         from io_mesh_3mf.paint.quantize import _rgb_to_hsv
+
         self._rgb_to_hsv = _rgb_to_hsv
 
     def test_pure_red(self):
@@ -63,11 +65,14 @@ class RgbToHsvTests(unittest.TestCase):
 
     def test_batch_input(self):
         """Multiple colors are processed correctly in batch."""
-        rgb = np.array([
-            [1.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0],
-            [0.0, 0.0, 1.0],
-        ], dtype=np.float32)
+        rgb = np.array(
+            [
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 0.0, 1.0],
+            ],
+            dtype=np.float32,
+        )
         hsv = self._rgb_to_hsv(rgb)
         self.assertEqual(hsv.shape, (3, 3))
 
@@ -77,6 +82,7 @@ class HueAwareDistanceTests(unittest.TestCase):
 
     def setUp(self):
         from io_mesh_3mf.paint.quantize import _hue_aware_distance, _rgb_to_hsv
+
         self._hue_aware_distance = _hue_aware_distance
         self._rgb_to_hsv = _rgb_to_hsv
 
@@ -84,9 +90,7 @@ class HueAwareDistanceTests(unittest.TestCase):
         """Distance between identical colors should be ~0."""
         pixel_rgb = np.array([[[[1.0, 0.0, 0.0]]]], dtype=np.float32)
         palette_rgb = np.array([[[[1.0, 0.0, 0.0]]]], dtype=np.float32)
-        pixel_hsv = self._rgb_to_hsv(pixel_rgb.reshape(-1, 3)).reshape(
-            pixel_rgb.shape
-        )
+        pixel_hsv = self._rgb_to_hsv(pixel_rgb.reshape(-1, 3)).reshape(pixel_rgb.shape)
         palette_hsv = self._rgb_to_hsv(palette_rgb.reshape(-1, 3)).reshape(
             palette_rgb.shape
         )
@@ -97,9 +101,7 @@ class HueAwareDistanceTests(unittest.TestCase):
         """Red vs cyan (complementary hues) should have large distance."""
         pixel_rgb = np.array([[[[1.0, 0.0, 0.0]]]], dtype=np.float32)  # red
         palette_rgb = np.array([[[[0.0, 1.0, 1.0]]]], dtype=np.float32)  # cyan
-        pixel_hsv = self._rgb_to_hsv(pixel_rgb.reshape(-1, 3)).reshape(
-            pixel_rgb.shape
-        )
+        pixel_hsv = self._rgb_to_hsv(pixel_rgb.reshape(-1, 3)).reshape(pixel_rgb.shape)
         palette_hsv = self._rgb_to_hsv(palette_rgb.reshape(-1, 3)).reshape(
             palette_rgb.shape
         )
@@ -112,6 +114,7 @@ class QuantizePixelsTests(unittest.TestCase):
 
     def setUp(self):
         from io_mesh_3mf.paint.quantize import _quantize_pixels
+
         self._quantize_pixels = _quantize_pixels
 
     def test_single_color_no_change(self):
@@ -167,8 +170,10 @@ class QuantizePixelsTests(unittest.TestCase):
 
         # V=0.4 is closer to black (dv=0.4) than to white (dv=0.6)
         np.testing.assert_array_almost_equal(
-            pixels[0, 0, :3], [0.0, 0.0, 0.0], decimal=2,
-            err_msg="Dark grey (V=0.4) should snap to black"
+            pixels[0, 0, :3],
+            [0.0, 0.0, 0.0],
+            decimal=2,
+            err_msg="Dark grey (V=0.4) should snap to black",
         )
 
     def test_light_grey_snaps_to_white(self):
@@ -180,8 +185,10 @@ class QuantizePixelsTests(unittest.TestCase):
 
         # V=0.6 is closer to white (dv=0.4) than to black (dv=0.6)
         np.testing.assert_array_almost_equal(
-            pixels[0, 0, :3], [1.0, 1.0, 1.0], decimal=2,
-            err_msg="Light grey (V=0.6) should snap to white"
+            pixels[0, 0, :3],
+            [1.0, 1.0, 1.0],
+            decimal=2,
+            err_msg="Light grey (V=0.6) should snap to white",
         )
 
 
@@ -190,6 +197,7 @@ class GetTextureSizeTests(unittest.TestCase):
 
     def setUp(self):
         from io_mesh_3mf.paint.bake import _get_texture_size
+
         self._get_texture_size = _get_texture_size
 
     def test_override_returns_override(self):
@@ -234,6 +242,7 @@ class ApplyMajorityFilterTests(unittest.TestCase):
 
     def setUp(self):
         from io_mesh_3mf.paint.quantize import _apply_majority_filter
+
         self._apply_majority_filter = _apply_majority_filter
 
     def test_uniform_image_no_change(self):
@@ -315,7 +324,9 @@ class ApplyMajorityFilterTests(unittest.TestCase):
         #   y=8 window: y=6,7,8,9,10 → 2 white + 3 black rows = 10 white, 15 black → stay black
         # But with kernel=7, y=8 sees y=5,6,7,8,9,10,11 → 4 white + 3 black = 28 white, 21 black → flip
         pixels_k7 = pixels.copy()
-        flipped = self._apply_majority_filter(pixels_k7, palette, kernel_size=7, passes=2)
+        flipped = self._apply_majority_filter(
+            pixels_k7, palette, kernel_size=7, passes=2
+        )
 
         # With 7×7 kernel and 2 passes, the thin band should be gone
         self.assertGreater(flipped, 0)
@@ -351,11 +362,13 @@ class ApplyMajorityFilterTests(unittest.TestCase):
 #  Color detection module tests
 # ===========================================================================
 
+
 class DeduplicateColorsTests(unittest.TestCase):
     """Tests for paint.color_detection._deduplicate_colors()."""
 
     def setUp(self):
         from io_mesh_3mf.paint.color_detection import _deduplicate_colors
+
         self._deduplicate_colors = _deduplicate_colors
 
     def test_no_duplicates(self):
@@ -388,6 +401,7 @@ class SrgbToHsvArrayTests(unittest.TestCase):
 
     def setUp(self):
         from io_mesh_3mf.paint.color_detection import _srgb_to_hsv_array
+
         self._srgb_to_hsv_array = _srgb_to_hsv_array
 
     def test_red(self):
@@ -410,6 +424,7 @@ class BinPixelsHsvTests(unittest.TestCase):
 
     def setUp(self):
         from io_mesh_3mf.paint.color_detection import _bin_pixels_hsv
+
         self._bin_pixels_hsv = _bin_pixels_hsv
 
     def test_single_color(self):
@@ -448,6 +463,7 @@ class SelectDiverseColorsTests(unittest.TestCase):
 
     def setUp(self):
         from io_mesh_3mf.paint.color_detection import _select_diverse_colors
+
         self._select_diverse_colors = _select_diverse_colors
 
     def test_empty_input(self):
@@ -468,9 +484,7 @@ class SelectDiverseColorsTests(unittest.TestCase):
 
     def test_exact_count(self):
         """Requesting exact number of bins returns all."""
-        colors = np.array(
-            [[1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=np.float32
-        )
+        colors = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=np.float32)
         counts = np.array([100, 80, 60], dtype=np.float64)
         result = self._select_diverse_colors(colors, counts, 3)
         self.assertEqual(len(result), 3)
@@ -491,6 +505,7 @@ class LinearToSrgbArrayTests(unittest.TestCase):
 
     def setUp(self):
         from io_mesh_3mf.paint.color_detection import _linear_to_srgb_array
+
         self._linear_to_srgb_array = _linear_to_srgb_array
 
     def test_black(self):
@@ -526,6 +541,7 @@ class HsDistanceTests(unittest.TestCase):
 
     def setUp(self):
         from io_mesh_3mf.paint.color_detection import _hs_distance
+
         self._hs_distance = _hs_distance
 
     def test_identical_zero_distance(self):
@@ -547,15 +563,18 @@ class HsDistanceTests(unittest.TestCase):
 #  Helpers module tests
 # ===========================================================================
 
+
 class DefaultPaletteTests(unittest.TestCase):
     """Tests for paint.helpers.DEFAULT_PALETTE."""
 
     def test_palette_has_16_entries(self):
         from io_mesh_3mf.paint.helpers import DEFAULT_PALETTE
+
         self.assertEqual(len(DEFAULT_PALETTE), 16)
 
     def test_palette_entries_are_rgb_tuples(self):
         from io_mesh_3mf.paint.helpers import DEFAULT_PALETTE
+
         for color in DEFAULT_PALETTE:
             self.assertEqual(len(color), 3)
             for c in color:
@@ -568,6 +587,7 @@ class LayerHelpersTests(unittest.TestCase):
 
     def test_layer_colors_seam(self):
         from io_mesh_3mf.paint.helpers import _layer_colors
+
         bg, enforce, block = _layer_colors("SEAM")
         self.assertEqual(len(bg), 3)
         self.assertEqual(len(enforce), 3)
@@ -575,48 +595,59 @@ class LayerHelpersTests(unittest.TestCase):
 
     def test_layer_colors_support(self):
         from io_mesh_3mf.paint.helpers import _layer_colors
+
         bg, enforce, block = _layer_colors("SUPPORT")
         self.assertEqual(len(bg), 3)
 
     def test_layer_colors_unknown(self):
         from io_mesh_3mf.paint.helpers import _layer_colors
+
         result = _layer_colors("UNKNOWN")
         self.assertIsNone(result)
 
     def test_layer_uv_name_seam(self):
         from io_mesh_3mf.paint.helpers import _layer_uv_name
+
         self.assertEqual(_layer_uv_name("SEAM"), "Seam_Paint")
 
     def test_layer_uv_name_support(self):
         from io_mesh_3mf.paint.helpers import _layer_uv_name
+
         self.assertEqual(_layer_uv_name("SUPPORT"), "Support_Paint")
 
     def test_layer_uv_name_default(self):
         from io_mesh_3mf.paint.helpers import _layer_uv_name
+
         self.assertEqual(_layer_uv_name("COLOR"), "MMU_Paint")
 
     def test_layer_flag_key_seam(self):
         from io_mesh_3mf.paint.helpers import _layer_flag_key
+
         self.assertEqual(_layer_flag_key("SEAM"), "3mf_has_seam_paint")
 
     def test_layer_flag_key_support(self):
         from io_mesh_3mf.paint.helpers import _layer_flag_key
+
         self.assertEqual(_layer_flag_key("SUPPORT"), "3mf_has_support_paint")
 
     def test_layer_flag_key_default(self):
         from io_mesh_3mf.paint.helpers import _layer_flag_key
+
         self.assertEqual(_layer_flag_key("COLOR"), "3mf_is_paint_texture")
 
     def test_layer_colors_key_seam(self):
         from io_mesh_3mf.paint.helpers import _layer_colors_key
+
         self.assertEqual(_layer_colors_key("SEAM"), "3mf_seam_paint_colors")
 
     def test_layer_colors_key_support(self):
         from io_mesh_3mf.paint.helpers import _layer_colors_key
+
         self.assertEqual(_layer_colors_key("SUPPORT"), "3mf_support_paint_colors")
 
     def test_layer_colors_key_default(self):
         from io_mesh_3mf.paint.helpers import _layer_colors_key
+
         self.assertEqual(_layer_colors_key("COLOR"), "3mf_paint_extruder_colors")
 
 
@@ -624,11 +655,13 @@ class LayerHelpersTests(unittest.TestCase):
 #  Region-Based Quantization tests
 # ===========================================================================
 
+
 class FloodFillSegmentationTests(unittest.TestCase):
     """Tests for paint.bake._flood_fill_segmentation()."""
 
     def setUp(self):
         from io_mesh_3mf.paint.quantize import _flood_fill_segmentation
+
         self._flood_fill_segmentation = _flood_fill_segmentation
 
     def test_uniform_image_single_region(self):
@@ -648,7 +681,9 @@ class FloodFillSegmentationTests(unittest.TestCase):
         pixels[4:, :, :3] = [0.0, 0.0, 0.0]  # black bottom
         pixels[:, :, 3] = 1.0  # fully opaque
 
-        region_map, num_regions = self._flood_fill_segmentation(pixels, similarity_threshold=0.25)
+        region_map, num_regions = self._flood_fill_segmentation(
+            pixels, similarity_threshold=0.25
+        )
 
         self.assertEqual(num_regions, 2)
         # Top and bottom should have different region IDs
@@ -663,7 +698,9 @@ class FloodFillSegmentationTests(unittest.TestCase):
             pixels[y, :, :3] = val
         pixels[:, :, 3] = 1.0
 
-        region_map, num_regions = self._flood_fill_segmentation(pixels, similarity_threshold=0.25)
+        region_map, num_regions = self._flood_fill_segmentation(
+            pixels, similarity_threshold=0.25
+        )
 
         # Should be one connected region (gradient is within threshold)
         self.assertEqual(num_regions, 1)
@@ -688,7 +725,10 @@ class RegionRepresentativeColorsTests(unittest.TestCase):
 
     def setUp(self):
         from io_mesh_3mf.paint.quantize import _compute_region_representative_colors
-        self._compute_region_representative_colors = _compute_region_representative_colors
+
+        self._compute_region_representative_colors = (
+            _compute_region_representative_colors
+        )
 
     def test_uniform_region_same_color(self):
         """A region with uniform color returns that color as representative."""
@@ -728,6 +768,7 @@ class QuantizeByRegionsTests(unittest.TestCase):
 
     def setUp(self):
         from io_mesh_3mf.paint.quantize import _quantize_by_regions
+
         self._quantize_by_regions = _quantize_by_regions
 
     def test_uniform_image_single_color(self):
@@ -778,8 +819,10 @@ class QuantizeByRegionsTests(unittest.TestCase):
         # 1. Region segmentation groups white+shadows together via gradient
         # 2. The representative color (75th percentile) is white
         np.testing.assert_array_almost_equal(
-            pixels[16, 16, :3], [1.0, 1.0, 1.0], decimal=2,
-            err_msg="Grey shadow on white glove should quantize to white"
+            pixels[16, 16, :3],
+            [1.0, 1.0, 1.0],
+            decimal=2,
+            err_msg="Grey shadow on white glove should quantize to white",
         )
         # The originally white area should still be white
         np.testing.assert_array_almost_equal(
@@ -839,11 +882,13 @@ class QuantizeByRegionsTests(unittest.TestCase):
 # Gradient Magnitude Tests
 # ===========================================================================
 
+
 class GradientMagnitudeTests(unittest.TestCase):
     """Tests for paint.bake._compute_gradient_magnitude()."""
 
     def setUp(self):
         from io_mesh_3mf.paint.quantize import _compute_gradient_magnitude
+
         self._compute_gradient_magnitude = _compute_gradient_magnitude
 
     def test_uniform_image_zero_gradient(self):
@@ -887,11 +932,13 @@ class GradientMagnitudeTests(unittest.TestCase):
 # Merge Small Regions Tests
 # ===========================================================================
 
+
 class MergeSmallRegionsTests(unittest.TestCase):
     """Tests for paint.bake._merge_small_regions()."""
 
     def setUp(self):
         from io_mesh_3mf.paint.quantize import _merge_small_regions
+
         self._merge_small_regions = _merge_small_regions
 
     def test_no_small_regions_unchanged(self):
@@ -937,8 +984,10 @@ class MergeSmallRegionsTests(unittest.TestCase):
         merged, num = self._merge_small_regions(region_map, 2, min_region_size=10)
 
         # Tiny center should merge into its neighbor (region 1), not background
-        self.assertTrue(np.all(merged[4:6, 4:6] > 0),
-                        "Small region should merge into neighbor, not background")
+        self.assertTrue(
+            np.all(merged[4:6, 4:6] > 0),
+            "Small region should merge into neighbor, not background",
+        )
 
 
 if __name__ == "__main__":

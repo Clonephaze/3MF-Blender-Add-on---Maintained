@@ -51,6 +51,7 @@ def cleanup_temp_dir():
 # Base Test Classes
 # ============================================================================
 
+
 class Blender3mfTestCase(unittest.TestCase):
     """Base test case for Blender 3MF addon integration tests.
 
@@ -62,6 +63,7 @@ class Blender3mfTestCase(unittest.TestCase):
     def setUpClass(cls):
         """Register the addon once for the entire test class."""
         import io_mesh_3mf
+
         try:
             io_mesh_3mf.register()
         except ValueError as e:
@@ -74,6 +76,7 @@ class Blender3mfTestCase(unittest.TestCase):
         """Clean scene and create a unique temp file path."""
         self.clean_scene()
         import uuid
+
         self.temp_file = get_temp_test_dir() / f"test_{uuid.uuid4().hex[:8]}.3mf"
         self.test_resources_dir = get_test_resources_dir()
 

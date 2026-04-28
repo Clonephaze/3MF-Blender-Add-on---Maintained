@@ -22,6 +22,7 @@ from io_mesh_3mf.import_3mf.scene import (
 #  apply_import_location
 # ============================================================================
 
+
 class ApplyImportLocationTests(unittest.TestCase):
     """Tests for apply_import_location()."""
 
@@ -67,12 +68,15 @@ class ApplyImportLocationTests(unittest.TestCase):
         """All modes return a copy, not mutate the input."""
         m = self._mat()
         _ = apply_import_location(m, "ORIGIN")
-        self.assertAlmostEqual(m.translation.x, 5.0, msg="Original should not be mutated")
+        self.assertAlmostEqual(
+            m.translation.x, 5.0, msg="Original should not be mutated"
+        )
 
 
 # ============================================================================
 #  apply_grid_layout
 # ============================================================================
+
 
 class ApplyGridLayoutTests(Blender3mfTestCase):
     """Tests for apply_grid_layout()."""
@@ -103,7 +107,9 @@ class ApplyGridLayoutTests(Blender3mfTestCase):
         positions = set()
         for obj in objs:
             positions.add((round(obj.location.x, 1), round(obj.location.y, 1)))
-        self.assertGreater(len(positions), 1, "Objects should be at different positions")
+        self.assertGreater(
+            len(positions), 1, "Objects should be at different positions"
+        )
 
     def test_grid_uses_spacing(self):
         """Objects have gaps matching the grid_spacing parameter."""
@@ -122,6 +128,7 @@ class ApplyGridLayoutTests(Blender3mfTestCase):
 # ============================================================================
 #  set_object_origin
 # ============================================================================
+
 
 class SetObjectOriginTests(Blender3mfTestCase):
     """Tests for set_object_origin()."""
@@ -163,6 +170,7 @@ class SetObjectOriginTests(Blender3mfTestCase):
 #  Import options via operator (end-to-end)
 # ============================================================================
 
+
 class ImportMaterialModeTests(Blender3mfTestCase):
     """Test import_materials option via operator."""
 
@@ -179,7 +187,7 @@ class ImportMaterialModeTests(Blender3mfTestCase):
         """Default import includes materials."""
         self._create_test_3mf()
         result = bpy.ops.import_mesh.threemf(filepath=str(self.temp_file))
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         obj = bpy.data.objects[0]
         self.assertGreater(len(obj.data.materials), 0)
 
@@ -189,7 +197,7 @@ class ImportMaterialModeTests(Blender3mfTestCase):
         result = bpy.ops.import_mesh.threemf(
             filepath=str(self.temp_file), import_materials="NONE"
         )
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         obj = bpy.data.objects[0]
         self.assertEqual(len(obj.data.materials), 0)
 
@@ -265,13 +273,11 @@ class ImportHiddenObjectTests(Blender3mfTestCase):
         cube = bpy.context.object
         cube.hide_set(True)
 
-        bpy.ops.export_mesh.threemf(
-            filepath=str(self.temp_file), export_hidden=True
-        )
+        bpy.ops.export_mesh.threemf(filepath=str(self.temp_file), export_hidden=True)
         self.clean_scene()
 
         result = bpy.ops.import_mesh.threemf(filepath=str(self.temp_file))
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertGreater(len(bpy.data.objects), 0)
 
 

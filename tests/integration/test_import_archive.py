@@ -47,6 +47,7 @@ def _make_archive(files: dict) -> zipfile.ZipFile:
 # read_content_types
 # ============================================================================
 
+
 class TestReadContentTypes(unittest.TestCase):
     """read_content_types() with crafted [Content_Types].xml files."""
 
@@ -58,10 +59,12 @@ class TestReadContentTypes(unittest.TestCase):
             '            ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml" />'
             "</Types>"
         )
-        archive = _make_archive({
-            CONTENT_TYPES_LOCATION: ct_xml,
-            "3D/3dmodel.model": "<model />",
-        })
+        archive = _make_archive(
+            {
+                CONTENT_TYPES_LOCATION: ct_xml,
+                "3D/3dmodel.model": "<model />",
+            }
+        )
         ctx = _make_ctx()
         result = read_content_types(ctx, archive)
 
@@ -79,10 +82,12 @@ class TestReadContentTypes(unittest.TestCase):
             '           ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml" />'
             "</Types>"
         )
-        archive = _make_archive({
-            CONTENT_TYPES_LOCATION: ct_xml,
-            "3D/3dmodel.model": "<model />",
-        })
+        archive = _make_archive(
+            {
+                CONTENT_TYPES_LOCATION: ct_xml,
+                "3D/3dmodel.model": "<model />",
+            }
+        )
         ctx = _make_ctx()
         result = read_content_types(ctx, archive)
 
@@ -92,9 +97,11 @@ class TestReadContentTypes(unittest.TestCase):
 
     def test_missing_content_types(self):
         """Missing [Content_Types].xml should still return fallback patterns."""
-        archive = _make_archive({
-            "3D/3dmodel.model": "<model />",
-        })
+        archive = _make_archive(
+            {
+                "3D/3dmodel.model": "<model />",
+            }
+        )
         ctx = _make_ctx()
         result = read_content_types(ctx, archive)
 
@@ -105,10 +112,12 @@ class TestReadContentTypes(unittest.TestCase):
 
     def test_malformed_xml(self):
         """Malformed XML should still return fallback patterns."""
-        archive = _make_archive({
-            CONTENT_TYPES_LOCATION: "<<<NOT XML>>>",
-            "3D/3dmodel.model": "<model />",
-        })
+        archive = _make_archive(
+            {
+                CONTENT_TYPES_LOCATION: "<<<NOT XML>>>",
+                "3D/3dmodel.model": "<model />",
+            }
+        )
         ctx = _make_ctx()
         result = read_content_types(ctx, archive)
         # Should still have fallbacks
@@ -119,15 +128,18 @@ class TestReadContentTypes(unittest.TestCase):
 # assign_content_types
 # ============================================================================
 
+
 class TestAssignContentTypes(unittest.TestCase):
     """assign_content_types() with crafted archives."""
 
     def test_model_file_gets_type(self):
-        archive = _make_archive({
-            CONTENT_TYPES_LOCATION: "<Types />",
-            "3D/3dmodel.model": "<model />",
-            "_rels/.rels": "<Relationships />",
-        })
+        archive = _make_archive(
+            {
+                CONTENT_TYPES_LOCATION: "<Types />",
+                "3D/3dmodel.model": "<model />",
+                "_rels/.rels": "<Relationships />",
+            }
+        )
         content_types = [
             (re.compile(r".*\.model"), MODEL_MIMETYPE),
             (re.compile(r".*\.rels"), RELS_MIMETYPE),
@@ -139,10 +151,12 @@ class TestAssignContentTypes(unittest.TestCase):
         self.assertEqual(result["_rels/.rels"], RELS_MIMETYPE)
 
     def test_unrecognized_gets_empty(self):
-        archive = _make_archive({
-            CONTENT_TYPES_LOCATION: "<Types />",
-            "random.txt": "hello",
-        })
+        archive = _make_archive(
+            {
+                CONTENT_TYPES_LOCATION: "<Types />",
+                "random.txt": "hello",
+            }
+        )
         content_types = [
             (re.compile(r".*\.model"), MODEL_MIMETYPE),
         ]
@@ -152,20 +166,24 @@ class TestAssignContentTypes(unittest.TestCase):
 
     def test_content_types_excluded(self):
         """[Content_Types].xml itself should not appear in results."""
-        archive = _make_archive({
-            CONTENT_TYPES_LOCATION: "<Types />",
-            "3D/3dmodel.model": "<model />",
-        })
+        archive = _make_archive(
+            {
+                CONTENT_TYPES_LOCATION: "<Types />",
+                "3D/3dmodel.model": "<model />",
+            }
+        )
         content_types = []
         result = assign_content_types(archive, content_types)
         self.assertNotIn(CONTENT_TYPES_LOCATION, result)
 
     def test_priority_override_first(self):
         """Earlier patterns (overrides) should win over later ones (defaults)."""
-        archive = _make_archive({
-            CONTENT_TYPES_LOCATION: "<Types />",
-            "3D/3dmodel.model": "<model />",
-        })
+        archive = _make_archive(
+            {
+                CONTENT_TYPES_LOCATION: "<Types />",
+                "3D/3dmodel.model": "<model />",
+            }
+        )
         content_types = [
             (re.compile(re.escape("/3D/3dmodel.model")), "override/xml"),
             (re.compile(r".*\.model"), MODEL_MIMETYPE),

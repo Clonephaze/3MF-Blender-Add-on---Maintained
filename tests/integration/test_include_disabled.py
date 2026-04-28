@@ -27,6 +27,7 @@ CONTENT_TYPES_NS = "http://schemas.openxmlformats.org/package/2006/content-types
 # Helpers
 # ============================================================================
 
+
 def _assign_material_per_face(cube, mat_a, mat_b):
     """Assign mat_a to the first half of faces, mat_b to the rest."""
     cube.data.materials.append(mat_a)
@@ -46,6 +47,7 @@ def _assign_material_per_face(cube, mat_a, mat_b):
 # ============================================================================
 # Operator: Orca export with disabled objects
 # ============================================================================
+
 
 class TestOrcaIncludeDisabled(Blender3mfTestCase):
     """Orca PAINT export must include render-disabled objects when opted in."""
@@ -77,7 +79,8 @@ class TestOrcaIncludeDisabled(Blender3mfTestCase):
                 n for n in archive.namelist() if n.startswith("3D/Objects/")
             ]
             self.assertEqual(
-                len(object_files), 2,
+                len(object_files),
+                2,
                 f"Both objects should be exported; got {object_files}",
             )
 
@@ -106,7 +109,8 @@ class TestOrcaIncludeDisabled(Blender3mfTestCase):
                 n for n in archive.namelist() if n.startswith("3D/Objects/")
             ]
             self.assertEqual(
-                len(object_files), 1,
+                len(object_files),
+                1,
                 f"Only the enabled object should be exported; got {object_files}",
             )
 
@@ -149,6 +153,7 @@ class TestOrcaIncludeDisabled(Blender3mfTestCase):
 # Operator: Prusa export with disabled objects
 # ============================================================================
 
+
 class TestPrusaIncludeDisabled(Blender3mfTestCase):
     """Prusa PAINT export must include render-disabled objects when opted in."""
 
@@ -179,11 +184,11 @@ class TestPrusaIncludeDisabled(Blender3mfTestCase):
             root = ET.fromstring(model_data)
             objects = root.findall(f".//{{{MODEL_NS}}}object")
             mesh_objects = [
-                o for o in objects
-                if o.find(f"{{{MODEL_NS}}}mesh") is not None
+                o for o in objects if o.find(f"{{{MODEL_NS}}}mesh") is not None
             ]
             self.assertGreaterEqual(
-                len(mesh_objects), 2,
+                len(mesh_objects),
+                2,
                 "Both objects (enabled + disabled) should have mesh data",
             )
 
@@ -191,6 +196,7 @@ class TestPrusaIncludeDisabled(Blender3mfTestCase):
 # ============================================================================
 # Operator: Standard export with disabled objects
 # ============================================================================
+
 
 class TestStandardIncludeDisabled(Blender3mfTestCase):
     """Standard exporter must include render-disabled objects when opted in."""
@@ -218,11 +224,11 @@ class TestStandardIncludeDisabled(Blender3mfTestCase):
             root = ET.fromstring(model_data)
             objects = root.findall(f".//{{{MODEL_NS}}}object")
             mesh_objects = [
-                o for o in objects
-                if o.find(f"{{{MODEL_NS}}}mesh") is not None
+                o for o in objects if o.find(f"{{{MODEL_NS}}}mesh") is not None
             ]
             self.assertGreaterEqual(
-                len(mesh_objects), 2,
+                len(mesh_objects),
+                2,
                 "Standard export with include_disabled should write both objects",
             )
 
@@ -231,6 +237,7 @@ class TestStandardIncludeDisabled(Blender3mfTestCase):
 # API: export_3mf(objects=[...]) with hidden/disabled objects
 # ============================================================================
 
+
 class TestAPIExplicitObjects(Blender3mfTestCase):
     """export_3mf(objects=[...]) must respect the caller's explicit list."""
 
@@ -238,8 +245,8 @@ class TestAPIExplicitObjects(Blender3mfTestCase):
         """An explicitly passed hidden object should be exported."""
         bpy.ops.mesh.primitive_cube_add(location=(0, 0, 0))
         cube = bpy.context.object
-        cube.hide_set(True)          # viewport-hidden
-        cube.hide_render = True       # render-disabled
+        cube.hide_set(True)  # viewport-hidden
+        cube.hide_render = True  # render-disabled
 
         result = export_3mf(
             str(self.temp_file),
@@ -275,7 +282,8 @@ class TestAPIExplicitObjects(Blender3mfTestCase):
                 n for n in archive.namelist() if n.startswith("3D/Objects/")
             ]
             self.assertEqual(
-                len(object_files), 1,
+                len(object_files),
+                1,
                 "The explicitly passed object should be exported",
             )
 
@@ -303,6 +311,7 @@ class TestAPIExplicitObjects(Blender3mfTestCase):
 # ============================================================================
 # Component detection with disabled linked duplicates
 # ============================================================================
+
 
 class TestComponentsIncludeDisabled(Blender3mfTestCase):
     """detect_linked_duplicates must see disabled objects when include_disabled is set."""
@@ -341,14 +350,16 @@ class TestComponentsIncludeDisabled(Blender3mfTestCase):
             # Both objects should appear as component instances referencing
             # the same shared mesh definition
             self.assertGreaterEqual(
-                len(components), 2,
+                len(components),
+                2,
                 "Both linked duplicates (inc. disabled one) should be component instances",
             )
 
             # All component refs should point to the same objectid
             object_ids = {c.get("objectid") for c in components}
             self.assertEqual(
-                len(object_ids), 1,
+                len(object_ids),
+                1,
                 "All component instances should reference the same mesh definition",
             )
 
@@ -356,6 +367,7 @@ class TestComponentsIncludeDisabled(Blender3mfTestCase):
 # ============================================================================
 # Thumbnail OPC content type
 # ============================================================================
+
 
 class TestThumbnailContentType(Blender3mfTestCase):
     """Thumbnail must have image/png content type for Windows Explorer."""
@@ -376,41 +388,33 @@ class TestThumbnailContentType(Blender3mfTestCase):
             root = ET.fromstring(ct_data)
 
             # The .png Default should be the 3MF texture type (not image/png)
-            defaults = root.findall(
-                f"{{{CONTENT_TYPES_NS}}}Default"
-            )
+            defaults = root.findall(f"{{{CONTENT_TYPES_NS}}}Default")
             png_default = None
             for d in defaults:
                 ext = d.get(f"{{{CONTENT_TYPES_NS}}}Extension") or d.get("Extension")
                 if ext == "png":
-                    png_default = (
-                        d.get(f"{{{CONTENT_TYPES_NS}}}ContentType")
-                        or d.get("ContentType")
+                    png_default = d.get(f"{{{CONTENT_TYPES_NS}}}ContentType") or d.get(
+                        "ContentType"
                     )
 
             # Whether or not the png default is the texture type, there should
             # be an Override for the thumbnail with image/png
-            overrides = root.findall(
-                f"{{{CONTENT_TYPES_NS}}}Override"
-            )
+            overrides = root.findall(f"{{{CONTENT_TYPES_NS}}}Override")
             thumbnail_override = None
             for o in overrides:
-                part = (
-                    o.get(f"{{{CONTENT_TYPES_NS}}}PartName")
-                    or o.get("PartName")
-                )
+                part = o.get(f"{{{CONTENT_TYPES_NS}}}PartName") or o.get("PartName")
                 if part and "thumbnail" in part.lower():
-                    thumbnail_override = (
-                        o.get(f"{{{CONTENT_TYPES_NS}}}ContentType")
-                        or o.get("ContentType")
-                    )
+                    thumbnail_override = o.get(
+                        f"{{{CONTENT_TYPES_NS}}}ContentType"
+                    ) or o.get("ContentType")
 
             self.assertIsNotNone(
                 thumbnail_override,
                 "Should have an Override for Metadata/thumbnail.png",
             )
             self.assertEqual(
-                thumbnail_override, "image/png",
+                thumbnail_override,
+                "image/png",
                 "Thumbnail Override content type must be image/png",
             )
 

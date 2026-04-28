@@ -155,9 +155,7 @@ class TestResourcePBRTextureDisplay(unittest.TestCase):
         self.assertEqual(pbr.factors, {})
 
     def test_specular_with_factors(self):
-        pbr = ResourcePBRTextureDisplay(
-            type="specular", factors={"glossiness": "0.8"}
-        )
+        pbr = ResourcePBRTextureDisplay(type="specular", factors={"glossiness": "0.8"})
         self.assertEqual(pbr.factors["glossiness"], "0.8")
 
 

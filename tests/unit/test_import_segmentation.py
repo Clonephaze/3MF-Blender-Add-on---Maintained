@@ -116,9 +116,7 @@ class SubdivideInUvSpaceTests(unittest.TestCase):
         parent0.special_side = 0
         parent0.children = [child1, child2]
 
-        result0 = subdivide_in_uv_space(
-            (0.0, 0.0), (1.0, 0.0), (0.5, 1.0), parent0
-        )
+        result0 = subdivide_in_uv_space((0.0, 0.0), (1.0, 0.0), (0.5, 1.0), parent0)
 
         # With special_side=1 — should produce different UV coords
         child3 = SegmentationNode()
@@ -131,9 +129,7 @@ class SubdivideInUvSpaceTests(unittest.TestCase):
         parent1.special_side = 1
         parent1.children = [child3, child4]
 
-        result1 = subdivide_in_uv_space(
-            (0.0, 0.0), (1.0, 0.0), (0.5, 1.0), parent1
-        )
+        result1 = subdivide_in_uv_space((0.0, 0.0), (1.0, 0.0), (0.5, 1.0), parent1)
 
         # The UV coordinates should differ due to vertex rotation
         self.assertEqual(len(result0), len(result1))
@@ -143,8 +139,9 @@ class SubdivideInUvSpaceTests(unittest.TestCase):
             if r0[0] != r1[0] or r0[1] != r1[1] or r0[2] != r1[2]:
                 coords_differ = True
                 break
-        self.assertTrue(coords_differ,
-                        "Different special_side should produce different UV coords")
+        self.assertTrue(
+            coords_differ, "Different special_side should produce different UV coords"
+        )
 
     def test_recursive_subdivision(self):
         """Nested subdivision produces correct number of leaf triangles."""
@@ -167,9 +164,7 @@ class SubdivideInUvSpaceTests(unittest.TestCase):
         parent.special_side = 0
         parent.children = [child_with_children, child_leaf]
 
-        result = subdivide_in_uv_space(
-            (0.0, 0.0), (1.0, 0.0), (0.5, 1.0), parent
-        )
+        result = subdivide_in_uv_space((0.0, 0.0), (1.0, 0.0), (0.5, 1.0), parent)
 
         # Should produce 3 leaf triangles: 2 from first child + 1 from second
         self.assertEqual(len(result), 3)
@@ -189,8 +184,12 @@ class RenderTriangleToImageTests(unittest.TestCase):
 
         # Triangle covers most of the image
         render_triangle_to_image(
-            buf, 32, 32,
-            (0.1, 0.1), (0.9, 0.1), (0.5, 0.9),
+            buf,
+            32,
+            32,
+            (0.1, 0.1),
+            (0.9, 0.1),
+            (0.5, 0.9),
             color,
         )
 
@@ -205,8 +204,12 @@ class RenderTriangleToImageTests(unittest.TestCase):
 
         # Collinear points
         render_triangle_to_image(
-            buf, 32, 32,
-            (0.1, 0.5), (0.5, 0.5), (0.9, 0.5),
+            buf,
+            32,
+            32,
+            (0.1, 0.5),
+            (0.5, 0.5),
+            (0.9, 0.5),
             color,
         )
 
@@ -220,14 +223,19 @@ class RenderTriangleToImageTests(unittest.TestCase):
 
         # Tiny triangle in a small area
         render_triangle_to_image(
-            buf, 64, 64,
-            (0.50, 0.50), (0.51, 0.50), (0.505, 0.51),
+            buf,
+            64,
+            64,
+            (0.50, 0.50),
+            (0.51, 0.50),
+            (0.505, 0.51),
             color,
         )
 
         painted = np.sum(buf[:, :, 3] > 0.5)
-        self.assertGreaterEqual(painted, 1,
-                                "Tiny triangle should paint at least 1 pixel via centroid")
+        self.assertGreaterEqual(
+            painted, 1, "Tiny triangle should paint at least 1 pixel via centroid"
+        )
 
     def test_out_of_bounds_triangle_safe(self):
         """Triangle outside the image does not crash or corrupt."""
@@ -236,8 +244,12 @@ class RenderTriangleToImageTests(unittest.TestCase):
 
         # Entirely outside the image
         render_triangle_to_image(
-            buf, 16, 16,
-            (-1.0, -1.0), (-0.5, -1.0), (-0.75, -0.5),
+            buf,
+            16,
+            16,
+            (-1.0, -1.0),
+            (-0.5, -1.0),
+            (-0.75, -0.5),
             color,
         )
 
@@ -252,24 +264,35 @@ class RenderTriangleToImageTests(unittest.TestCase):
         # Tight triangle
         buf_tight = self._make_buffer(size)
         render_triangle_to_image(
-            buf_tight, size, size,
-            (0.3, 0.3), (0.7, 0.3), (0.5, 0.7),
-            color, expand_px=0.0,
+            buf_tight,
+            size,
+            size,
+            (0.3, 0.3),
+            (0.7, 0.3),
+            (0.5, 0.7),
+            color,
+            expand_px=0.0,
         )
 
         # Expanded triangle
         buf_expanded = self._make_buffer(size)
         render_triangle_to_image(
-            buf_expanded, size, size,
-            (0.3, 0.3), (0.7, 0.3), (0.5, 0.7),
-            color, expand_px=2.0,
+            buf_expanded,
+            size,
+            size,
+            (0.3, 0.3),
+            (0.7, 0.3),
+            (0.5, 0.7),
+            color,
+            expand_px=2.0,
         )
 
         tight_count = np.sum(buf_tight[:, :, 3] > 0.5)
         expanded_count = np.sum(buf_expanded[:, :, 3] > 0.5)
 
-        self.assertGreater(expanded_count, tight_count,
-                           "Expanded triangle should paint more pixels")
+        self.assertGreater(
+            expanded_count, tight_count, "Expanded triangle should paint more pixels"
+        )
 
     def test_color_values_correct(self):
         """Painted pixels have the exact specified color."""
@@ -277,8 +300,12 @@ class RenderTriangleToImageTests(unittest.TestCase):
         color = np.array([0.2, 0.4, 0.6, 1.0], dtype=np.float32)
 
         render_triangle_to_image(
-            buf, 32, 32,
-            (0.1, 0.1), (0.9, 0.1), (0.5, 0.9),
+            buf,
+            32,
+            32,
+            (0.1, 0.1),
+            (0.9, 0.1),
+            (0.5, 0.9),
             color,
         )
 
@@ -309,8 +336,11 @@ class DilatePassTests(unittest.TestCase):
         result = _dilate_pass(buf, min_neighbors=1)
 
         # The hole should be filled
-        self.assertGreater(result[4, 4, 3], 0.5,
-                           "Transparent pixel with opaque neighbors should be filled")
+        self.assertGreater(
+            result[4, 4, 3],
+            0.5,
+            "Transparent pixel with opaque neighbors should be filled",
+        )
 
     def test_isolated_transparent_pixel_not_filled_min2(self):
         """A transparent pixel with only 1 neighbor is not filled when min_neighbors=2."""
@@ -322,8 +352,11 @@ class DilatePassTests(unittest.TestCase):
 
         # Neighbors of the single pixel have only 1 opaque neighbor
         # so they should NOT be filled with min_neighbors=2
-        self.assertLess(result[3, 4, 3], 0.5,
-                        "Pixel with only 1 opaque neighbor shouldn't be filled at min=2")
+        self.assertLess(
+            result[3, 4, 3],
+            0.5,
+            "Pixel with only 1 opaque neighbor shouldn't be filled at min=2",
+        )
 
     def test_dilate_preserves_opaque_pixels(self):
         """Existing opaque pixels are not altered during dilation."""
@@ -371,8 +404,11 @@ class CloseGapsInTextureTests(unittest.TestCase):
         smart_count = np.sum(result_smart[:, :, 3] > 0.5)
         lightmap_count = np.sum(result_lightmap[:, :, 3] > 0.5)
 
-        self.assertGreater(lightmap_count, smart_count,
-                           "LIGHTMAP should dilate more aggressively than SMART")
+        self.assertGreater(
+            lightmap_count,
+            smart_count,
+            "LIGHTMAP should dilate more aggressively than SMART",
+        )
 
     def test_fully_opaque_unchanged(self):
         """A fully opaque buffer is returned unchanged regardless of mode."""

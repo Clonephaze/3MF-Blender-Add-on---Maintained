@@ -23,7 +23,9 @@ class TestMetadataBasics(unittest.TestCase):
 
     def test_set_and_get(self):
         m = Metadata()
-        entry = MetadataEntry(name="Title", preserve=True, datatype="xs:string", value="Cube")
+        entry = MetadataEntry(
+            name="Title", preserve=True, datatype="xs:string", value="Cube"
+        )
         m["Title"] = entry
         self.assertIn("Title", m)
         self.assertEqual(m["Title"].value, "Cube")
@@ -93,7 +95,9 @@ class TestMetadataConflicts(unittest.TestCase):
         m = Metadata()
         m["a"] = MetadataEntry(name="a", preserve=False, datatype="", value="1")
         m["b"] = MetadataEntry(name="b", preserve=False, datatype="", value="2")
-        m["b"] = MetadataEntry(name="b", preserve=False, datatype="", value="3")  # conflict
+        m["b"] = MetadataEntry(
+            name="b", preserve=False, datatype="", value="3"
+        )  # conflict
         self.assertEqual(len(m), 1)
 
 
@@ -122,7 +126,6 @@ class TestMetadataPreserve(unittest.TestCase):
 
 
 class TestMetadataEquality(unittest.TestCase):
-
     def test_equal_empty(self):
         self.assertEqual(Metadata(), Metadata())
 
@@ -145,7 +148,6 @@ class TestMetadataEquality(unittest.TestCase):
 
 
 class TestMetadataValues(unittest.TestCase):
-
     def test_values_iterator(self):
         m = Metadata()
         m["x"] = MetadataEntry(name="x", preserve=False, datatype="", value="1")
@@ -156,7 +158,9 @@ class TestMetadataValues(unittest.TestCase):
     def test_values_skips_conflicts(self):
         m = Metadata()
         m["x"] = MetadataEntry(name="x", preserve=False, datatype="", value="1")
-        m["x"] = MetadataEntry(name="x", preserve=False, datatype="", value="2")  # conflict
+        m["x"] = MetadataEntry(
+            name="x", preserve=False, datatype="", value="2"
+        )  # conflict
         vals = list(m.values())
         self.assertEqual(len(vals), 0)
 

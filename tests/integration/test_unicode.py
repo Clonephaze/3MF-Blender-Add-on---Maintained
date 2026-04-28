@@ -23,22 +23,24 @@ class UnicodeObjectNamesTests(Blender3mfTestCase):
 
         result = bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertTrue(self.temp_file.exists())
 
         # Verify XML contains the Chinese name correctly encoded
-        with zipfile.ZipFile(self.temp_file, 'r') as archive:
-            model_data = archive.read('3D/3dmodel.model')
+        with zipfile.ZipFile(self.temp_file, "r") as archive:
+            model_data = archive.read("3D/3dmodel.model")
             root = ET.fromstring(model_data)
 
-            ns = {'m': 'http://schemas.microsoft.com/3dmanufacturing/core/2015/02'}
-            objects = root.findall('.//m:object', ns)
+            ns = {"m": "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"}
+            objects = root.findall(".//m:object", ns)
             self.assertGreater(len(objects), 0)
 
             # Find object with our name - check both with and without namespace prefix
             found = False
             for obj in objects:
-                name = obj.get('{http://schemas.microsoft.com/3dmanufacturing/core/2015/02}name') or obj.get('name')
+                name = obj.get(
+                    "{http://schemas.microsoft.com/3dmanufacturing/core/2015/02}name"
+                ) or obj.get("name")
                 if name == "丁七亇三角形":
                     found = True
                     break
@@ -52,7 +54,7 @@ class UnicodeObjectNamesTests(Blender3mfTestCase):
 
         result = bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertTrue(self.temp_file.exists())
 
     def test_export_korean_object_name(self):
@@ -63,7 +65,7 @@ class UnicodeObjectNamesTests(Blender3mfTestCase):
 
         result = bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertTrue(self.temp_file.exists())
 
     def test_export_emoji_object_name(self):
@@ -74,7 +76,7 @@ class UnicodeObjectNamesTests(Blender3mfTestCase):
 
         result = bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertTrue(self.temp_file.exists())
 
     def test_export_mixed_unicode_object_name(self):
@@ -85,7 +87,7 @@ class UnicodeObjectNamesTests(Blender3mfTestCase):
 
         result = bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertTrue(self.temp_file.exists())
 
 
@@ -103,7 +105,7 @@ class UnicodeMaterialNamesTests(Blender3mfTestCase):
 
         result = bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertTrue(self.temp_file.exists())
 
         # With materials present the exporter auto-promotes to Orca format
@@ -111,8 +113,8 @@ class UnicodeMaterialNamesTests(Blender3mfTestCase):
         # names.  The key check is that Chinese characters in the material
         # name do not cause an encoding crash — the archive must be valid
         # and contain a parseable main model file.
-        with zipfile.ZipFile(self.temp_file, 'r') as archive:
-            model_data = archive.read('3D/3dmodel.model')
+        with zipfile.ZipFile(self.temp_file, "r") as archive:
+            model_data = archive.read("3D/3dmodel.model")
             root = ET.fromstring(model_data)
             self.assertIsNotNone(root, "Main model file should parse as valid XML")
 
@@ -127,7 +129,7 @@ class UnicodeMaterialNamesTests(Blender3mfTestCase):
 
         result = bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertTrue(self.temp_file.exists())
 
     def test_export_multiple_unicode_materials(self):
@@ -145,7 +147,7 @@ class UnicodeMaterialNamesTests(Blender3mfTestCase):
 
         result = bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertTrue(self.temp_file.exists())
 
 
@@ -158,15 +160,11 @@ class UnicodeMetadataTests(Blender3mfTestCase):
         cube = bpy.context.object
 
         # Add custom property with Unicode value
-        cube["作者"] = {
-            "datatype": "xs:string",
-            "preserve": True,
-            "value": "张三"
-        }
+        cube["作者"] = {"datatype": "xs:string", "preserve": True, "value": "张三"}
 
         result = bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertTrue(self.temp_file.exists())
 
     def test_export_unicode_partnumber(self):
@@ -179,22 +177,24 @@ class UnicodeMetadataTests(Blender3mfTestCase):
 
         result = bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertTrue(self.temp_file.exists())
 
         # Verify XML contains the Unicode partnumber
-        with zipfile.ZipFile(self.temp_file, 'r') as archive:
-            model_data = archive.read('3D/3dmodel.model')
+        with zipfile.ZipFile(self.temp_file, "r") as archive:
+            model_data = archive.read("3D/3dmodel.model")
             root = ET.fromstring(model_data)
 
-            ns = {'m': 'http://schemas.microsoft.com/3dmanufacturing/core/2015/02'}
-            items = root.findall('.//m:item', ns)
+            ns = {"m": "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"}
+            items = root.findall(".//m:item", ns)
 
             # Check if any item has the Unicode partnumber - check both with and without namespace prefix
             found = False
             for item in items:
-                partnumber = item.get('{http://schemas.microsoft.com/3dmanufacturing/core/2015/02}partnumber')
-                partnumber = partnumber or item.get('partnumber')
+                partnumber = item.get(
+                    "{http://schemas.microsoft.com/3dmanufacturing/core/2015/02}partnumber"
+                )
+                partnumber = partnumber or item.get("partnumber")
                 if partnumber == "零件-001-型号甲":
                     found = True
                     break
@@ -215,13 +215,13 @@ class UnicodeRoundtripTests(Blender3mfTestCase):
         bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
         # Clear scene
-        bpy.ops.object.select_all(action='SELECT')
+        bpy.ops.object.select_all(action="SELECT")
         bpy.ops.object.delete()
 
         # Import back
         result = bpy.ops.import_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertGreater(len(bpy.data.objects), 0)
 
         # Verify name preserved
@@ -242,13 +242,13 @@ class UnicodeRoundtripTests(Blender3mfTestCase):
         bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
         # Clear scene
-        bpy.ops.object.select_all(action='SELECT')
+        bpy.ops.object.select_all(action="SELECT")
         bpy.ops.object.delete()
 
         # Import back
         result = bpy.ops.import_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
 
         # Verify material name preserved (Blender may add .001 suffix for duplicates)
         imported = bpy.data.objects[0]
@@ -256,8 +256,9 @@ class UnicodeRoundtripTests(Blender3mfTestCase):
             imported_mat_name = imported.data.materials[0].name
             # Check if it's either exact match or with Blender's auto-suffix
             self.assertTrue(
-                imported_mat_name == original_mat_name or imported_mat_name.startswith(original_mat_name + '.'),
-                f"Material name '{imported_mat_name}' doesn't match original '{original_mat_name}'"
+                imported_mat_name == original_mat_name
+                or imported_mat_name.startswith(original_mat_name + "."),
+                f"Material name '{imported_mat_name}' doesn't match original '{original_mat_name}'",
             )
 
     def test_roundtrip_unicode_metadata(self):
@@ -271,20 +272,20 @@ class UnicodeRoundtripTests(Blender3mfTestCase):
         cube[metadata_key] = {
             "datatype": "xs:string",
             "preserve": True,
-            "value": metadata_value
+            "value": metadata_value,
         }
 
         # Export
         bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
         # Clear scene
-        bpy.ops.object.select_all(action='SELECT')
+        bpy.ops.object.select_all(action="SELECT")
         bpy.ops.object.delete()
 
         # Import back
         result = bpy.ops.import_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
 
         # Verify metadata preserved
         imported = bpy.data.objects[0]
@@ -309,13 +310,13 @@ class UnicodeRoundtripTests(Blender3mfTestCase):
         bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
         # Clear scene
-        bpy.ops.object.select_all(action='SELECT')
+        bpy.ops.object.select_all(action="SELECT")
         bpy.ops.object.delete()
 
         # Import back
         result = bpy.ops.import_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertEqual(len(bpy.data.objects), len(objects_data))
 
         # Verify all names are preserved (may be in different order)
@@ -335,7 +336,7 @@ class UnicodeEdgeCasesTests(Blender3mfTestCase):
 
         result = bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertTrue(self.temp_file.exists())
 
     def test_export_combining_characters(self):
@@ -346,7 +347,7 @@ class UnicodeEdgeCasesTests(Blender3mfTestCase):
 
         result = bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertTrue(self.temp_file.exists())
 
     def test_export_surrogate_pair_emoji(self):
@@ -357,7 +358,7 @@ class UnicodeEdgeCasesTests(Blender3mfTestCase):
 
         result = bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertTrue(self.temp_file.exists())
 
     def test_export_very_long_unicode_name(self):
@@ -369,9 +370,9 @@ class UnicodeEdgeCasesTests(Blender3mfTestCase):
 
         result = bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertTrue(self.temp_file.exists())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

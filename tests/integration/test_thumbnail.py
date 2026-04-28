@@ -44,6 +44,7 @@ def _png_dimensions(data: bytes):
 # Thumbnail — Operator (bpy.ops)
 # ============================================================================
 
+
 class TestThumbnailOperator(Blender3mfTestCase):
     """Thumbnail via the export operator."""
 
@@ -94,6 +95,7 @@ class TestThumbnailOperator(Blender3mfTestCase):
 # ============================================================================
 # Thumbnail — API (export_3mf)
 # ============================================================================
+
 
 class TestThumbnailAPI(Blender3mfTestCase):
     """Thumbnail via the public API."""

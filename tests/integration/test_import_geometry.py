@@ -41,6 +41,7 @@ def _make_object_node(vertices_xml: str = "", triangles_xml: str = "") -> ET.Ele
 # read_vertices
 # ============================================================================
 
+
 class TestReadVertices(unittest.TestCase):
     """read_vertices() with crafted XML."""
 

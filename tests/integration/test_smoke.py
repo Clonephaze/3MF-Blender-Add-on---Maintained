@@ -17,25 +17,28 @@ class SmokeTests(Blender3mfTestCase):
         version = bpy.app.version
         self.assertGreaterEqual(version[0], 4, f"Expected Blender 4.x+, got {version}")
         if version[0] == 4:
-            self.assertGreaterEqual(version[1], 2, f"Expected Blender 4.2+, got {version}")
+            self.assertGreaterEqual(
+                version[1], 2, f"Expected Blender 4.2+, got {version}"
+            )
 
     def test_addon_can_import(self):
         """Verify the addon module can be imported."""
         import io_mesh_3mf
+
         self.assertIsNotNone(io_mesh_3mf)
         # Verify key components exist
-        self.assertTrue(hasattr(io_mesh_3mf, 'register'))
-        self.assertTrue(hasattr(io_mesh_3mf, 'unregister'))
-        self.assertTrue(hasattr(io_mesh_3mf, 'Import3MF'))
-        self.assertTrue(hasattr(io_mesh_3mf, 'Export3MF'))
+        self.assertTrue(hasattr(io_mesh_3mf, "register"))
+        self.assertTrue(hasattr(io_mesh_3mf, "unregister"))
+        self.assertTrue(hasattr(io_mesh_3mf, "Import3MF"))
+        self.assertTrue(hasattr(io_mesh_3mf, "Export3MF"))
 
     def test_export_operator_registered(self):
         """Verify export operator is available."""
-        self.assertTrue(hasattr(bpy.ops.export_mesh, 'threemf'))
+        self.assertTrue(hasattr(bpy.ops.export_mesh, "threemf"))
 
     def test_import_operator_registered(self):
         """Verify import operator is available."""
-        self.assertTrue(hasattr(bpy.ops.import_mesh, 'threemf'))
+        self.assertTrue(hasattr(bpy.ops.import_mesh, "threemf"))
 
     def test_export_simple_cube(self):
         """Test exporting a simple cube - most basic export test."""
@@ -43,7 +46,7 @@ class SmokeTests(Blender3mfTestCase):
 
         result = bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
         self.assertTrue(self.temp_file.exists())
         self.assertGreater(self.temp_file.stat().st_size, 0)
 
@@ -56,7 +59,7 @@ class SmokeTests(Blender3mfTestCase):
 
         result = bpy.ops.import_mesh.threemf(filepath=str(test_file))
 
-        self.assertIn('FINISHED', result)
+        self.assertIn("FINISHED", result)
 
     def test_clean_scene(self):
         """Verify clean_scene works."""
@@ -78,5 +81,5 @@ class SmokeTests(Blender3mfTestCase):
         self.assertTrue(blue_mat.use_nodes)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

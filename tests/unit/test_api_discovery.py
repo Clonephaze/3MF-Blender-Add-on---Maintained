@@ -65,8 +65,12 @@ class APICapabilitiesTests(unittest.TestCase):
     def test_parameter_capabilities_present(self):
         """Parameter-level capabilities should be defined."""
         params = {
-            "global_scale", "compression", "thumbnail",
-            "use_components", "auto_smooth", "subdivision_depth",
+            "global_scale",
+            "compression",
+            "thumbnail",
+            "use_components",
+            "auto_smooth",
+            "subdivision_depth",
         }
         self.assertTrue(params.issubset(API_CAPABILITIES))
 
@@ -187,6 +191,7 @@ class DiscoveryHelperModuleTests(unittest.TestCase):
     def test_discovery_helper_exists(self):
         """The discovery helper module should exist."""
         from io_mesh_3mf import threemf_discovery
+
         self.assertIsNotNone(threemf_discovery)
 
     def test_discovery_helper_functions(self):

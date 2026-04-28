@@ -63,7 +63,9 @@ class CreateArchiveTests(Blender3mfTestCase):
 
     def test_compression_level_zero(self):
         """compression_level=0 should produce a valid archive (stored)."""
-        archive = create_archive(str(self.temp_file), self._noop_report, compression_level=0)
+        archive = create_archive(
+            str(self.temp_file), self._noop_report, compression_level=0
+        )
         self.assertIsNotNone(archive)
         archive.close()
 
@@ -72,7 +74,9 @@ class CreateArchiveTests(Blender3mfTestCase):
 
     def test_compression_level_nine(self):
         """compression_level=9 should produce a valid archive (max compression)."""
-        archive = create_archive(str(self.temp_file), self._noop_report, compression_level=9)
+        archive = create_archive(
+            str(self.temp_file), self._noop_report, compression_level=9
+        )
         self.assertIsNotNone(archive)
         archive.close()
 
@@ -270,9 +274,7 @@ class FullExportArchiveTests(Blender3mfTestCase):
         bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
 
         with zipfile.ZipFile(str(self.temp_file), "r") as zf:
-            model_files = [
-                n for n in zf.namelist() if n.endswith(".model")
-            ]
+            model_files = [n for n in zf.namelist() if n.endswith(".model")]
             self.assertGreater(len(model_files), 0)
 
     def test_model_xml_is_parseable(self):

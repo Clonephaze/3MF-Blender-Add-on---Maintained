@@ -23,8 +23,10 @@ from io_mesh_3mf.export_3mf.operator import _maybe_show_rating_nudge
 # enabled via bpy.ops, which is unreliable in headless test environments).
 # ---------------------------------------------------------------------------
 
+
 class _FakePrefs:
     """Minimal stand-in for ThreeMFPreferences with just the nudge fields."""
+
     def __init__(self, count=0, threshold=5):
         self.export_count = count
         self.rating_prompt_after = threshold
@@ -32,6 +34,7 @@ class _FakePrefs:
 
 class _FakeContext:
     """Minimal stand-in for bpy.context with a controllable prefs entry."""
+
     def __init__(self, prefs: _FakePrefs):
         self._prefs = prefs
         self.preferences = self
@@ -40,6 +43,7 @@ class _FakeContext:
     def get(self, key):
         class _Entry:
             pass
+
         e = _Entry()
         e.preferences = self._prefs
         return e
@@ -127,6 +131,7 @@ class TestRatingNudgeOperatorActions(Blender3mfTestCase):
         # Calling addon_enable on an already-registered module is safe;
         # Blender just adds the prefs entry without double-registering.
         import io_mesh_3mf
+
         pkg = io_mesh_3mf.__package__ or "io_mesh_3mf"
         cls._addon_pkg = pkg
         try:

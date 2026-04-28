@@ -13,19 +13,24 @@
 # Note: Unit and integration tests require Blender and must be run locally before commits.
 # Run all tests locally with: python tests/run_all_tests.py
 name: Code Style
-on: [push, pull_request]
+
+on:
+  push:
+  pull_request:
 
 jobs:
   lint: # Performs code style checks.
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v4
+        uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
       - name: Install dependencies
         run: python3 -m pip install pycodestyle
       - name: Code style
-        run: python3 -m pycodestyle --ignore=E402,W503 --max-line-length=120 io_mesh_3mf/ # W503 is ignored because it conflicts with PEP8's recommendation to break before binary operators.
+        # E402: module-level import not at top (common in Blender addons)
+        # W503: line break before binary operator (conflicts with PEP8 recommendation)
+        run: python3 -m pycodestyle --ignore=E402,W503 --max-line-length=120 io_mesh_3mf/ tests/

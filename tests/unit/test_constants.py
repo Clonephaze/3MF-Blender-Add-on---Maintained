@@ -28,17 +28,17 @@ from io_mesh_3mf.common.constants import (
 
 
 class TestSpecVersion(unittest.TestCase):
-
     def test_is_string(self):
         self.assertIsInstance(SPEC_VERSION, str)
 
     def test_has_three_components(self):
         parts = SPEC_VERSION.split(".")
-        self.assertEqual(len(parts), 3, f"Expected 'major.minor.patch', got '{SPEC_VERSION}'")
+        self.assertEqual(
+            len(parts), 3, f"Expected 'major.minor.patch', got '{SPEC_VERSION}'"
+        )
 
 
 class TestSupportedExtensions(unittest.TestCase):
-
     def test_is_set(self):
         self.assertIsInstance(SUPPORTED_EXTENSIONS, set)
 
@@ -53,7 +53,6 @@ class TestSupportedExtensions(unittest.TestCase):
 
 
 class TestFileLocations(unittest.TestCase):
-
     def test_model_location(self):
         self.assertEqual(MODEL_LOCATION, "3D/3dmodel.model")
 
@@ -65,7 +64,6 @@ class TestFileLocations(unittest.TestCase):
 
 
 class TestMIMETypes(unittest.TestCase):
-
     def test_model_mimetype(self):
         self.assertIn("3dmanufacturing", MODEL_MIMETYPE)
 
@@ -80,7 +78,6 @@ class TestMIMETypes(unittest.TestCase):
 
 
 class TestNamespaces(unittest.TestCase):
-
     def test_model_namespace_is_url(self):
         self.assertTrue(MODEL_NAMESPACE.startswith("http"))
 
@@ -103,7 +100,6 @@ class TestNamespaces(unittest.TestCase):
 
 
 class TestDefaults(unittest.TestCase):
-
     def test_default_unit(self):
         self.assertEqual(MODEL_DEFAULT_UNIT, "millimeter")
 
