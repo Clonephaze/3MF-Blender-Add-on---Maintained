@@ -1,0 +1,30 @@
+name: Stale Issues
+
+on:
+  schedule:
+    - cron: "0 6 * * *"  # Daily at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          stale-issue-message: >
+            This issue has had no activity for 60 days. It will be closed in 14 days
+            unless there is further activity. If this is still relevant, please leave a
+            comment or a 👍 to keep it open.
+          close-issue-message: >
+            Closing due to inactivity. Feel free to reopen if the issue is still present
+            in the latest version.
+          stale-issue-label: "stale"
+          exempt-issue-labels: "pinned,bug,in progress"
+          days-before-stale: 60
+          days-before-close: 14
+          # Don't touch PRs — let those be reviewed manually.
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
