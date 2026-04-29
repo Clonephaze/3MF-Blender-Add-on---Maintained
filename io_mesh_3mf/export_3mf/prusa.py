@@ -46,61 +46,172 @@ class PrusaExporter(BaseExporter):
 
     def _generate_model_config(
         self,
-        resources_element: xml.etree.ElementTree.Element,
-        mesh_objects: list,
+        combined_id,
+        part_info_list: list,
     ) -> bytes:
-        """Generate Slic3r_PE_model.config XML assigning extruders per object.
+        """Generate Slic3r_PE_model.config with a single object and one volume per part.
 
-        PrusaSlicer reads per-object extruder assignments from this config file.
-        Without it, every object defaults to extruder 1 regardless of material.
+        PrusaSlicer reads per-volume extruder assignments from this config file.
+        All volumes are grouped under one <object> matching the single build item,
+        which avoids the "Multi-part object detected" dialog.
 
-        :param resources_element: The written <resources> element, scanned for
-            object IDs by name.
-        :param mesh_objects: Flat list of Blender MESH objects that were exported.
+        :param combined_id: Resource ID of the combined mesh object, or None.
+        :param part_info_list: List of dicts with keys: name, extruder, firstid, lastid.
         :return: UTF-8 encoded XML bytes ready to write into the archive.
         """
-        ctx = self.ctx
-
-        # Build name -> resource_id from the written <object> elements.
-        name_to_id: dict = {}
-        for child in resources_element:
-            tag = child.tag.split("}")[1] if "}" in child.tag else child.tag
-            if tag == "object":
-                obj_id = child.get("id")
-                obj_name = child.get("name")
-                if obj_id and obj_name:
-                    name_to_id[obj_name] = obj_id
-
         config_root = xml.etree.ElementTree.Element("config")
+
+        if combined_id is None or not part_info_list:
+            return xml.etree.ElementTree.tostring(
+                config_root, encoding="UTF-8", xml_declaration=True
+            )
+
+        obj_elem = xml.etree.ElementTree.SubElement(config_root, "object")
+        obj_elem.set("id", str(combined_id))
+        obj_elem.set("instances_count", "1")
+
+        xml.etree.ElementTree.SubElement(
+            obj_elem, "metadata",
+            {"type": "object", "key": "name", "value": part_info_list[0]["name"]},
+        )
+        xml.etree.ElementTree.SubElement(
+            obj_elem, "metadata",
+            {"type": "object", "key": "extruder", "value": "0"},
+        )
+
+        for part in part_info_list:
+            vol_elem = xml.etree.ElementTree.SubElement(obj_elem, "volume")
+            vol_elem.set("firstid", str(part["firstid"]))
+            vol_elem.set("lastid", str(part["lastid"]))
+
+            for key, val in (
+                ("name", part["name"]),
+                ("volume_type", "ModelPart"),
+                ("extruder", str(part["extruder"])),
+            ):
+                xml.etree.ElementTree.SubElement(
+                    vol_elem, "metadata",
+                    {"type": "volume", "key": key, "value": val},
+                )
+
+            mesh_elem = xml.etree.ElementTree.SubElement(vol_elem, "mesh")
+            for attr in (
+                "edges_fixed", "degenerate_facets", "facets_removed",
+                "facets_reversed", "backwards_edges",
+            ):
+                mesh_elem.set(attr, "0")
+
+            debug(
+                f"  [model_config] volume '{part['name']}': "
+                f"firstid={part['firstid']}, lastid={part['lastid']}, "
+                f"extruder={part['extruder']}"
+            )
+
+        return xml.etree.ElementTree.tostring(
+            config_root, encoding="UTF-8", xml_declaration=True
+        )
+
+    def _write_prusa_combined_objects(
+        self,
+        std_exporter,
+        root: xml.etree.ElementTree.Element,
+        resources_element: xml.etree.ElementTree.Element,
+        mesh_objects: list,
+        global_scale: float,
+    ) -> tuple:
+        """Write all mesh objects as a single combined mesh for PrusaSlicer.
+
+        Creates one <object> resource with all vertices and triangles merged
+        (transformed to world space), and one <build><item> referencing it.
+        PrusaSlicer requires a single build item to avoid the "Multi-part object
+        detected" dialog and to preserve the Z-position of each part.
+
+        :param std_exporter: A StandardExporter instance used for PAINT
+            segmentation extraction.
+        :param root: The root <model> element.
+        :param resources_element: The <resources> element.
+        :param mesh_objects: Flat list of Blender MESH objects to export.
+        :param global_scale: Uniform scale factor applied to all coordinates.
+        :return: (combined_id, part_info_list) where combined_id is the resource
+            ID of the combined object (or None if nothing was written), and
+            part_info_list is a list of dicts with keys:
+            name, extruder, firstid, lastid.
+        """
+        import mathutils
+
+        ctx = self.ctx
+        prec = ctx.options.coordinate_precision
+
+        combined_vertices = []   # (x, y, z) tuples in world space
+        combined_triangles = []  # (v1, v2, v3, seg_string_or_None)
+        part_info_list = []
+
+        vertex_offset = 0
+        triangle_offset = 0
 
         for blender_object in mesh_objects:
             obj_name = str(blender_object.name)
-            obj_id = name_to_id.get(obj_name)
-            if obj_id is None:
-                debug(f"  [model_config] No resource ID found for '{obj_name}', skipping")
-                continue
+            original_object = blender_object
 
-            # Count triangles on the (optionally evaluated) mesh.
+            if ctx.options.use_mesh_modifiers:
+                dep_graph = bpy.context.evaluated_depsgraph_get()
+                eval_object = blender_object.evaluated_get(dep_graph)
+            else:
+                eval_object = blender_object
+
             try:
-                if ctx.options.use_mesh_modifiers:
-                    dep_graph = bpy.context.evaluated_depsgraph_get()
-                    eval_obj = blender_object.evaluated_get(dep_graph)
-                else:
-                    eval_obj = blender_object
-                mesh = eval_obj.to_mesh()
-                if mesh is None:
-                    continue
-                mesh.calc_loop_triangles()
-                num_triangles = len(mesh.loop_triangles)
-                eval_obj.to_mesh_clear()
-            except Exception as e:
-                debug(f"  [model_config] Failed to get mesh for '{obj_name}': {e}")
+                mesh = eval_object.to_mesh()
+            except RuntimeError as e:
+                debug(f"  [prusa_combined] '{obj_name}': to_mesh() failed: {e}")
                 continue
 
-            if num_triangles == 0:
+            if mesh is None:
+                debug(f"  [prusa_combined] '{obj_name}': to_mesh() returned None, skipping")
                 continue
 
-            # Determine the extruder number from the object's primary material.
+            mesh.calc_loop_triangles()
+            loop_tris = mesh.loop_triangles
+            num_tris = len(loop_tris)
+
+            if num_tris == 0:
+                eval_object.to_mesh_clear()
+                debug(f"  [prusa_combined] '{obj_name}': no triangles, skipping")
+                continue
+
+            # Extract segmentation strings for PAINT mode
+            seg_strings = {}
+            if ctx.options.use_orca_format == "PAINT" and mesh.uv_layers.active:
+                try:
+                    seg_strings = std_exporter._extract_segmentation(
+                        original_object, eval_object, mesh
+                    )
+                except Exception as e:
+                    debug(
+                        f"  [prusa_combined] Segmentation extraction failed "
+                        f"for '{obj_name}': {e}"
+                    )
+
+            # Apply world transform + global_scale to get world-space vertices.
+            world_matrix = blender_object.matrix_world
+            scale_matrix = mathutils.Matrix.Scale(global_scale, 4)
+            transform = scale_matrix @ world_matrix
+
+            for v in mesh.vertices:
+                co = transform @ v.co
+                combined_vertices.append((
+                    round(co.x, prec),
+                    round(co.y, prec),
+                    round(co.z, prec),
+                ))
+
+            # Add triangles with cumulative vertex offset; carry segmentation.
+            for tri_idx, tri in enumerate(loop_tris):
+                v1 = tri.vertices[0] + vertex_offset
+                v2 = tri.vertices[1] + vertex_offset
+                v3 = tri.vertices[2] + vertex_offset
+                combined_triangles.append((v1, v2, v3, seg_strings.get(tri_idx)))
+
+            # Determine extruder from the object's primary material.
             extruder = 1
             for slot in blender_object.material_slots:
                 if slot.material:
@@ -109,45 +220,86 @@ class PrusaExporter(BaseExporter):
                         extruder = ctx.vertex_colors[hex_color]
                         break
 
-            obj_elem = xml.etree.ElementTree.SubElement(config_root, "object")
-            obj_elem.set("id", obj_id)
-            obj_elem.set("instances_count", "1")
+            part_info_list.append({
+                "name": obj_name,
+                "extruder": extruder,
+                "firstid": triangle_offset,
+                "lastid": triangle_offset + num_tris - 1,
+            })
 
-            for key, val in (("name", obj_name), ("extruder", str(extruder))):
-                xml.etree.ElementTree.SubElement(
-                    obj_elem, "metadata",
-                    {"type": "object", "key": key, "value": val},
-                )
+            debug(
+                f"  [prusa_combined] '{obj_name}': {len(mesh.vertices)} verts, "
+                f"{num_tris} tris, extruder={extruder}"
+            )
 
-            vol_elem = xml.etree.ElementTree.SubElement(obj_elem, "volume")
-            vol_elem.set("firstid", "0")
-            vol_elem.set("lastid", str(num_triangles - 1))
+            vertex_offset += len(mesh.vertices)
+            triangle_offset += num_tris
+            eval_object.to_mesh_clear()
 
-            for key, val in (
-                ("name", obj_name),
-                ("volume_type", "ModelPart"),
-                ("extruder", str(extruder)),
-            ):
-                xml.etree.ElementTree.SubElement(
-                    vol_elem, "metadata",
-                    {"type": "volume", "key": key, "value": val},
-                )
-
-            mesh_elem = xml.etree.ElementTree.SubElement(vol_elem, "mesh")
-            for attr, val in (
-                ("edges_fixed", "0"),
-                ("degenerate_facets", "0"),
-                ("facets_removed", "0"),
-                ("facets_reversed", "0"),
-                ("backwards_edges", "0"),
-            ):
-                mesh_elem.set(attr, val)
-
-            debug(f"  [model_config] {obj_name} → object id={obj_id}, extruder={extruder}, tris={num_triangles}")
-
-        return xml.etree.ElementTree.tostring(
-            config_root, encoding="UTF-8", xml_declaration=True
+        # Always write the build element.
+        build_element = xml.etree.ElementTree.SubElement(
+            root, f"{{{MODEL_NAMESPACE}}}build"
         )
+
+        if not combined_vertices:
+            warn("No mesh data found for Prusa combined export")
+            return (None, [])
+
+        # Assign a new resource ID for the combined object.
+        combined_id = ctx.next_resource_id
+        ctx.next_resource_id += 1
+
+        # Write combined <object> with merged mesh.
+        obj_elem = xml.etree.ElementTree.SubElement(
+            resources_element, f"{{{MODEL_NAMESPACE}}}object"
+        )
+        obj_elem.set("id", str(combined_id))
+        obj_elem.set("type", "model")
+
+        mesh_elem = xml.etree.ElementTree.SubElement(
+            obj_elem, f"{{{MODEL_NAMESPACE}}}mesh"
+        )
+
+        vertices_elem = xml.etree.ElementTree.SubElement(
+            mesh_elem, f"{{{MODEL_NAMESPACE}}}vertices"
+        )
+        for (x, y, z) in combined_vertices:
+            v_elem = xml.etree.ElementTree.SubElement(
+                vertices_elem, f"{{{MODEL_NAMESPACE}}}vertex"
+            )
+            v_elem.set("x", str(x))
+            v_elem.set("y", str(y))
+            v_elem.set("z", str(z))
+
+        SLIC3R_NS = "http://schemas.slic3r.org/3mf/2017/06"
+        triangles_elem = xml.etree.ElementTree.SubElement(
+            mesh_elem, f"{{{MODEL_NAMESPACE}}}triangles"
+        )
+        for (v1, v2, v3, seg) in combined_triangles:
+            t_elem = xml.etree.ElementTree.SubElement(
+                triangles_elem, f"{{{MODEL_NAMESPACE}}}triangle"
+            )
+            t_elem.set("v1", str(v1))
+            t_elem.set("v2", str(v2))
+            t_elem.set("v3", str(v3))
+            if seg:
+                t_elem.set(f"{{{SLIC3R_NS}}}mmu_segmentation", seg)
+
+        # Single build item — no transform since vertices are already world-space.
+        item_elem = xml.etree.ElementTree.SubElement(
+            build_element, f"{{{MODEL_NAMESPACE}}}item"
+        )
+        item_elem.set("objectid", str(combined_id))
+
+        ctx.num_written = len(part_info_list)
+
+        debug(
+            f"  [prusa_combined] Combined object id={combined_id}: "
+            f"{len(combined_vertices)} vertices, {len(combined_triangles)} triangles, "
+            f"{len(part_info_list)} parts"
+        )
+
+        return (combined_id, part_info_list)
 
     def execute(
         self,
@@ -264,20 +416,27 @@ class PrusaExporter(BaseExporter):
         # PrusaSlicer MMU painting doesn't use basematerials
         ctx.material_name_to_index = {}
 
-        # Use StandardExporter's write_objects (reuse the logic)
+        # Write all mesh objects as a single combined mesh object with one build
+        # item, so PrusaSlicer does not show the "Multi-part object detected" dialog.
         std_exporter = StandardExporter(ctx)
-        std_exporter.write_objects(
-            root, resources_element, blender_objects, global_scale
+        combined_id, part_info_list = self._write_prusa_combined_objects(
+            std_exporter, root, resources_element, mesh_objects, global_scale
         )
 
         # Write filament colors to metadata for round-trip import
         write_prusa_filament_colors(archive, ctx.vertex_colors)
 
         # Write back stashed or profile PrusaSlicer config files.
-        # For Slic3r_PE_model.config specifically, fall back to generating it
-        # from the exported objects so per-object extruder assignments are
-        # always written (not just when a prior Prusa import was round-tripped).
+        # Slic3r_PE_model.config is always regenerated so object IDs and
+        # extruder assignments match the current combined-mesh export.
         for config_path in ("Metadata/Slic3r_PE.config", "Metadata/Slic3r_PE_model.config"):
+            if config_path == "Metadata/Slic3r_PE_model.config":
+                generated = self._generate_model_config(combined_id, part_info_list)
+                with archive.open(config_path, "w") as f:
+                    f.write(generated)
+                debug("Generated Slic3r_PE_model.config from exported parts")
+                continue
+
             stashed = get_stashed_config(config_path)
             if stashed is None and ctx.options.slicer_profile != "NONE":
                 stashed = get_profile_config(
@@ -293,11 +452,6 @@ class PrusaExporter(BaseExporter):
                 with archive.open(config_path, "w") as f:
                     f.write(stashed)
                 debug(f"Wrote {config_path} to archive")
-            elif config_path == "Metadata/Slic3r_PE_model.config":
-                generated = self._generate_model_config(resources_element, mesh_objects)
-                with archive.open(config_path, "w") as f:
-                    f.write(generated)
-                debug("Generated Slic3r_PE_model.config from object materials")
 
         document = xml.etree.ElementTree.ElementTree(root)
         with archive.open(MODEL_LOCATION, "w", force_zip64=True) as f:

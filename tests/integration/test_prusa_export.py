@@ -207,8 +207,8 @@ class PrusaExportMultiMaterialTests(Blender3mfTestCase):
             self.assertIsNotNone(root, "Model file should parse as valid XML")
 
     def test_prusa_export_multiple_objects(self):
-        """Multiple objects export in Prusa format."""
-        for i, loc in enumerate([(0, 0, 0), (3, 0, 0), (-3, 0, 0)]):
+        """Multiple objects are combined into a single build item (fixes issue #24)."""
+        for loc in [(0, 0, 0), (3, 0, 0), (-3, 0, 0)]:
             bpy.ops.mesh.primitive_cube_add(location=loc)
             cube = bpy.context.object
             mat = self.create_red_material()
@@ -228,9 +228,173 @@ class PrusaExportMultiMaterialTests(Blender3mfTestCase):
             ns = {"m": MODEL_NS}
             resources = root.find("m:resources", ns)
             objects = resources.findall("m:object", ns)
-            self.assertGreaterEqual(
-                len(objects), 3, "Should have at least 3 objects in resources"
+            # All mesh objects are combined into ONE object resource so that
+            # PrusaSlicer does not show the "Multi-part object detected" dialog.
+            self.assertEqual(
+                len(objects), 1, "Multiple Blender objects must be merged into a single combined object"
             )
+
+
+class PrusaExportSingleBuildItemTests(Blender3mfTestCase):
+    """Tests that enforce the single-build-item requirement (issue #24)."""
+
+    def _export_multi_object(self):
+        """Create 3 objects with different materials and export as Prusa."""
+        red_mat = self.create_red_material()
+        blue_mat = self.create_blue_material()
+
+        bpy.ops.mesh.primitive_cube_add(location=(0, 0, 0))
+        bpy.context.object.data.materials.append(red_mat)
+
+        bpy.ops.mesh.primitive_cube_add(location=(3, 0, 0))
+        bpy.context.object.data.materials.append(blue_mat)
+
+        bpy.ops.mesh.primitive_cube_add(location=(0, 0, 3))
+        bpy.context.object.data.materials.append(red_mat)
+
+        bpy.ops.export_mesh.threemf(
+            filepath=str(self.temp_file),
+            use_orca_format="PAINT",
+            mmu_slicer_format="PRUSA",
+        )
+
+    def test_single_build_item(self):
+        """Prusa export produces exactly one <build><item>.
+
+        PrusaSlicer shows 'Multi-part object detected' when there are multiple
+        build items, which breaks Z-positions and color assignments (issue #24).
+        """
+        self._export_multi_object()
+
+        with zipfile.ZipFile(str(self.temp_file), "r") as archive:
+            with archive.open("3D/3dmodel.model") as f:
+                root = ET.parse(f).getroot()
+
+        ns = {"m": MODEL_NS}
+        build = root.find("m:build", ns)
+        self.assertIsNotNone(build, "<build> element must exist")
+        items = build.findall("m:item", ns)
+        self.assertEqual(
+            len(items), 1,
+            "Prusa export must have exactly one <build><item> to avoid the "
+            "'Multi-part object detected' dialog in PrusaSlicer"
+        )
+
+    def test_single_combined_object_resource(self):
+        """Prusa export produces exactly one <object> in <resources>."""
+        self._export_multi_object()
+
+        with zipfile.ZipFile(str(self.temp_file), "r") as archive:
+            with archive.open("3D/3dmodel.model") as f:
+                root = ET.parse(f).getroot()
+
+        ns = {"m": MODEL_NS}
+        resources = root.find("m:resources", ns)
+        objects = resources.findall("m:object", ns)
+        self.assertEqual(
+            len(objects), 1,
+            "All mesh objects must be merged into a single <object> resource"
+        )
+
+    def test_build_item_references_combined_object(self):
+        """The single build item must reference the single combined object."""
+        self._export_multi_object()
+
+        with zipfile.ZipFile(str(self.temp_file), "r") as archive:
+            with archive.open("3D/3dmodel.model") as f:
+                root = ET.parse(f).getroot()
+
+        ns = {"m": MODEL_NS}
+        obj_id = root.find("m:resources/m:object", ns).get("id")
+        item = root.find("m:build/m:item", ns)
+        self.assertEqual(
+            item.get("objectid"), obj_id,
+            "The build item must reference the combined object's resource ID"
+        )
+
+    def test_model_config_single_object_with_volumes(self):
+        """Slic3r_PE_model.config has one <object> with one <volume> per mesh."""
+        self._export_multi_object()
+
+        with zipfile.ZipFile(str(self.temp_file), "r") as archive:
+            names = archive.namelist()
+            self.assertIn(
+                "Metadata/Slic3r_PE_model.config", names,
+                "Slic3r_PE_model.config must be present"
+            )
+            with archive.open("Metadata/Slic3r_PE_model.config") as f:
+                config_root = ET.parse(f).getroot()
+
+        objects = config_root.findall("object")
+        self.assertEqual(
+            len(objects), 1,
+            "model config must have exactly one <object> element"
+        )
+        volumes = objects[0].findall("volume")
+        self.assertEqual(
+            len(volumes), 3,
+            "model config object must have one <volume> per exported mesh"
+        )
+
+    def test_model_config_volume_cumulative_ids(self):
+        """Volume firstid/lastid in model config are cumulative across parts."""
+        self._export_multi_object()
+
+        with zipfile.ZipFile(str(self.temp_file), "r") as archive:
+            with archive.open("Metadata/Slic3r_PE_model.config") as f:
+                config_root = ET.parse(f).getroot()
+
+        volumes = config_root.find("object").findall("volume")
+        prev_lastid = -1
+        for vol in volumes:
+            firstid = int(vol.get("firstid"))
+            lastid = int(vol.get("lastid"))
+            self.assertEqual(
+                firstid, prev_lastid + 1,
+                f"Volume firstid={firstid} must follow previous lastid={prev_lastid}"
+            )
+            self.assertGreater(
+                lastid, firstid,
+                f"Volume lastid={lastid} must be >= firstid={firstid}"
+            )
+            prev_lastid = lastid
+
+    def test_z_position_preserved_in_combined_mesh(self):
+        """Objects at different Z heights have distinct vertex Z values.
+
+        Regression test for issue #24: clicking 'No' in PrusaSlicer's dialog
+        reset all Z positions to 0. With the combined-mesh approach the world
+        transform is baked in, so each part's Z offset must appear in the vertex
+        data.
+        """
+        # Cube A at Z=0, Cube B at Z=5
+        bpy.ops.mesh.primitive_cube_add(location=(0, 0, 0))
+        bpy.context.object.data.materials.append(self.create_red_material())
+
+        bpy.ops.mesh.primitive_cube_add(location=(0, 0, 5))
+        bpy.context.object.data.materials.append(self.create_blue_material())
+
+        bpy.ops.export_mesh.threemf(
+            filepath=str(self.temp_file),
+            use_orca_format="PAINT",
+            mmu_slicer_format="PRUSA",
+        )
+
+        with zipfile.ZipFile(str(self.temp_file), "r") as archive:
+            with archive.open("3D/3dmodel.model") as f:
+                root = ET.parse(f).getroot()
+
+        ns = {"m": MODEL_NS}
+        vertices = root.findall(".//m:vertex", ns)
+        z_values = {float(v.get("z")) for v in vertices}
+
+        # The cube at Z=5 has vertices at 4 and 6 (unit cube half-size=1).
+        # If world transforms are baked in, we expect some z > 3.
+        high_z = [z for z in z_values if z > 3.0]
+        self.assertTrue(
+            len(high_z) > 0,
+            f"Expected vertices with z > 3 from the elevated cube, got z values: {sorted(z_values)}"
+        )
 
 
 if __name__ == "__main__":

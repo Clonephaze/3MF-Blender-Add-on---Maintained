@@ -11,6 +11,8 @@ Features
 
 Bug Fixes
 ----
+* **PrusaSlicer "Multi-part object detected" dialog (Issue #24)** — Blender exports with multiple objects no longer trigger the dialog in PrusaSlicer. All mesh objects are now combined into a single mesh (with world transforms baked into vertex coordinates) and written as one `<build><item>`. The `Slic3r_PE_model.config` is updated to match, with one `<volume firstid=… lastid=…>` per original object, each carrying the correct extruder assignment.
+* **Diffuse BSDF and other shader types not recognized** — `material_to_hex_color()` previously only read color from Principled BSDF nodes, so materials using Diffuse BSDF, Glossy, Emission, Glass, Toon, Velvet, and others were all treated as the same default gray. Colors are now read from any recognized shader node type, with the node closest to the Material Output taking priority.
 * **Mixed filaments included in bake quantization** — Baking and re-quantizing now use the full palette including mixed virtual slots, so painted mixed-color regions are no longer snapped back to the nearest physical color.
 * **Filament add/remove in paint panel** — Adding a filament now immediately appears in the list; removing one no longer corrupts the virtual slot order.
 

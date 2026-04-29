@@ -62,9 +62,19 @@ def material_to_hex_color(material: bpy.types.Material) -> Optional[str]:
     """
     Extract hex color string from a Blender material.
 
-    Tries Principled BSDF first (for node-based materials), falls back to diffuse_color.
-    Skips default gray (0.8, 0.8, 0.8) from Principled BSDF.
-    Converts from linear (Blender) to sRGB (3MF hex) color space.
+    Walks the node tree looking for a representative color in this order:
+    1. Principled BSDF "Base Color" (via PrincipledBSDFWrapper)
+    2. Any shader node with a "Base Color" or "Color" socket that is not
+       connected to another node (i.e. a plain colour value):
+       Diffuse BSDF, Glossy BSDF, Emission, Glass BSDF, Subsurface Scattering,
+       Toon BSDF, Velvet BSDF, Translucent BSDF, Specular BSDF, etc.
+    3. A standalone RGB node whose output is not driven by anything upstream.
+    4. ``material.diffuse_color`` (legacy / non-node materials).
+
+    Skips default gray (0.8, 0.8, 0.8) so that untouched auto-generated
+    materials don't pollute the colour→extruder mapping.
+
+    Converts from linear (Blender) to sRGB (3MF hex) colour space.
 
     :param material: The Blender material to extract color from.
     :return: Hex color string like "#RRGGBB" or None if no material.
@@ -72,27 +82,115 @@ def material_to_hex_color(material: bpy.types.Material) -> Optional[str]:
     if material is None:
         return None
 
+    _DEFAULT_GRAY = (0.8, 0.8, 0.8)
+
+    def _is_default(c) -> bool:
+        return (
+            abs(c[0] - 0.8) < 0.01
+            and abs(c[1] - 0.8) < 0.01
+            and abs(c[2] - 0.8) < 0.01
+        )
+
     color = None
 
-    # Try Principled BSDF first for materials with node setup
     if material.use_nodes and material.node_tree:
-        principled = bpy_extras.node_shader_utils.PrincipledBSDFWrapper(material, is_readonly=True)
-        base_color = principled.base_color
-        # Check if it's not the default gray (0.8, 0.8, 0.8)
-        if base_color and not (
-            abs(base_color[0] - 0.8) < 0.01 and abs(base_color[1] - 0.8) < 0.01 and abs(base_color[2] - 0.8) < 0.01
-        ):
-            color = base_color
+        # 1. Principled BSDF via the stable wrapper API
+        try:
+            principled = bpy_extras.node_shader_utils.PrincipledBSDFWrapper(
+                material, is_readonly=True
+            )
+            base_color = principled.base_color
+            if base_color and not _is_default(base_color):
+                color = base_color[:3]
+        except Exception:
+            pass
 
-    # Fall back to diffuse_color for simple materials
+        # 2. Walk shader nodes for any colour socket that holds a plain value.
+        #    Priority: nodes connected to the Material Output first (most
+        #    likely to be the "final" shader), then all others.
+        if color is None:
+            # Node types that carry a meaningful colour in a named socket.
+            COLOR_SOCKETS = {
+                # (node_type, socket_name)
+                "BSDF_DIFFUSE":       "Color",
+                "BSDF_GLOSSY":        "Color",
+                "BSDF_GLASS":         "Color",
+                "BSDF_TRANSLUCENT":   "Color",
+                "BSDF_TRANSPARENT":   "Color",
+                "BSDF_TOON":          "Color",
+                "BSDF_VELVET":        "Color",
+                "SUBSURFACE_SCATTERING": "Color",
+                "EEVEE_SPECULAR":     "Base Color",
+                "EMISSION":           "Color",
+            }
+
+            def _color_from_node(node):
+                socket_name = COLOR_SOCKETS.get(node.type)
+                if socket_name is None:
+                    return None
+                socket = node.inputs.get(socket_name)
+                if socket is None or socket.is_linked:
+                    return None
+                c = socket.default_value
+                if len(c) >= 3 and not _is_default(c):
+                    return tuple(c[:3])
+                return None
+
+            # Collect candidate nodes ordered by proximity to Material Output
+            nodes = list(material.node_tree.nodes)
+            output_node = next(
+                (n for n in nodes if n.type == "OUTPUT_MATERIAL"), None
+            )
+
+            ordered = []
+            if output_node:
+                # BFS from the output node backwards through links
+                visited = set()
+                queue = [output_node]
+                while queue:
+                    n = queue.pop(0)
+                    if id(n) in visited:
+                        continue
+                    visited.add(id(n))
+                    ordered.append(n)
+                    for inp in n.inputs:
+                        for link in inp.links:
+                            queue.append(link.from_node)
+                # Remaining nodes not reachable from output
+                for n in nodes:
+                    if id(n) not in visited:
+                        ordered.append(n)
+            else:
+                ordered = nodes
+
+            for node in ordered:
+                c = _color_from_node(node)
+                if c is not None:
+                    color = c
+                    break
+
+        # 3. Standalone RGB node
+        if color is None:
+            for node in material.node_tree.nodes:
+                if node.type == "RGB":
+                    c = node.outputs[0].default_value
+                    if len(c) >= 3 and not _is_default(c):
+                        color = tuple(c[:3])
+                        break
+
+    # 4. Legacy / non-node fallback
+    if color is None:
+        fallback = material.diffuse_color[:3]
+        if not _is_default(fallback):
+            color = fallback
+
     if color is None:
         color = material.diffuse_color[:3]
 
-    # Blender stores colors in linear space; 3MF hex colors are sRGB.
-    # Convert linear -> sRGB before encoding.
-    red = min(255, max(0, round(linear_to_srgb(color[0]) * 255)))
+    # Blender stores colours in linear space; 3MF hex colours are sRGB.
+    red   = min(255, max(0, round(linear_to_srgb(color[0]) * 255)))
     green = min(255, max(0, round(linear_to_srgb(color[1]) * 255)))
-    blue = min(255, max(0, round(linear_to_srgb(color[2]) * 255)))
+    blue  = min(255, max(0, round(linear_to_srgb(color[2]) * 255)))
     return "#%0.2X%0.2X%0.2X" % (red, green, blue)
 
 
