@@ -44,17 +44,69 @@ ORCA_FILAMENT_CODES = [
     "4",
     "8",
     # Tier 2: 0C–EC (indices 3–17)
-    "0C", "1C", "2C", "3C", "4C", "5C", "6C", "7C",
-    "8C", "9C", "AC", "BC", "CC", "DC", "EC",
+    "0C",
+    "1C",
+    "2C",
+    "3C",
+    "4C",
+    "5C",
+    "6C",
+    "7C",
+    "8C",
+    "9C",
+    "AC",
+    "BC",
+    "CC",
+    "DC",
+    "EC",
     # Tier 3: 0FC–EFC (indices 18–32)
-    "0FC", "1FC", "2FC", "3FC", "4FC", "5FC", "6FC", "7FC",
-    "8FC", "9FC", "AFC", "BFC", "CFC", "DFC", "EFC",
+    "0FC",
+    "1FC",
+    "2FC",
+    "3FC",
+    "4FC",
+    "5FC",
+    "6FC",
+    "7FC",
+    "8FC",
+    "9FC",
+    "AFC",
+    "BFC",
+    "CFC",
+    "DFC",
+    "EFC",
     # Tier 4: 0FFC–EFFC (indices 33–47)
-    "0FFC", "1FFC", "2FFC", "3FFC", "4FFC", "5FFC", "6FFC", "7FFC",
-    "8FFC", "9FFC", "AFFC", "BFFC", "CFFC", "DFFC", "EFFC",
+    "0FFC",
+    "1FFC",
+    "2FFC",
+    "3FFC",
+    "4FFC",
+    "5FFC",
+    "6FFC",
+    "7FFC",
+    "8FFC",
+    "9FFC",
+    "AFFC",
+    "BFFC",
+    "CFFC",
+    "DFFC",
+    "EFFC",
     # Tier 5: 0FFFC–EFFFC (indices 48–62)
-    "0FFFC", "1FFFC", "2FFFC", "3FFFC", "4FFFC", "5FFFC", "6FFFC", "7FFFC",
-    "8FFFC", "9FFFC", "AFFFC", "BFFFC", "CFFFC", "DFFFC", "EFFFC",
+    "0FFFC",
+    "1FFFC",
+    "2FFFC",
+    "3FFFC",
+    "4FFFC",
+    "5FFFC",
+    "6FFFC",
+    "7FFFC",
+    "8FFFC",
+    "9FFFC",
+    "AFFFC",
+    "BFFFC",
+    "CFFFC",
+    "DFFFC",
+    "EFFFC",
 ]
 
 
@@ -86,9 +138,7 @@ def material_to_hex_color(material: bpy.types.Material) -> Optional[str]:
 
     def _is_default(c) -> bool:
         return (
-            abs(c[0] - 0.8) < 0.01
-            and abs(c[1] - 0.8) < 0.01
-            and abs(c[2] - 0.8) < 0.01
+            abs(c[0] - 0.8) < 0.01 and abs(c[1] - 0.8) < 0.01 and abs(c[2] - 0.8) < 0.01
         )
 
     color = None
@@ -112,16 +162,16 @@ def material_to_hex_color(material: bpy.types.Material) -> Optional[str]:
             # Node types that carry a meaningful colour in a named socket.
             COLOR_SOCKETS = {
                 # (node_type, socket_name)
-                "BSDF_DIFFUSE":       "Color",
-                "BSDF_GLOSSY":        "Color",
-                "BSDF_GLASS":         "Color",
-                "BSDF_TRANSLUCENT":   "Color",
-                "BSDF_TRANSPARENT":   "Color",
-                "BSDF_TOON":          "Color",
-                "BSDF_VELVET":        "Color",
+                "BSDF_DIFFUSE": "Color",
+                "BSDF_GLOSSY": "Color",
+                "BSDF_GLASS": "Color",
+                "BSDF_TRANSLUCENT": "Color",
+                "BSDF_TRANSPARENT": "Color",
+                "BSDF_TOON": "Color",
+                "BSDF_VELVET": "Color",
                 "SUBSURFACE_SCATTERING": "Color",
-                "EEVEE_SPECULAR":     "Base Color",
-                "EMISSION":           "Color",
+                "EEVEE_SPECULAR": "Base Color",
+                "EMISSION": "Color",
             }
 
             def _color_from_node(node):
@@ -138,9 +188,7 @@ def material_to_hex_color(material: bpy.types.Material) -> Optional[str]:
 
             # Collect candidate nodes ordered by proximity to Material Output
             nodes = list(material.node_tree.nodes)
-            output_node = next(
-                (n for n in nodes if n.type == "OUTPUT_MATERIAL"), None
-            )
+            output_node = next((n for n in nodes if n.type == "OUTPUT_MATERIAL"), None)
 
             ordered = []
             if output_node:
@@ -188,9 +236,9 @@ def material_to_hex_color(material: bpy.types.Material) -> Optional[str]:
         color = material.diffuse_color[:3]
 
     # Blender stores colours in linear space; 3MF hex colours are sRGB.
-    red   = min(255, max(0, round(linear_to_srgb(color[0]) * 255)))
+    red = min(255, max(0, round(linear_to_srgb(color[0]) * 255)))
     green = min(255, max(0, round(linear_to_srgb(color[1]) * 255)))
-    blue  = min(255, max(0, round(linear_to_srgb(color[2]) * 255)))
+    blue = min(255, max(0, round(linear_to_srgb(color[2]) * 255)))
     return "#%0.2X%0.2X%0.2X" % (red, green, blue)
 
 
@@ -246,7 +294,6 @@ def collect_face_colors(
     )
 
     for blender_object in mesh_list:
-
         objects_processed += 1
         debug(f"Processing object: {blender_object.name}")
 
@@ -268,7 +315,9 @@ def collect_face_colors(
             continue
 
         # Extract colors from face material assignments
-        debug(f"Object {blender_object.name}: {len(mesh.vertices)} vertices, {len(mesh.polygons)} faces")
+        debug(
+            f"Object {blender_object.name}: {len(mesh.vertices)} vertices, {len(mesh.polygons)} faces"
+        )
 
         # Get all materials used by faces
         # Use the evaluated object's material slots when available, because
@@ -282,7 +331,9 @@ def collect_face_colors(
                     color = material_to_hex_color(material)
                     if color:
                         unique_colors.add(color)
-                        debug(f"Face {face.index}: material={material.name}, color={color}")
+                        debug(
+                            f"Face {face.index}: material={material.name}, color={color}"
+                        )
 
         eval_object.to_mesh_clear()
 
@@ -294,7 +345,9 @@ def collect_face_colors(
     sorted_colors = sorted(unique_colors)
     color_to_index = {color: idx + 1 for idx, color in enumerate(sorted_colors)}
 
-    debug(f"Collected {len(unique_colors)} unique colors from {objects_processed} objects for Orca export")
+    debug(
+        f"Collected {len(unique_colors)} unique colors from {objects_processed} objects for Orca export"
+    )
     debug(f"Colors: {sorted_colors}")
 
     # Report to user
@@ -393,7 +446,9 @@ def write_materials(
                 continue
 
             # Read linear color from Blender and convert to sRGB for 3MF hex.
-            principled = bpy_extras.node_shader_utils.PrincipledBSDFWrapper(material, is_readonly=True)
+            principled = bpy_extras.node_shader_utils.PrincipledBSDFWrapper(
+                material, is_readonly=True
+            )
             color = principled.base_color
             red = min(255, max(0, round(linear_to_srgb(color[0]) * 255)))
             green = min(255, max(0, round(linear_to_srgb(color[1]) * 255)))
@@ -481,6 +536,8 @@ def write_prusa_filament_colors(archive, vertex_colors: Dict[str, int]) -> None:
             with archive.open("Metadata/blender_filament_colors.xml", "w") as f:
                 tree.write(f, xml_declaration=True, encoding="UTF-8")
 
-            debug(f"Wrote {len(sorted_colors)} filament color mappings to metadata (fallback only)")
+            debug(
+                f"Wrote {len(sorted_colors)} filament color mappings to metadata (fallback only)"
+            )
     except Exception as e:
         warn(f"Failed to write filament colors: {e}")
