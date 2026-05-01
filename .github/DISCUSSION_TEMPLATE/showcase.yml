@@ -1,0 +1,53 @@
+title: ""
+labels: ["showcase"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Show off something you made with the 3MF addon! Prints, sliced models, multi-material setups, creative workflows — all welcome.
+
+  - type: input
+    id: title
+    attributes:
+      label: What did you make?
+      placeholder: "e.g. 7-colour dragon with Orca paint export, functional hinge assembly..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: workflow
+    attributes:
+      label: Which workflow did you use?
+      options:
+        - Standard export
+        - Orca / BambuStudio multi-colour
+        - PrusaSlicer MMU
+        - Import + re-export roundtrip
+        - Multi-Material Paint Suite
+        - Other / combination
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Tell us about it
+      description: What was the process? Any tips or tricks you discovered?
+    validations:
+      required: true
+
+  - type: textarea
+    id: media
+    attributes:
+      label: Photos / screenshots / files
+      description: Drag images in here, or share a link. A photo of the finished print is always a highlight!
+    validations:
+      required: false
+
+  - type: input
+    id: addon-version
+    attributes:
+      label: Addon version used
+      placeholder: "e.g. 2.0.0"
+    validations:
+      required: false

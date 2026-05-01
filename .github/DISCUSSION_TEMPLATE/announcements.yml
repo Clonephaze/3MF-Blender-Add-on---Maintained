@@ -1,0 +1,25 @@
+title: ""
+labels: ["announcement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 📢 New Announcement
+        Use this category for release notes, important project updates, and milestone callouts.
+        Only maintainers should post here.
+
+  - type: input
+    id: version
+    attributes:
+      label: Related version (if applicable)
+      placeholder: "e.g. v2.1.0"
+    validations:
+      required: false
+
+  - type: textarea
+    id: content
+    attributes:
+      label: Announcement
+      description: Write the full announcement here. Markdown is supported.
+    validations:
+      required: true

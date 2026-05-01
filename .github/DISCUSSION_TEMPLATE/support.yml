@@ -1,0 +1,72 @@
+title: "[Support] "
+labels: ["support"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Having trouble? Fill this out and the community can help.
+        For confirmed bugs, please open a [Bug Report issue](../../issues/new/choose) instead.
+
+  - type: input
+    id: addon-version
+    attributes:
+      label: Addon Version
+      description: Found in Edit → Preferences → Add-ons → 3MF Format
+      placeholder: "e.g. 2.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: blender-version
+    attributes:
+      label: Blender Version
+      placeholder: "e.g. 5.0"
+    validations:
+      required: true
+
+  - type: input
+    id: slicer
+    attributes:
+      label: Target Slicer (if relevant)
+      placeholder: "e.g. OrcaSlicer 2.3, PrusaSlicer 2.9, BambuStudio"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area does this relate to?
+      options:
+        - Import
+        - Export — Standard
+        - Export — Orca / BambuStudio
+        - Export — PrusaSlicer
+        - Multi-Material Paint
+        - UI / Preferences
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: What are you trying to do?
+      description: Describe what you're attempting and where you're getting stuck.
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: What have you tried?
+      description: Steps you've already taken, workarounds attempted, etc.
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Console output, screenshots, or a sample .3mf file are very helpful.
+    validations:
+      required: false

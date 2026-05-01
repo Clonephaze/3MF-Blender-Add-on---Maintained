@@ -1,0 +1,54 @@
+title: "[Idea] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Got an idea to make the addon better? Share it here for community discussion before it becomes a formal feature request.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area does this relate to?
+      options:
+        - Import
+        - Export — Standard
+        - Export — Orca / BambuStudio
+        - Export — PrusaSlicer
+        - Multi-Material Paint
+        - UI / Preferences
+        - Performance
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the limitation or gap you've hit.
+      placeholder: "When I try to... I can't... because..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: Describe your idea
+      description: What would the ideal solution look like? Rough sketches, mockups, and examples from other tools are all welcome.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds you've considered
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+    validations:
+      required: false
