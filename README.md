@@ -1,4 +1,5 @@
 # Blender 3MF Format
+![Static Badge](https://img.shields.io/badge/Funding-%2460-blue?style=for-the-badge&logo=buymeacoffee) ![Static Badge](https://img.shields.io/badge/Supporters-2-success?style=for-the-badge&logo=buymeacoffee) ![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/Clonephaze/3MF-Blender-Add-on---Maintained?style=for-the-badge&logo=github&color=critical) ![GitHub Issues or Pull Requests](https://img.shields.io/github/issues-closed/Clonephaze/3MF-Blender-Add-on---Maintained?style=for-the-badge&logo=github)
 
 > [!NOTE]
 > This is an actively maintained fork of the [original Blender 3MF add-on](https://github.com/Ghostkeeper/Blender3mfFormat), updated for modern Blender versions (4.2+) and ongoing development.
