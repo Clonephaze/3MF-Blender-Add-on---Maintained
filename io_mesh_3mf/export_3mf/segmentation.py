@@ -229,71 +229,38 @@ def _analyze_recursive(
     s2 = int(state_map[y2, x2])
 
     # Even if corners match, interior stripes can cross a triangle.
-    # Sample center + edges + quarter points before treating as uniform.
+    # Use a barycentric grid whose density scales with the triangle's pixel
+    # footprint: ~0.5 steps per pixel up to N=40, minimum N=6.
+    # This guarantees sample spacing of ≤2px regardless of triangle size,
+    # so even narrow text strokes are reliably detected before the
+    # early-exit fires.
     if s0 == s1 == s2:
-        cu = (u0 + u1 + u2) * 0.3333333333333333
-        cv = (v0 + v1 + v2) * 0.3333333333333333
-        cx = max(0, min(wm1, int(max(0.0, min(1.0, cu)) * wm1 + 0.5)))
-        cy = max(0, min(hm1, int(max(0.0, min(1.0, cv)) * hm1 + 0.5)))
-        if int(state_map[cy, cx]) != s0:
-            pass
-        else:
-            m01u = (u0 + u1) * 0.5
-            m01v = (v0 + v1) * 0.5
-            mx = max(0, min(wm1, int(max(0.0, min(1.0, m01u)) * wm1 + 0.5)))
-            my = max(0, min(hm1, int(max(0.0, min(1.0, m01v)) * hm1 + 0.5)))
-            if int(state_map[my, mx]) != s0:
-                pass
-            else:
-                m12u = (u1 + u2) * 0.5
-                m12v = (v1 + v2) * 0.5
-                mx = max(0, min(wm1, int(max(0.0, min(1.0, m12u)) * wm1 + 0.5)))
-                my = max(0, min(hm1, int(max(0.0, min(1.0, m12v)) * hm1 + 0.5)))
-                if int(state_map[my, mx]) != s0:
-                    pass
-                else:
-                    m20u = (u2 + u0) * 0.5
-                    m20v = (v2 + v0) * 0.5
-                    mx = max(0, min(wm1, int(max(0.0, min(1.0, m20u)) * wm1 + 0.5)))
-                    my = max(0, min(hm1, int(max(0.0, min(1.0, m20v)) * hm1 + 0.5)))
-                    if int(state_map[my, mx]) != s0:
-                        pass
-                    else:
-                        qu = (u0 * 2 + cu) * 0.3333333333333333
-                        qv = (v0 * 2 + cv) * 0.3333333333333333
-                        qx = max(0, min(wm1, int(max(0.0, min(1.0, qu)) * wm1 + 0.5)))
-                        qy = max(0, min(hm1, int(max(0.0, min(1.0, qv)) * hm1 + 0.5)))
-                        if int(state_map[qy, qx]) != s0:
-                            pass
-                        else:
-                            qu = (u1 * 2 + cu) * 0.3333333333333333
-                            qv = (v1 * 2 + cv) * 0.3333333333333333
-                            qx = max(
-                                0, min(wm1, int(max(0.0, min(1.0, qu)) * wm1 + 0.5))
-                            )
-                            qy = max(
-                                0, min(hm1, int(max(0.0, min(1.0, qv)) * hm1 + 0.5))
-                            )
-                            if int(state_map[qy, qx]) != s0:
-                                pass
-                            else:
-                                qu = (u2 * 2 + cu) * 0.3333333333333333
-                                qv = (v2 * 2 + cv) * 0.3333333333333333
-                                qx = max(
-                                    0, min(wm1, int(max(0.0, min(1.0, qu)) * wm1 + 0.5))
-                                )
-                                qy = max(
-                                    0, min(hm1, int(max(0.0, min(1.0, qv)) * hm1 + 0.5))
-                                )
-                                if int(state_map[qy, qx]) != s0:
-                                    pass
-                                else:
-                                    return SegmentationNode(
-                                        state=s0,
-                                        split_sides=0,
-                                        special_side=0,
-                                        children=[],
-                                    )
+        u_span = max(u0, u1, u2) - min(u0, u1, u2)
+        v_span = max(v0, v1, v2) - min(v0, v1, v2)
+        pixel_span = max(u_span * wm1, v_span * hm1)
+        N = max(6, min(int(pixel_span * 0.5 + 0.5), 40))
+        uniform = True
+        stop = False
+        for i in range(N + 1):
+            for j in range(N + 1 - i):
+                k = N - i - j
+                gu = (i * u0 + j * u1 + k * u2) / N
+                gv = (i * v0 + j * v1 + k * v2) / N
+                gx = max(0, min(wm1, int(max(0.0, min(1.0, gu)) * wm1 + 0.5)))
+                gy = max(0, min(hm1, int(max(0.0, min(1.0, gv)) * hm1 + 0.5)))
+                if int(state_map[gy, gx]) != s0:
+                    uniform = False
+                    stop = True
+                    break
+            if stop:
+                break
+        if uniform:
+            return SegmentationNode(
+                state=s0,
+                split_sides=0,
+                special_side=0,
+                children=[],
+            )
 
     # Max depth reached: collapse to the most common corner state.
     if max_depth <= 0:

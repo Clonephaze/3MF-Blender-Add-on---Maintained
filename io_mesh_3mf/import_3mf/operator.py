@@ -32,6 +32,7 @@ import bpy.types
 import bpy_extras.io_utils
 
 from ..common import debug, warn, error
+from ..progress import ProgressWindow, PHASES, should_show_progress
 from ..common.constants import (
     RELS_MIMETYPE,
     MODEL_MIMETYPE,
@@ -324,12 +325,33 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
     def _progress_begin(self, context: bpy.types.Context, message: str) -> None:
         self._progress_context = context
         self._progress_value = 0
+        self._progress_window: Optional[ProgressWindow] = None
         wm = getattr(context, "window_manager", None)
         if wm:
             if hasattr(wm, "progress_begin"):
                 wm.progress_begin(0, 100)
             if hasattr(wm, "status_text_set"):
                 wm.status_text_set(message)
+        # Start browser progress card if threshold is met.
+        # Compute total file size across all paths being imported.
+        import os as _os
+        paths = [_os.path.join(self.directory, name.name) for name in self.files]
+        if not paths:
+            paths = [self.filepath]
+        total_bytes = sum(
+            _os.path.getsize(p) for p in paths if _os.path.isfile(p)
+        )
+        filename = _os.path.basename(paths[0]) if paths else "model.3mf"
+        if should_show_progress("import", file_size_bytes=total_bytes):
+            pw = ProgressWindow()
+            pw.start(
+                context,
+                "import",
+                filename,
+                phases=PHASES["import"],
+                can_cancel=False,
+            )
+            self._progress_window = pw
 
     def _progress_update(self, value: int, message: Optional[str] = None) -> None:
         ctx_bl = getattr(self, "_progress_context", None)
@@ -343,6 +365,21 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             wm.progress_update(new_value)
         if message and wm and hasattr(wm, "status_text_set"):
             wm.status_text_set(message)
+        # Forward to browser progress card.
+        # Import phases (weights): Reading Archive=10, Parsing Objects=40,
+        #   Materials=30, Building Scene=20
+        pw = getattr(self, "_progress_window", None)
+        if pw is not None:
+            # Cumulative % thresholds: 10, 50, 80, 100
+            _PHASE_BREAKS = [10, 50, 80, 100]
+            phase_idx = 0
+            for i, threshold in enumerate(_PHASE_BREAKS):
+                if new_value < threshold:
+                    phase_idx = i
+                    break
+            else:
+                phase_idx = len(_PHASE_BREAKS) - 1
+            pw.update(new_value / 100.0, phase_idx, message or "")
 
     def _progress_end(self) -> None:
         ctx_bl = getattr(self, "_progress_context", None)
@@ -355,6 +392,10 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             if hasattr(wm, "status_text_set"):
                 wm.status_text_set(None)
         self._progress_context = None
+        pw = getattr(self, "_progress_window", None)
+        if pw is not None:
+            pw.finish()
+            self._progress_window = None
 
     # ----- Main entry point -------------------------------------------------
 
@@ -402,10 +443,24 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         if bpy.ops.object.select_all.poll():
             bpy.ops.object.select_all(action="DESELECT")
 
-        for path in paths:
+        num_paths = len(paths)
+        for file_idx, path in enumerate(paths):
             ctx.current_archive_path = path
-            self._progress_update(5, f"Reading {os.path.basename(path)}...")
+            basename = os.path.basename(path)
+            self._progress_update(5, f"Reading {basename}...")
+            # Update browser progress card with per-file slice.
+            # Each file occupies an equal share of 0–95% (5% reserved for finalize).
+            # This lets the card show meaningful progress across many files rather
+            # than resetting 0→100 for each one.
+            pw = getattr(self, "_progress_window", None)
+            if pw is not None:
+                file_start = file_idx / num_paths * 0.95
+                pw.update(file_start, 0, f"File {file_idx + 1}/{num_paths}: {basename}")
             self._import_single_archive(ctx, path, context, scene_metadata, annotations)
+            # Mark this file complete in the browser card.
+            if pw is not None:
+                file_end = (file_idx + 1) / num_paths * 0.95
+                pw.update(file_end, 2, f"Loaded {basename}")
 
         # Store scene-level data.
         scene_metadata.store(bpy.context.scene)

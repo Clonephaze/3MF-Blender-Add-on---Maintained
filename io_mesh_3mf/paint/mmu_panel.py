@@ -151,7 +151,16 @@ class VIEW3D_PT_mmu_paint(bpy.types.Panel):
                 # Reset and Initialize buttons
                 row = box.row(align=True)
                 row.operator("mmu.reset_init_filaments", icon="FILE_REFRESH")
-                row.operator("mmu.initialize_painting", icon="PLAY", text="Initialize")
+
+                # UV method selection (before Initialize button)
+                uv_col = box.column(align=True)
+                uv_col.prop(settings, "uv_method")
+                if settings.uv_method == "LIGHTMAP":
+                    uv_col.prop(settings, "lightmap_divisions")
+                elif settings.uv_method == "EXISTING":
+                    uv_col.prop(settings, "existing_uv_layer")
+
+                box.operator("mmu.initialize_painting", icon="PLAY", text="Initialize")
 
                 # Bake to MMU — for procedural/complex materials
                 obj = context.active_object

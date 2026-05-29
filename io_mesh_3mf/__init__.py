@@ -122,6 +122,17 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         default=True,
     )
 
+    show_progress_window: bpy.props.BoolProperty(
+        name="Show Progress Window",
+        description=(
+            "Display a floating browser card with a live progress bar for "
+            "long-running operations (export, import, bake). "
+            "Requires Chrome, Edge, or another Chromium-based browser for the "
+            "frameless card; falls back to a normal browser tab otherwise"
+        ),
+        default=True,
+    )
+
     show_mixed_filaments: bpy.props.BoolProperty(
         name="Show Mixed Filaments",
         description=(
@@ -478,6 +489,11 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
             else:
                 box.label(text="No profiles saved", icon="INFO")
             box.operator("threemf.load_slicer_profile", icon="FILEBROWSER")
+
+        # ---- Progress Window ----
+        layout.separator()
+        box = layout.box()
+        box.prop(self, "show_progress_window", icon="WINDOW")
 
         # ---- Mixed Filaments (FullSpectrum) ----
         layout.separator()

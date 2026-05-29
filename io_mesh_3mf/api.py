@@ -111,7 +111,7 @@ from .common.units import (
 #: - MAJOR: Breaking changes to existing functions/signatures
 #: - MINOR: New features, backward-compatible
 #: - PATCH: Bug fixes only
-API_VERSION = (1, 2, 0)
+API_VERSION = (1, 3, 0)
 
 #: Human-readable version string
 API_VERSION_STRING = ".".join(str(v) for v in API_VERSION)
@@ -139,6 +139,7 @@ API_CAPABILITIES = frozenset({
     "subdivision_depth",   # Paint segmentation subdivision depth control
     "flatten_hierarchy",    # Option to flatten parented meshes into top-level build items (export)
     "modifier_parts",       # Orca/BambuStudio modifier part subtypes (import, export, inspect)
+    "progress_window",      # show_progress_window param on export_3mf() opens the browser card
 })
 
 #: Registry key in bpy.app.driver_namespace
@@ -929,12 +930,13 @@ def export_3mf(
     object_settings: Optional[Dict] = None,
     on_progress: Optional[ProgressCallback] = None,
     on_warning: Optional[WarningCallback] = None,
+    show_progress_window: bool = False,
 ) -> ExportResult:
     """Export Blender objects to a 3MF file.
 
     This is the headless/programmatic counterpart to the ``Export3MF``
-    operator.  It skips UI-specific behaviour (progress bars, status text)
-    but runs the exact same export pipeline.
+    operator.  It skips UI-specific behaviour by default, but the browser
+    progress card can be requested via *show_progress_window*.
 
     :param filepath: Destination path for the ``.3mf`` file.
     :param objects: Explicit list of ``bpy.types.Object`` to export.
@@ -1001,6 +1003,12 @@ def export_3mf(
 
     :param on_progress: Optional ``(percentage: int, message: str)`` callback.
     :param on_warning: Optional ``(message: str)`` callback for warnings.
+    :param show_progress_window: When *True*, open the 3MF browser progress
+        card (same one shown by the Blender file-dialog operator).  Respects
+        the ``Show Progress Window`` addon preference.  Useful when calling
+        from another addon that wants the card without going through the
+        operator (e.g. ``export_3mf(path, ..., show_progress_window=True)``).
+        The *on_progress* callback still fires in addition if provided.
     :return: :class:`ExportResult` with status, written count, and filepath.
     """
     from .export_3mf.context import ExportContext, ExportOptions
@@ -1013,6 +1021,29 @@ def export_3mf(
 
     filepath = os.path.abspath(filepath)
     result = ExportResult(filepath=filepath)
+
+    # ── Optional browser progress card ───────────────────────────────────────
+    _pw = None
+    if show_progress_window:
+        from .progress import ProgressWindow, PHASES, should_show_progress
+        _filename = os.path.basename(filepath)
+        if should_show_progress("export", tri_count=999_999, has_paint=True,
+                                thumbnail_render=False):
+            _pw = ProgressWindow()
+            _pw.start(bpy.context, "export", _filename,
+                      phases=PHASES["export"], can_cancel=False)
+        # Wrap on_progress so both the caller's callback and the window update
+        _caller_on_progress = on_progress
+        def on_progress(pct: int, msg: str) -> None:  # type: ignore[misc]
+            if _pw is not None:
+                # Map the coarse on_progress int% into ProgressWindow.update()
+                import math
+                _phases = PHASES["export"]
+                _n = len(_phases)
+                _phase_idx = min(int(pct / 100 * _n), _n - 1)
+                _pw.update(pct / 100, _phase_idx, msg)
+            if _caller_on_progress is not None:
+                _caller_on_progress(pct, msg)
 
     if on_progress:
         on_progress(0, "Starting export…")
@@ -1071,6 +1102,8 @@ def export_3mf(
     # Create archive.
     archive = create_archive(filepath, ctx.safe_report, ctx.options.compression_level)
     if archive is None:
+        if _pw is not None:
+            _pw.finish()
         result.status = "CANCELLED"
         return result
 
@@ -1185,6 +1218,8 @@ def export_3mf(
         result.status = next(iter(status_set)) if status_set else "FINISHED"
     except Exception as e:
         error(f"Export failed: {e}")
+        if _pw is not None:
+            _pw.finish()
         result.status = "CANCELLED"
         result.warnings.append(str(e))
         return result
@@ -1193,6 +1228,9 @@ def export_3mf(
 
     if on_progress:
         on_progress(100, "Export complete")
+
+    if _pw is not None:
+        _pw.finish()
 
     debug(f"API: Exported {ctx.num_written} objects to {filepath}")
     return result

@@ -28,6 +28,9 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from ..common.extensions import ExtensionManager
 from ..common.logging import debug, warn, error
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from ..progress import ProgressWindow
 
 
 # ---------------------------------------------------------------------------
@@ -107,6 +110,8 @@ class ExportContext:
     _progress_context: object = None
     _progress_value: int = 0
     _progress_range: Optional[Tuple[int, int]] = None
+    # Browser progress window (None when disabled / below threshold)
+    progress: Optional["ProgressWindow"] = None
 
     # --- Helpers ------------------------------------------------------------
 
@@ -147,6 +152,21 @@ class ExportContext:
             window_manager.progress_update(new_value)
         if message and window_manager and hasattr(window_manager, "status_text_set"):
             window_manager.status_text_set(message)
+        # Forward to browser progress window
+        # Map the 0-100 Blender progress value to a phase index and percent.
+        # Export phases (weights): Preparing=5, Geometry=40, Materials=20,
+        #   Segmentation=25, Thumbnail=5, Packaging=5
+        if self.progress is not None:
+            # Approximate phase boundaries by cumulative weight
+            _PHASE_BREAKS = [5, 45, 65, 90, 95, 100]  # cumulative %
+            phase_idx = 0
+            for i, threshold in enumerate(_PHASE_BREAKS):
+                if new_value < threshold:
+                    phase_idx = i
+                    break
+            else:
+                phase_idx = len(_PHASE_BREAKS) - 1
+            self.progress.update(new_value / 100.0, phase_idx, message or "")
 
     def _progress_end(self) -> None:
         """End progress tracking."""
@@ -160,6 +180,9 @@ class ExportContext:
             if hasattr(window_manager, "status_text_set"):
                 window_manager.status_text_set(None)
         self._progress_context = None
+        if self.progress is not None:
+            self.progress.finish()
+            self.progress = None
 
     def finalize_export(self, archive: zipfile.ZipFile, format_name: str = "") -> Set[str]:
         """

@@ -19,6 +19,20 @@ import bpy
 import bpy.props
 import bpy.types
 
+
+# ---------------------------------------------------------------------------
+#  Search callback for UV layer name autocomplete
+# ---------------------------------------------------------------------------
+
+def _uv_layer_search_items(self, context, edit_text):
+    """Return UV layer names on the active mesh for StringProperty search autocomplete."""
+    if context is None:
+        return []
+    obj = context.active_object
+    if obj is None or obj.type != "MESH" or obj.data is None:
+        return []
+    return [layer.name for layer in obj.data.uv_layers]
+
 from .helpers import _on_active_filament_changed, _on_active_mix_filament_changed
 
 
@@ -214,7 +228,9 @@ class MMUPaintSettings(bpy.types.PropertyGroup):
             "UV unwrap strategy for MMU paint textures.\n"
             "Smart UV Project shares edges between faces for seamless painting.\n"
             "Lightmap Pack gives every face its own rectangle — best for "
-            "procedural bakes but may show edge bleed when hand-painting"
+            "procedural bakes but may show edge bleed when hand-painting.\n"
+            "Use Existing UV Map skips the unwrap entirely and uses a "
+            "hand-crafted UV layer you already have on the mesh"
         ),
         items=[
             ("SMART", "Smart UV Project",
@@ -223,8 +239,21 @@ class MMUPaintSettings(bpy.types.PropertyGroup):
             ("LIGHTMAP", "Lightmap Pack",
              "Every face gets its own UV rectangle. "
              "Best for procedural/baked textures"),
+            ("EXISTING", "Use Existing UV Map",
+             "Use a hand-crafted UV layer already on the mesh — "
+             "skips dissolve and UV projection entirely"),
         ],
         default="SMART",
+    )
+    existing_uv_layer: bpy.props.StringProperty(
+        name="UV Layer",
+        description=(
+            "Name of the existing UV layer to use as the paint map.\n"
+            "Leave empty to reuse the MMU_Paint layer if present, "
+            "otherwise falls back to Smart UV Project"
+        ),
+        default="",
+        search=_uv_layer_search_items,
     )
     lightmap_divisions: bpy.props.IntProperty(
         name="Lightmap Divisions",

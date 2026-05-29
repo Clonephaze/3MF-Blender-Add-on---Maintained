@@ -23,7 +23,7 @@ import bpy.props
 import bpy.types
 
 from ..common.colors import rgb_to_hex as _hex_from_rgb
-from ..common.logging import debug
+from ..common.logging import debug, warn
 
 from .helpers import (
     DEFAULT_PALETTE,
@@ -91,43 +91,62 @@ class MMU_OT_initialize(bpy.types.Operator):
         context.view_layer.objects.active = obj
         uv_method = settings.uv_method
 
-        # Limited Dissolve merges coplanar triangles, giving each face
-        # more UV space and reducing blurriness.  ~2 deg is conservative
-        # enough to keep all intentional geometry detail.
-        if not settings.skip_dissolve:
-            bm = bmesh.new()
-            bm.from_mesh(mesh)
-            bmesh.ops.dissolve_limit(
-                bm, angle_limit=0.0349,
-                verts=bm.verts, edges=bm.edges,
-            )
-            bm.to_mesh(mesh)
-            bm.free()
-            mesh.update()
+        if uv_method == "EXISTING":
+            # Copy the user's chosen UV layer into MMU_Paint, skipping
+            # dissolve and UV projection entirely.
+            layer_name = settings.existing_uv_layer.strip() or "MMU_Paint"
+            src_layer = mesh.uv_layers.get(layer_name)
+            if src_layer is None:
+                warn(
+                    f"Initialize: UV layer '{layer_name}' not found -- "
+                    "falling back to Smart UV Project"
+                )
+                uv_method = "SMART"  # fall through below
+            elif src_layer.name != "MMU_Paint":
+                num_loops = len(mesh.loops)
+                src_flat = np.zeros(num_loops * 2, dtype=np.float64)
+                src_layer.data.foreach_get("uv", src_flat)
+                mmu_layer.data.foreach_set("uv", src_flat)
+                debug(f"Initialize: copied UV data from '{src_layer.name}' -> 'MMU_Paint'")
 
-        bpy.ops.object.mode_set(mode="EDIT")
-        bpy.ops.mesh.select_all(action="SELECT")
+        if uv_method != "EXISTING":
+            # Limited Dissolve merges coplanar triangles, giving each face
+            # more UV space and reducing blurriness.  ~2 deg is conservative
+            # enough to keep all intentional geometry detail.
+            if not settings.skip_dissolve:
+                bm = bmesh.new()
+                bm.from_mesh(mesh)
+                bmesh.ops.dissolve_limit(
+                    bm, angle_limit=0.0349,
+                    verts=bm.verts, edges=bm.edges,
+                )
+                bm.to_mesh(mesh)
+                bm.free()
+                mesh.update()
 
-        if uv_method == "LIGHTMAP":
-            bpy.ops.uv.lightmap_pack(
-                PREF_CONTEXT="ALL_FACES",
-                PREF_PACK_IN_ONE=True,
-                PREF_NEW_UVLAYER=False,
-                PREF_BOX_DIV=settings.lightmap_divisions,
-                PREF_MARGIN_DIV=0.05,
-            )
-        else:
-            bpy.ops.uv.smart_project(
-                angle_limit=1.15192,
-                margin_method="SCALED",
-                rotate_method="AXIS_ALIGNED",
-                island_margin=0.002,
-                area_weight=0.6,
-                correct_aspect=True,
-                scale_to_bounds=False,
-            )
+            bpy.ops.object.mode_set(mode="EDIT")
+            bpy.ops.mesh.select_all(action="SELECT")
 
-        bpy.ops.object.mode_set(mode="OBJECT")
+            if uv_method == "LIGHTMAP":
+                bpy.ops.uv.lightmap_pack(
+                    PREF_CONTEXT="ALL_FACES",
+                    PREF_PACK_IN_ONE=True,
+                    PREF_NEW_UVLAYER=False,
+                    PREF_BOX_DIV=settings.lightmap_divisions,
+                    PREF_MARGIN_DIV=0.05,
+                )
+            else:
+                bpy.ops.uv.smart_project(
+                    angle_limit=1.15192,
+                    margin_method="SCALED",
+                    rotate_method="AXIS_ALIGNED",
+                    island_margin=0.002,
+                    area_weight=0.6,
+                    correct_aspect=True,
+                    scale_to_bounds=False,
+                )
+
+            bpy.ops.object.mode_set(mode="OBJECT")
 
         # --- Texture size by triangle count ---
         tri_count = len(mesh.polygons)

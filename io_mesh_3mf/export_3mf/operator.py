@@ -40,6 +40,7 @@ from .geometry import check_non_manifold_geometry
 from .orca import OrcaExporter
 from .prusa import PrusaExporter
 from .standard import StandardExporter
+from ..progress import ProgressWindow, PHASES, should_show_progress
 
 # The top-level package name — works in both dev (io_mesh_3mf.export_3mf)
 # and installed-extension namespace (bl_ext.user_default.io_mesh_3mf.export_3mf).
@@ -628,6 +629,40 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         :return: A set of status flags to indicate whether the write succeeded or not.
         """
         ctx = self._build_context()
+
+        # ── Browser progress window (pre-flight heuristics) ──────────────────
+        import os as _os
+        _filename = _os.path.basename(self.filepath) if self.filepath else "model.3mf"
+
+        # Compute hints cheaply before the archive is opened
+        _candidate_objects = (
+            list(context.selected_objects)
+            if self.use_selection
+            else list(context.scene.objects)
+        )
+        _mesh_objs = [o for o in _candidate_objects if o.type == "MESH"]
+        _tri_count = sum(len(o.data.polygons) for o in _mesh_objs if o.data)
+        _has_paint = any(
+            o.data and o.data.get("3mf_is_paint_texture") for o in _mesh_objs
+        )
+        _thumbnail_render = self.thumbnail_mode == "AUTO"
+
+        if should_show_progress(
+            "export",
+            tri_count=_tri_count,
+            has_paint=_has_paint,
+            thumbnail_render=_thumbnail_render,
+        ):
+            pw = ProgressWindow()
+            pw.start(
+                context,
+                "export",
+                _filename,
+                phases=PHASES["export"],
+                can_cancel=False,
+            )
+            ctx.progress = pw
+
         ctx._progress_begin(context, "Exporting 3MF...")
 
         try:
@@ -694,6 +729,10 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                 has_materials = any(
                     len(obj.material_slots) >= 1 for obj in mesh_objects
                 )
+
+            # Advance browser card: Preparing → Geometry
+            if ctx.progress is not None:
+                ctx.progress.update(0.05, 1, f"{len(mesh_objects)} object(s)")
 
             # Dispatch to format-specific exporter
             exporter = _select_exporter(ctx, context, mesh_objects, has_materials)

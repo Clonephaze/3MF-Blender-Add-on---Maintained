@@ -37,6 +37,7 @@ import bpy.types
 from ..common.colors import hex_to_rgb as _rgb_from_hex
 from ..common.colors import rgb_to_hex as _hex_from_rgb
 from ..common.logging import debug, error
+from ..progress import ProgressWindow, PHASES, should_show_progress
 
 from .quantize import (  # noqa: F401 â€” re-exported for backward compat
     _rgb_to_hsv,
@@ -71,20 +72,17 @@ from .vertex_colors import (  # noqa: F401 â€” re-exported for backward com
 def _ensure_uv_unwrap(obj, context):
     """Ensure the object has a dedicated MMU_Paint UV layer.
 
-    Uses the UV method selected in MMUPaintSettings (Smart UV Project by
-    default, Lightmap Pack as an option).
+    Uses the UV method in MMUPaintSettings: Smart UV Project (default),
+    Lightmap Pack, or an existing user-defined layer (EXISTING).
 
-    A Limited Dissolve pass (angle ~0.5Â°) is applied first to merge coplanar
-    triangles â€” this gives each remaining face more UV space and reduces
-    blurriness, especially with Lightmap Pack.
+    For SMART / LIGHTMAP: a Limited Dissolve pass is applied first to merge
+    coplanar triangles, giving each face more UV space.
 
-    Any existing UVs (e.g. hand-crafted unwraps) are left untouched.
-    The ``MMU_Paint`` layer is set as the **active render** layer so the
-    bake writes to it; the caller is responsible for restoring the
-    original active layer afterward if desired.
+    For EXISTING: the named UV layer's data is copied into MMU_Paint with no
+    dissolve and no UV projection.  The original layer is left intact.
 
-    Returns the name of the previously active UV layer (or ``None``)
-    so the caller can restore it.
+    The MMU_Paint layer is set as the active render layer so the bake writes
+    to it.  Returns the name of the previously active UV layer (or None).
     """
     mesh = obj.data
     settings = context.scene.mmu_paint
@@ -95,20 +93,50 @@ def _ensure_uv_unwrap(obj, context):
     if mesh.uv_layers.active:
         prev_active_name = str(mesh.uv_layers.active.name)
 
-    # Create or reuse the dedicated MMU_Paint UV layer
+    # ------------------------------------------------------------------
+    # EXISTING path: copy UV data from the user's layer into MMU_Paint,
+    # skipping dissolve and UV projection entirely.
+    # ------------------------------------------------------------------
+    if uv_method == "EXISTING":
+        layer_name = settings.existing_uv_layer.strip()
+        if not layer_name:
+            layer_name = "MMU_Paint"
+        src_layer = mesh.uv_layers.get(layer_name)
+        if src_layer is None:
+            warn(
+                f"_ensure_uv_unwrap: UV layer '{layer_name}' not found -- "
+                "falling back to Smart UV Project"
+            )
+            uv_method = "SMART"  # fall through to SMART/LIGHTMAP below
+        else:
+            mmu_layer = mesh.uv_layers.get("MMU_Paint")
+            if mmu_layer is None:
+                mmu_layer = mesh.uv_layers.new(name="MMU_Paint")
+            if src_layer.name != "MMU_Paint":
+                num_loops = len(mesh.loops)
+                src_flat = np.zeros(num_loops * 2, dtype=np.float64)
+                src_layer.data.foreach_get("uv", src_flat)
+                mmu_layer.data.foreach_set("uv", src_flat)
+                debug(
+                    f"_ensure_uv_unwrap: copied UV data from "
+                    f"'{src_layer.name}' -> 'MMU_Paint'"
+                )
+            mesh.uv_layers.active = mmu_layer
+            mmu_layer.active_render = True
+            return prev_active_name
+
+    # ------------------------------------------------------------------
+    # SMART / LIGHTMAP path: create/reuse MMU_Paint and run UV project.
+    # ------------------------------------------------------------------
     mmu_layer = mesh.uv_layers.get("MMU_Paint")
     if mmu_layer is None:
         mmu_layer = mesh.uv_layers.new(name="MMU_Paint")
 
-    # Set it as both the active and active-render layer
     mesh.uv_layers.active = mmu_layer
     mmu_layer.active_render = True
-
     context.view_layer.objects.active = obj
 
-    # Limited Dissolve merges coplanar triangles, giving each face more
-    # UV space and reducing blurriness.  ~0.5Â° is tight enough to only
-    # merge truly flat faces while leaving curved surfaces intact.
+    # Limited Dissolve merges coplanar triangles, giving each face more UV space.
     if not settings.skip_dissolve:
         bm = bmesh.new()
         bm.from_mesh(mesh)
@@ -122,7 +150,6 @@ def _ensure_uv_unwrap(obj, context):
     else:
         debug("_ensure_uv_unwrap: skipping Limited Dissolve (skip_dissolve=True)")
 
-    # Must be in edit mode for UV operators
     prev_mode = obj.mode
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="SELECT")
@@ -147,10 +174,7 @@ def _ensure_uv_unwrap(obj, context):
         )
 
     bpy.ops.object.mode_set(mode=prev_mode)
-
     return prev_active_name
-
-
 def _get_texture_size(mesh, override_size=0):
     """Determine texture size based on triangle count or user override."""
     if override_size > 0:
@@ -367,8 +391,12 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
         col.prop(settings, "uv_method")
         if settings.uv_method == "LIGHTMAP":
             col.prop(settings, "lightmap_divisions")
+        elif settings.uv_method == "EXISTING":
+            col.prop(settings, "existing_uv_layer")
         if not is_vc:
-            col.prop(settings, "skip_dissolve")
+            skip_row = col.row()
+            skip_row.enabled = settings.uv_method != "EXISTING"
+            skip_row.prop(settings, "skip_dissolve")
 
         # --- Quantization -------------------------------------------------
         quant_box = layout.box()
@@ -389,11 +417,34 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
             self.report({"ERROR"}, "At least 2 filaments required")
             return {"CANCELLED"}
 
-        # --- Vertex-color fast path (before UV unwrap) ---
-        # Detect FIRST â€” Limited Dissolve in _ensure_uv_unwrap would
-        # destroy vertex color data and is extremely slow on high-poly
-        # meshes.  The fast path skips dissolve entirely.
+        # --- Detect path and start browser progress card ---
         vc_attr_name = _detect_vertex_color_source(obj)
+        op_type = "bake_vc" if vc_attr_name else "bake_cycles"
+        face_count = len(mesh.polygons)
+        # Convert linear RGB tuples to hex strings for swatch display
+        filament_hex = [_hex_from_rgb(*c[:3]) for c in filament_colors]
+        _pw = None
+        if should_show_progress(op_type, face_count=face_count):
+            _pw = ProgressWindow()
+            _pw.start(
+                context,
+                op_type,
+                str(mesh.name),
+                phases=PHASES[op_type],
+                can_cancel=True,
+                filament_colors=filament_hex,
+            )
+
+        try:
+            return self._execute_body(
+                context, obj, mesh, settings, filament_colors, vc_attr_name, _pw,
+            )
+        finally:
+            if _pw is not None:
+                _pw.finish()
+
+    def _execute_body(self, context, obj, mesh, settings, filament_colors, vc_attr_name, _pw):
+        """Inner bake logic, wrapped by execute() for clean progress window teardown."""
         if vc_attr_name:
             debug(f"Bake to MMU: vertex color fast path, attr='{vc_attr_name}'")
             self.report({"INFO"}, "Converting vertex colors (fast path)...")
@@ -412,7 +463,7 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
                 return {"CANCELLED"}
             wm.progress_update(10)
 
-            # B â€” Lightweight UV unwrap (no Limited Dissolve)
+            # B -- Lightweight UV unwrap (no Limited Dissolve for VC fast path)
             self.report({"INFO"}, "Creating UV map...")
             mmu_layer = mesh.uv_layers.get("MMU_Paint")
             if mmu_layer is None:
@@ -421,30 +472,53 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
             mmu_layer.active_render = True
             context.view_layer.objects.active = obj
 
-            prev_mode = obj.mode
-            bpy.ops.object.mode_set(mode="EDIT")
-            bpy.ops.mesh.select_all(action="SELECT")
             uv_method = settings.uv_method
-            if uv_method == "LIGHTMAP":
-                bpy.ops.uv.lightmap_pack(
-                    PREF_CONTEXT="ALL_FACES",
-                    PREF_PACK_IN_ONE=True,
-                    PREF_NEW_UVLAYER=False,
-                    PREF_BOX_DIV=settings.lightmap_divisions,
-                    PREF_MARGIN_DIV=0.05,
-                )
-            else:
-                bpy.ops.uv.smart_project(
-                    angle_limit=1.15192,
-                    margin_method="SCALED",
-                    rotate_method="AXIS_ALIGNED",
-                    island_margin=0.002,
-                    area_weight=0.6,
-                    correct_aspect=True,
-                    scale_to_bounds=False,
-                )
-            bpy.ops.object.mode_set(mode=prev_mode)
+            if uv_method == "EXISTING":
+                layer_name = settings.existing_uv_layer.strip() or "MMU_Paint"
+                src_layer = mesh.uv_layers.get(layer_name)
+                if src_layer is None:
+                    warn(
+                        f"Bake to MMU (VC): UV layer '{layer_name}' not found -- "
+                        "falling back to Smart UV Project"
+                    )
+                    uv_method = "SMART"  # fall through below
+                elif src_layer.name != "MMU_Paint":
+                    num_loops = len(mesh.loops)
+                    src_flat = np.zeros(num_loops * 2, dtype=np.float64)
+                    src_layer.data.foreach_get("uv", src_flat)
+                    mmu_layer.data.foreach_set("uv", src_flat)
+                    debug(f"Bake to MMU (VC): copied UV from '{src_layer.name}' -> 'MMU_Paint'")
+
+            if uv_method != "EXISTING":
+                prev_mode = obj.mode
+                bpy.ops.object.mode_set(mode="EDIT")
+                bpy.ops.mesh.select_all(action="SELECT")
+                if uv_method == "LIGHTMAP":
+                    bpy.ops.uv.lightmap_pack(
+                        PREF_CONTEXT="ALL_FACES",
+                        PREF_PACK_IN_ONE=True,
+                        PREF_NEW_UVLAYER=False,
+                        PREF_BOX_DIV=settings.lightmap_divisions,
+                        PREF_MARGIN_DIV=0.05,
+                    )
+                else:
+                    bpy.ops.uv.smart_project(
+                        angle_limit=1.15192,
+                        margin_method="SCALED",
+                        rotate_method="AXIS_ALIGNED",
+                        island_margin=0.002,
+                        area_weight=0.6,
+                        correct_aspect=True,
+                        scale_to_bounds=False,
+                    )
+                bpy.ops.object.mode_set(mode=prev_mode)
             wm.progress_update(40)
+            if _pw is not None:
+                _pw.update(0.2, 1, 'Assigning colors...')
+                if _pw.is_cancel_requested():
+                    wm.progress_end()
+                    self.report({'WARNING'}, 'Bake cancelled')
+                    return {'CANCELLED'}
 
             # C â€” Texture size
             tex_size = _get_texture_size(mesh, int(self.texture_size))
@@ -462,6 +536,12 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
                 wm.progress_end()
                 return {"CANCELLED"}
             wm.progress_update(60)
+            if _pw is not None:
+                _pw.update(0.6, 2, 'Quantizing...')
+                if _pw.is_cancel_requested():
+                    wm.progress_end()
+                    self.report({'WARNING'}, 'Bake cancelled')
+                    return {'CANCELLED'}
 
             # E â€” Per-pixel quantize (always â€” region method is overkill
             #     here since the texture already contains near-exact
@@ -470,6 +550,8 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
             changed = _quantize_pixels(pixels, filament_colors)
             debug(f"Bake to MMU (VC): pixel quantize changed {changed} px")
             wm.progress_update(85)
+            if _pw is not None:
+                _pw.update(0.85, 3, 'Finalizing...')
 
             # F â€” Create image + finalize
             image_name = f"{mesh.name}_MMU_Paint"
@@ -499,6 +581,11 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
         # layer (which tells the bake where to write output pixels).
         if prev_uv_name and mesh.uv_layers.get(prev_uv_name):
             mesh.uv_layers[prev_uv_name].active_render = True
+        if _pw is not None:
+            _pw.update(0.15, 1, 'Setting up bake...')
+            if _pw.is_cancel_requested():
+                self.report({'WARNING'}, 'Bake cancelled')
+                return {'CANCELLED'}
 
         # --- Step 2: Determine texture size ---
         tex_size = _get_texture_size(mesh, int(self.texture_size))
@@ -728,6 +815,15 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
 
         # --- Step 7: Bake ---
         self.report({"INFO"}, "Baking texture...")
+        if _pw is not None:
+            _pw.update(0.25, 2, 'Baking...')
+            if _pw.is_cancel_requested():
+                _cleanup_per_mat_state(_per_mat_state)
+                cycles.samples = original_samples
+                cycles.device = original_device
+                context.scene.render.engine = original_engine
+                self.report({'WARNING'}, 'Bake cancelled')
+                return {'CANCELLED'}
         try:
             bake_kwargs = {
                 "type": bake_type,
@@ -769,6 +865,11 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
 
         # --- Step 9: Quantize the baked texture ---
         self.report({"INFO"}, "Quantizing to filament colors...")
+        if _pw is not None:
+            _pw.update(0.8, 3, 'Quantizing...')
+            if _pw.is_cancel_requested():
+                self.report({'WARNING'}, 'Bake cancelled')
+                return {'CANCELLED'}
         wm = context.window_manager
         wm.progress_begin(0, 100)
         wm.progress_update(5)
@@ -1151,7 +1252,14 @@ def _draw_bake_panel(layout, context):
         # Options
         opts_box = layout.box()
         opts_box.label(text="Options", icon="PREFERENCES")
-        opts_box.prop(settings, "skip_dissolve")
+        opts_box.prop(settings, "uv_method")
+        if settings.uv_method == "LIGHTMAP":
+            opts_box.prop(settings, "lightmap_divisions")
+        elif settings.uv_method == "EXISTING":
+            opts_box.prop(settings, "existing_uv_layer")
+        skip_row = opts_box.row()
+        skip_row.enabled = settings.uv_method != "EXISTING"
+        skip_row.prop(settings, "skip_dissolve")
 
         # Bake button
         bake_row = layout.row(align=True)
