@@ -500,10 +500,25 @@ _HTML = """<!DOCTYPE html>
 
   // ── SVG icon paths per operation type ──
   const OP_ICONS = {
-    export: '<path d="M5 1v6M2.5 4.5L5 7l2.5-2.5M1 8v1.5A.5.5 0 001.5 10h7a.5.5 0 00.5-.5V8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
-    import: '<path d="M5 9V3M2.5 5.5L5 3l2.5 2.5M1 8v1.5A.5.5 0 001.5 10h7a.5.5 0 00.5-.5V8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
-    bake_cycles: '<circle cx="5" cy="5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M5 1v1M5 8v1M1 5h1M8 5h1M2.05 2.05l.71.71M7.24 7.24l.71.71M7.24 2.76l-.71.71M2.76 7.24l-.71.71" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-    bake_vc:     '<path d="M2 7.5C2 5.567 3.343 4 5 4s3 1.567 3 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="5" cy="3" r="1.2" stroke="currentColor" stroke-width="1.2"/><path d="M1 9h8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+    export: (
+        '<path d="M5 1v6M2.5 4.5L5 7l2.5-2.5M1 8v1.5A.5.5 0 001.5 10h7a.5.5 0 00.5-.5V8"'
+        ' stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>'
+    ),
+    import: (
+        '<path d="M5 9V3M2.5 5.5L5 3l2.5 2.5M1 8v1.5A.5.5 0 001.5 10h7a.5.5 0 00.5-.5V8"'
+        ' stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>'
+    ),
+    bake_cycles: (
+        '<circle cx="5" cy="5" r="2" stroke="currentColor" stroke-width="1.3"/>'
+        '<path d="M5 1v1M5 8v1M1 5h1M8 5h1M2.05 2.05l.71.71M7.24 7.24l.71.71M7.24 2.76l-.71.71M2.76 7.24l-.71.71"'
+        ' stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>'
+    ),
+    bake_vc: (
+        '<path d="M2 7.5C2 5.567 3.343 4 5 4s3 1.567 3 3.5"'
+        ' stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>'
+        '<circle cx="5" cy="3" r="1.2" stroke="currentColor" stroke-width="1.2"/>'
+        '<path d="M1 9h8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>'
+    ),
   };
 
   const OP_LABELS = {
@@ -562,7 +577,8 @@ _HTML = """<!DOCTYPE html>
             '<circle cx="2.5" cy="2.5" r="2" stroke="currentColor" stroke-width="1" opacity="0.3"/>' +
           '</svg>' +
           '<svg class="step-check" width="7" height="6" viewBox="0 0 7 6" fill="none">' +
-            '<path d="M1 3l2 2 3-4" stroke="rgba(59,126,246,0.7)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="M1 3l2 2 3-4" stroke="rgba(59,126,246,0.7)"'
+            ' stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' +
           '</svg>' +
         '</div>' +
         '<span class="step-label" title="' + name + '">' + name + '</span>';
@@ -784,7 +800,11 @@ class _Handler(BaseHTTPRequestHandler):
             try:
                 body = self.__class__.json_path.read_bytes()
             except Exception:
-                body = b'{"active":true,"percent":0,"phase":"","phases":[],"phase_index":0,"message":"","elapsed":0,"can_cancel":false,"filament_colors":[]}'
+                body = (
+                    b'{"active":true,"percent":0,"phase":"","phases":[],'
+                    b'"phase_index":0,"message":"","elapsed":0,'
+                    b'"can_cancel":false,"filament_colors":[]}'
+                )
             self._respond(200, "application/json; charset=utf-8", body)
         else:
             self.send_response(404)

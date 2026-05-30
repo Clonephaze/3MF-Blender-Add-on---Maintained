@@ -58,6 +58,8 @@ def get_raw_geometry(mesh_element: xml.etree.ElementTree.Element):
 def clear_raw_geometry(mesh_element: xml.etree.ElementTree.Element) -> None:
     """Remove the cached raw geometry for *mesh_element* after it has been written."""
     _raw_geometry_cache.pop(id(mesh_element), None)
+
+
 from ..common.logging import debug, timing_debug, warn
 from ..common.metadata import Metadata
 from .materials import (

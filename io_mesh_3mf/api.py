@@ -1034,6 +1034,7 @@ def export_3mf(
                       phases=PHASES["export"], can_cancel=False)
         # Wrap on_progress so both the caller's callback and the window update
         _caller_on_progress = on_progress
+
         def on_progress(pct: int, msg: str) -> None:  # type: ignore[misc]
             if _pw is not None:
                 # Map the coarse on_progress int% into ProgressWindow.update()

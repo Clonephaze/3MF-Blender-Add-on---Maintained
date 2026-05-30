@@ -112,6 +112,7 @@ PHASES: dict[str, List[Tuple[str, int]]] = {
 # Preference helpers
 # ---------------------------------------------------------------------------
 
+
 def _get_addon_package() -> str:
     """Return the top-level addon package name."""
     pkg = __package__ or ""

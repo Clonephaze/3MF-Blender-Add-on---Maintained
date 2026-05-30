@@ -39,7 +39,10 @@ from ..common.xml import format_transformation
 
 from .archive import write_core_properties
 from .components import collect_mesh_objects, detect_linked_duplicates, should_use_components
-from .geometry import write_vertices, write_triangles, write_passthrough_triangles, write_metadata, get_raw_geometry, clear_raw_geometry
+from .geometry import (
+    write_vertices, write_triangles, write_passthrough_triangles,
+    write_metadata, get_raw_geometry, clear_raw_geometry,
+)
 from .materials import (
     write_materials,
     get_triangle_color,
