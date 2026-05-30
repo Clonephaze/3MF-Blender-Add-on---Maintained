@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Getting Started" href="guide.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>3MF Format API — v1.0.0</title>
+        <title>3MF Format API — v1.3.0</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -167,7 +167,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="#"><div class="brand">3MF Format API — v1.0.0</div></a>
+      <a href="#"><div class="brand">3MF Format API — v1.3.0</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -188,7 +188,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="#">
   
-  <span class="sidebar-brand-text">3MF Format API — v1.0.0</span>
+  <span class="sidebar-brand-text">3MF Format API — v1.3.0</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -248,6 +248,7 @@ the <a class="reference internal" href="api.html"><span class="doc">Core API</sp
 <li class="toctree-l1"><a class="reference internal" href="guide.html">Getting Started</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="guide.html#quick-start">Quick Start</a></li>
 <li class="toctree-l2"><a class="reference internal" href="guide.html#export-format-reference">Export Format Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guide.html#modifier-parts-orca-bambustudio">Modifier Parts (Orca / BambuStudio)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="guide.html#callbacks">Callbacks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="guide.html#error-handling">Error Handling</a></li>
 <li class="toctree-l2"><a class="reference internal" href="guide.html#cli-usage">CLI Usage</a></li>
@@ -261,6 +262,7 @@ the <a class="reference internal" href="api.html"><span class="doc">Core API</sp
 <li class="toctree-l2"><a class="reference internal" href="recipes.html#export-for-prusaslicer-with-mmu-paint">Export for PrusaSlicer with MMU Paint</a></li>
 <li class="toctree-l2"><a class="reference internal" href="recipes.html#custom-orca-project-template">Custom Orca Project Template</a></li>
 <li class="toctree-l2"><a class="reference internal" href="recipes.html#round-trip-conversion">Round-Trip Conversion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="recipes.html#modifier-parts">Modifier Parts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="recipes.html#inspect-without-importing">Inspect Without Importing</a></li>
 <li class="toctree-l2"><a class="reference internal" href="recipes.html#batch-operations">Batch Operations</a></li>
 </ul>
@@ -276,7 +278,8 @@ the <a class="reference internal" href="api.html"><span class="doc">Core API</sp
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="discovery.html">API Discovery</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="discovery.html#direct-discovery-from-api">Direct Discovery (from <code class="docutils literal notranslate"><span class="pre">api</span></code>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="discovery.html#direct-import-recommended">Direct Import (recommended)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="discovery.html#discovery-functions-from-api">Discovery Functions (from <code class="docutils literal notranslate"><span class="pre">api</span></code>)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="discovery.html#standalone-discovery-helper">Standalone Discovery Helper</a></li>
 </ul>
 </li>
@@ -332,7 +335,7 @@ the <a class="reference internal" href="api.html"><span class="doc">Core API</sp
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=4ebf8126"></script>
+</div><script src="_static/documentation_options.js?v=e3eff1ea"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

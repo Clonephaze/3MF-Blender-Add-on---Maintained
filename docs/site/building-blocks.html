@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="prev" title="API Discovery" href="discovery.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Building Blocks - 3MF Format API — v1.0.0</title>
+        <title>Building Blocks - 3MF Format API — v1.3.0</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -167,7 +167,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">3MF Format API — v1.0.0</div></a>
+      <a href="index.html"><div class="brand">3MF Format API — v1.3.0</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -188,7 +188,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">3MF Format API — v1.0.0</span>
+  <span class="sidebar-brand-text">3MF Format API — v1.3.0</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -299,13 +299,31 @@ Use this when the result will be assigned to Blender material properties
 Use this when reading colors from Blender materials for 3MF export.</p>
 </dd></dl>
 
+<dl class="py function">
+<dt class="sig sig-object py" id="io_mesh_3mf.common.colors.apply_subtype_material">
+<span class="sig-name descname"><span class="pre">apply_subtype_material</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">blender_object</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/common/colors.html#apply_subtype_material"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.common.colors.apply_subtype_material" title="Link to this definition">¶</a></dt>
+<dd><p>Assign a viewport-coloured material to a modifier/support/negative part.</p>
+<p>Creates (or reuses) a shared material named <code class="docutils literal notranslate"><span class="pre">3MF</span> <span class="pre">&lt;Label&gt;</span></code> with the
+Orca Slicer colour set as <code class="docutils literal notranslate"><span class="pre">diffuse_color</span></code> (including alpha).  When
+<em>subtype</em> is <code class="docutils literal notranslate"><span class="pre">&quot;normal_part&quot;</span></code> or unknown, any existing subtype material
+is removed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>blender_object</strong> – The Blender object (must have <code class="docutils literal notranslate"><span class="pre">.data.materials</span></code>).</p></li>
+<li><p><strong>subtype</strong> – One of the <code class="docutils literal notranslate"><span class="pre">SUBTYPE_COLORS</span></code> keys, or <code class="docutils literal notranslate"><span class="pre">&quot;normal_part&quot;</span></code>.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
 </section>
 <section id="module-io_mesh_3mf.common.units">
 <span id="units"></span><h2>Units<a class="headerlink" href="#module-io_mesh_3mf.common.units" title="Link to this heading">¶</a></h2>
 <p>Unit conversions between Blender’s units and 3MF’s units.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="io_mesh_3mf.common.units.import_unit_scale">
-<span class="sig-name descname"><span class="pre">import_unit_scale</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">context</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">&lt;MagicMock</span> <span class="pre">id</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'1414494726544'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">root</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">global_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/common/units.html#import_unit_scale"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.common.units.import_unit_scale" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">import_unit_scale</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">context</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">&lt;MagicMock</span> <span class="pre">id</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'2492305387696'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">root</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">global_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/common/units.html#import_unit_scale"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.common.units.import_unit_scale" title="Link to this definition">¶</a></dt>
 <dd><p>Compute the import scale factor from 3MF document units to Blender scene units.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -323,7 +341,7 @@ Use this when reading colors from Blender materials for 3MF export.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="io_mesh_3mf.common.units.export_unit_scale">
-<span class="sig-name descname"><span class="pre">export_unit_scale</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">context</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">&lt;MagicMock</span> <span class="pre">id</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'1414514073936'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">global_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/common/units.html#export_unit_scale"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.common.units.export_unit_scale" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">export_unit_scale</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">context</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">&lt;MagicMock</span> <span class="pre">id</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'2492307173744'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">global_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/common/units.html#export_unit_scale"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.common.units.export_unit_scale" title="Link to this definition">¶</a></dt>
 <dd><p>Compute the export scale factor from Blender scene units to 3MF millimeters.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -1108,11 +1126,19 @@ both official extensions from the 3MF Consortium and vendor-specific extensions.
 
 <dl class="py method">
 <dt class="sig sig-object py" id="io_mesh_3mf.common.extensions.ExtensionManager.activate">
-<span class="sig-name descname"><span class="pre">activate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">namespace</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/common/extensions.html#ExtensionManager.activate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.common.extensions.ExtensionManager.activate" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">activate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">namespace</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">required</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/common/extensions.html#ExtensionManager.activate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.common.extensions.ExtensionManager.activate" title="Link to this definition">¶</a></dt>
 <dd><p>Activate an extension by its namespace URI.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Raises<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If the namespace is not registered.</p>
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>namespace</strong> – The XML namespace URI of the extension.</p></li>
+<li><p><strong>required</strong> – If True, mark this extension as required in the
+<code class="docutils literal notranslate"><span class="pre">requiredextensions</span></code> model attribute, even if the extension’s
+default <code class="docutils literal notranslate"><span class="pre">required</span></code> flag is False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If the namespace is not registered.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -1147,7 +1173,7 @@ both official extensions from the 3MF Consortium and vendor-specific extensions.
 <dd><p>Build the <code class="docutils literal notranslate"><span class="pre">requiredextensions</span></code> attribute value for the model element.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>Space-separated string of namespace URIs that require declaration.</p>
+<dd class="field-odd"><p>Space-separated string of namespace prefixes that require declaration.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -1212,13 +1238,13 @@ with a different value marks that entry as conflicting (<code class="docutils li
 the intersection of consistent metadata survives a multi-file import.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="io_mesh_3mf.common.metadata.Metadata.store">
-<span class="sig-name descname"><span class="pre">store</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">blender_object</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">&lt;MagicMock</span> <span class="pre">id</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'1414514783488'&gt;</span> <span class="pre">|</span> <span class="pre">&lt;MagicMock</span> <span class="pre">id='1414514803872'&gt;</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/common/metadata.html#Metadata.store"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.common.metadata.Metadata.store" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">store</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">blender_object</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">&lt;MagicMock</span> <span class="pre">id</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'2492284975296'&gt;</span> <span class="pre">|</span> <span class="pre">&lt;MagicMock</span> <span class="pre">id='2492307936400'&gt;</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/common/metadata.html#Metadata.store"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.common.metadata.Metadata.store" title="Link to this definition">¶</a></dt>
 <dd><p>Store this metadata in a Blender object as custom properties.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="io_mesh_3mf.common.metadata.Metadata.retrieve">
-<span class="sig-name descname"><span class="pre">retrieve</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">blender_object</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">&lt;MagicMock</span> <span class="pre">id</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'1414514771728'&gt;</span> <span class="pre">|</span> <span class="pre">&lt;MagicMock</span> <span class="pre">id='1414514804880'&gt;</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/common/metadata.html#Metadata.retrieve"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.common.metadata.Metadata.retrieve" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">retrieve</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">blender_object</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">&lt;MagicMock</span> <span class="pre">id</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'2492249288064'&gt;</span> <span class="pre">|</span> <span class="pre">&lt;MagicMock</span> <span class="pre">id='2492307941296'&gt;</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/common/metadata.html#Metadata.retrieve"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.common.metadata.Metadata.retrieve" title="Link to this definition">¶</a></dt>
 <dd><p>Retrieve metadata from a Blender object’s custom properties.</p>
 </dd></dl>
 
@@ -1318,6 +1344,7 @@ the intersection of consistent metadata survives a multi-file import.</p>
 <li><a class="reference internal" href="#io_mesh_3mf.common.colors.hex_to_linear_rgb"><code class="docutils literal notranslate"><span class="pre">hex_to_linear_rgb()</span></code></a></li>
 <li><a class="reference internal" href="#io_mesh_3mf.common.colors.rgb_to_hex"><code class="docutils literal notranslate"><span class="pre">rgb_to_hex()</span></code></a></li>
 <li><a class="reference internal" href="#io_mesh_3mf.common.colors.linear_rgb_to_hex"><code class="docutils literal notranslate"><span class="pre">linear_rgb_to_hex()</span></code></a></li>
+<li><a class="reference internal" href="#io_mesh_3mf.common.colors.apply_subtype_material"><code class="docutils literal notranslate"><span class="pre">apply_subtype_material()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#module-io_mesh_3mf.common.units">Units</a><ul>
@@ -1524,7 +1551,7 @@ the intersection of consistent metadata survives a multi-file import.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=4ebf8126"></script>
+</div><script src="_static/documentation_options.js?v=e3eff1ea"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html"><link rel="search" title="Search" href="../../../search.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>io_mesh_3mf.common.colors - 3MF Format API — v1.0.0</title>
+        <title>io_mesh_3mf.common.colors - 3MF Format API — v1.3.0</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -166,7 +166,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../../../index.html"><div class="brand">3MF Format API — v1.0.0</div></a>
+      <a href="../../../index.html"><div class="brand">3MF Format API — v1.3.0</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -187,7 +187,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../../../index.html">
   
-  <span class="sidebar-brand-text">3MF Format API — v1.0.0</span>
+  <span class="sidebar-brand-text">3MF Format API — v1.3.0</span>
   
 </a><form class="sidebar-search-container" method="get" action="../../../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -261,6 +261,8 @@
     <span class="s2">&quot;hex_to_linear_rgb&quot;</span><span class="p">,</span>
     <span class="s2">&quot;rgb_to_hex&quot;</span><span class="p">,</span>
     <span class="s2">&quot;linear_rgb_to_hex&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;SUBTYPE_COLORS&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;apply_subtype_material&quot;</span><span class="p">,</span>
 <span class="p">]</span>
 
 
@@ -364,6 +366,65 @@
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="n">rgb_to_hex</span><span class="p">(</span><span class="n">linear_to_srgb</span><span class="p">(</span><span class="n">r</span><span class="p">),</span> <span class="n">linear_to_srgb</span><span class="p">(</span><span class="n">g</span><span class="p">),</span> <span class="n">linear_to_srgb</span><span class="p">(</span><span class="n">b</span><span class="p">))</span></div>
 
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1">#  Part subtype viewport colors (Orca Slicer / BambuStudio)</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<span class="c1"># sRGB byte values + alpha matching Orca Slicer&#39;s modifier colours.</span>
+<span class="n">SUBTYPE_COLORS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;modifier_part&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mh">0x92</span><span class="p">,</span> <span class="mh">0x92</span><span class="p">,</span> <span class="mh">0x18</span><span class="p">,</span> <span class="mh">0xFC</span><span class="p">),</span>
+    <span class="s2">&quot;support_blocker&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mh">0x74</span><span class="p">,</span> <span class="mh">0x3A</span><span class="p">,</span> <span class="mh">0x3D</span><span class="p">,</span> <span class="mh">0xFC</span><span class="p">),</span>
+    <span class="s2">&quot;support_enforcer&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mh">0x39</span><span class="p">,</span> <span class="mh">0x39</span><span class="p">,</span> <span class="mh">0x77</span><span class="p">,</span> <span class="mh">0xFC</span><span class="p">),</span>
+    <span class="s2">&quot;negative_part&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mh">0x39</span><span class="p">,</span> <span class="mh">0x39</span><span class="p">,</span> <span class="mh">0x3C</span><span class="p">,</span> <span class="mh">0xFC</span><span class="p">),</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="apply_subtype_material">
+<a class="viewcode-back" href="../../../building-blocks.html#io_mesh_3mf.common.colors.apply_subtype_material">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">apply_subtype_material</span><span class="p">(</span><span class="n">blender_object</span><span class="p">,</span> <span class="n">subtype</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Assign a viewport-coloured material to a modifier/support/negative part.</span>
+
+<span class="sd">    Creates (or reuses) a shared material named ``3MF &lt;Label&gt;`` with the</span>
+<span class="sd">    Orca Slicer colour set as ``diffuse_color`` (including alpha).  When</span>
+<span class="sd">    *subtype* is ``&quot;normal_part&quot;`` or unknown, any existing subtype material</span>
+<span class="sd">    is removed.</span>
+
+<span class="sd">    :param blender_object: The Blender object (must have ``.data.materials``).</span>
+<span class="sd">    :param subtype: One of the ``SUBTYPE_COLORS`` keys, or ``&quot;normal_part&quot;``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">bpy</span>  <span class="c1"># deferred — common/ is importable without bpy in tests</span>
+
+    <span class="n">color_bytes</span> <span class="o">=</span> <span class="n">SUBTYPE_COLORS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">subtype</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">color_bytes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># normal_part or unknown — strip any previous subtype material</span>
+        <span class="k">if</span> <span class="n">blender_object</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">materials</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">mat</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">blender_object</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">materials</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">mat</span> <span class="ow">and</span> <span class="n">mat</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;3MF &quot;</span><span class="p">):</span>
+                    <span class="n">blender_object</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">materials</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="n">i</span><span class="p">)</span>
+                    <span class="k">break</span>
+        <span class="k">return</span>
+
+    <span class="n">r</span><span class="p">,</span> <span class="n">g</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">a</span> <span class="o">=</span> <span class="n">color_bytes</span>
+    <span class="n">linear_r</span> <span class="o">=</span> <span class="n">srgb_to_linear</span><span class="p">(</span><span class="n">r</span> <span class="o">/</span> <span class="mf">255.0</span><span class="p">)</span>
+    <span class="n">linear_g</span> <span class="o">=</span> <span class="n">srgb_to_linear</span><span class="p">(</span><span class="n">g</span> <span class="o">/</span> <span class="mf">255.0</span><span class="p">)</span>
+    <span class="n">linear_b</span> <span class="o">=</span> <span class="n">srgb_to_linear</span><span class="p">(</span><span class="n">b</span> <span class="o">/</span> <span class="mf">255.0</span><span class="p">)</span>
+    <span class="n">alpha</span> <span class="o">=</span> <span class="n">a</span> <span class="o">/</span> <span class="mf">255.0</span>
+
+    <span class="n">label</span> <span class="o">=</span> <span class="n">subtype</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">title</span><span class="p">()</span>
+    <span class="n">mat_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;3MF </span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">&quot;</span>
+
+    <span class="n">mat</span> <span class="o">=</span> <span class="n">bpy</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">materials</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">mat_name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">mat</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">mat</span> <span class="o">=</span> <span class="n">bpy</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">materials</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">mat_name</span><span class="p">)</span>
+        <span class="n">mat</span><span class="o">.</span><span class="n">use_nodes</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">mat</span><span class="o">.</span><span class="n">diffuse_color</span> <span class="o">=</span> <span class="p">(</span><span class="n">linear_r</span><span class="p">,</span> <span class="n">linear_g</span><span class="p">,</span> <span class="n">linear_b</span><span class="p">,</span> <span class="n">alpha</span><span class="p">)</span>
+
+    <span class="n">blender_object</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">materials</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+    <span class="n">blender_object</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">materials</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">mat</span><span class="p">)</span></div>
+
 </pre></div>
         </article>
       </div>
@@ -396,7 +457,7 @@
       
     </aside>
   </div>
-</div><script src="../../../_static/documentation_options.js?v=4ebf8126"></script>
+</div><script src="../../../_static/documentation_options.js?v=e3eff1ea"></script>
     <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../../../_static/scripts/furo.js?v=46bd48cc"></script>

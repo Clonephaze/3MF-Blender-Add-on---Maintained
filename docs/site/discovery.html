@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Building Blocks" href="building-blocks.html"><link rel="prev" title="Core API" href="api.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>API Discovery - 3MF Format API — v1.0.0</title>
+        <title>API Discovery - 3MF Format API — v1.3.0</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -167,7 +167,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">3MF Format API — v1.0.0</div></a>
+      <a href="index.html"><div class="brand">3MF Format API — v1.3.0</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -188,7 +188,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">3MF Format API — v1.0.0</span>
+  <span class="sidebar-brand-text">3MF Format API — v1.3.0</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -237,18 +237,35 @@
         <article role="main" id="furo-main-content">
           <section id="api-discovery">
 <h1>API Discovery<a class="headerlink" href="#api-discovery" title="Link to this heading">¶</a></h1>
-<p>Other Blender addons can discover and feature-check the 3MF API without
-hard-importing it.  The addon registers itself in
-<code class="docutils literal notranslate"><span class="pre">bpy.app.driver_namespace[&quot;io_mesh_3mf&quot;]</span></code> on startup.</p>
-<section id="direct-discovery-from-api">
-<h2>Direct Discovery (from <code class="docutils literal notranslate"><span class="pre">api</span></code>)<a class="headerlink" href="#direct-discovery-from-api" title="Link to this heading">¶</a></h2>
+<p>Other Blender addons can detect and use the 3MF API at runtime.  Three
+strategies are available, from simplest to most robust.</p>
+<section id="direct-import-recommended">
+<h2>Direct Import (recommended)<a class="headerlink" href="#direct-import-recommended" title="Link to this heading">¶</a></h2>
+<p>If you know the addon is installed, a plain <code class="docutils literal notranslate"><span class="pre">try</span></code>/<code class="docutils literal notranslate"><span class="pre">except</span></code> is the
+simplest and most Pythonic approach:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">io_mesh_3mf.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">import_3mf</span><span class="p">,</span> <span class="n">export_3mf</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">import_3mf</span> <span class="o">=</span> <span class="n">export_3mf</span> <span class="o">=</span> <span class="kc">None</span>
+</pre></div>
+</div>
+</section>
+<section id="discovery-functions-from-api">
+<h2>Discovery Functions (from <code class="docutils literal notranslate"><span class="pre">api</span></code>)<a class="headerlink" href="#discovery-functions-from-api" title="Link to this heading">¶</a></h2>
 <dl class="py function">
 <dt class="sig sig-object py" id="io_mesh_3mf.api.is_available">
 <span class="sig-name descname"><span class="pre">is_available</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/api.html#is_available"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.api.is_available" title="Link to this definition">¶</a></dt>
-<dd><p>Check if the 3MF API is registered and available.</p>
+<dd><p>Check if the 3MF API is loaded and available.</p>
+<p>If you can import this function, the underlying code is available.
+This call ensures the module is registered in
+<code class="docutils literal notranslate"><span class="pre">bpy.app.driver_namespace</span></code> so that <a class="reference internal" href="#io_mesh_3mf.api.get_api" title="io_mesh_3mf.api.get_api"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_api()</span></code></a> and the
+standalone discovery helper (<a class="reference internal" href="#module-io_mesh_3mf.threemf_discovery" title="io_mesh_3mf.threemf_discovery"><code class="xref py py-mod docutils literal notranslate"><span class="pre">threemf_discovery</span></code></a>)
+can find it.</p>
+<p>Returns <code class="docutils literal notranslate"><span class="pre">False</span></code> only when the addon has been explicitly disabled
+via <code class="docutils literal notranslate"><span class="pre">unregister()</span></code> in the current session.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True if the API is registered in bpy.app.driver_namespace.</p>
+<dd class="field-odd"><p>True if the API is ready to use.</p>
 </dd>
 </dl>
 <p>Example:</p>
@@ -262,10 +279,14 @@ hard-importing it.  The addon registers itself in
 <dl class="py function">
 <dt class="sig sig-object py" id="io_mesh_3mf.api.get_api">
 <span class="sig-name descname"><span class="pre">get_api</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/io_mesh_3mf/api.html#get_api"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.api.get_api" title="Link to this definition">¶</a></dt>
-<dd><p>Get the registered 3MF API module.</p>
+<dd><p>Get the 3MF API module.</p>
+<p>Ensures the module is registered in <code class="docutils literal notranslate"><span class="pre">bpy.app.driver_namespace</span></code>
+first (handles Blender restart / load-order edge cases), then
+returns it.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>The io_mesh_3mf.api module, or None if not registered.</p>
+<dd class="field-odd"><p>The <code class="docutils literal notranslate"><span class="pre">io_mesh_3mf.api</span></code> module, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if the addon
+is disabled.</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p>module | None</p>
@@ -328,59 +349,48 @@ checks. New capabilities may be added in minor versions.</p>
 <section id="standalone-discovery-helper">
 <h2>Standalone Discovery Helper<a class="headerlink" href="#standalone-discovery-helper" title="Link to this heading">¶</a></h2>
 <p>For addons that want <strong>zero runtime dependency</strong> on the 3MF addon, copy
-<code class="docutils literal notranslate"><span class="pre">io_mesh_3mf/threemf_discovery.py</span></code> into your addon.</p>
-<p id="module-io_mesh_3mf.threemf_discovery">3MF API Discovery Helper — Copy this into your addon</p>
-<p>This module provides utility functions to discover and use the 3MF Import/Export
-addon’s public API from another Blender addon. Copy this file into your addon
-or inline the functions you need.</p>
-<p>The 3MF addon registers itself in bpy.app.driver_namespace[“io_mesh_3mf”] when
-enabled, making it discoverable without parsing addon directories.</p>
-<p>Example usage:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">threemf_discovery</span>  <span class="c1"># or inline the functions</span>
+<code class="docutils literal notranslate"><span class="pre">io_mesh_3mf/threemf_discovery.py</span></code> into your addon.  It resolves the
+addon’s import path automatically via <code class="docutils literal notranslate"><span class="pre">addon_utils</span></code>, caches the result,
+and works regardless of extension repo prefix or addon load order.</p>
+<p id="module-io_mesh_3mf.threemf_discovery">3MF API Discovery Helper — Copy this file into your addon.</p>
+<p>Provides a single, reliable way to access the 3MF Import/Export addon’s
+public API from another Blender addon.  Works across Blender restarts and
+regardless of addon load order.</p>
+<p><strong>Recommended pattern</strong> (put this at the top of your module):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">.threemf_discovery</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_threemf_api</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">my_operator_execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
-    <span class="n">api</span> <span class="o">=</span> <span class="n">threemf_discovery</span><span class="o">.</span><span class="n">get_threemf_api</span><span class="p">()</span>
+    <span class="n">api</span> <span class="o">=</span> <span class="n">get_threemf_api</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">api</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">report</span><span class="p">({</span><span class="s1">&#39;ERROR&#39;</span><span class="p">},</span> <span class="s2">&quot;3MF Format addon not installed/enabled&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;CANCELLED&#39;</span><span class="p">}</span>
 
-    <span class="c1"># Import a 3MF file</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">import_3mf</span><span class="p">(</span><span class="s2">&quot;/path/to/model.3mf&quot;</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">&quot;FINISHED&quot;</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">report</span><span class="p">({</span><span class="s1">&#39;INFO&#39;</span><span class="p">},</span> <span class="sa">f</span><span class="s2">&quot;Imported </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">num_loaded</span><span class="si">}</span><span class="s2"> objects&quot;</span><span class="p">)</span>
-
-    <span class="c1"># Export selected objects</span>
-    <span class="n">result</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">export_3mf</span><span class="p">(</span>
-        <span class="s2">&quot;/path/to/output.3mf&quot;</span><span class="p">,</span>
-        <span class="n">use_selection</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-        <span class="n">use_orca_format</span><span class="o">=</span><span class="s2">&quot;PAINT&quot;</span><span class="p">,</span>
-    <span class="p">)</span>
-
-    <span class="c1"># Inspect without importing</span>
-    <span class="n">info</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">inspect_3mf</span><span class="p">(</span><span class="s2">&quot;/path/to/model.3mf&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="n">info</span><span class="o">.</span><span class="n">unit</span><span class="p">,</span> <span class="n">info</span><span class="o">.</span><span class="n">num_objects</span><span class="p">)</span>
-
     <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;FINISHED&#39;</span><span class="p">}</span>
 </pre></div>
 </div>
-<dl class="py function">
-<dt class="sig sig-object py" id="io_mesh_3mf.threemf_discovery.is_threemf_available">
-<span class="sig-name descname"><span class="pre">is_threemf_available</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/threemf_discovery.html#is_threemf_available"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.threemf_discovery.is_threemf_available" title="Link to this definition">¶</a></dt>
-<dd><p>Check if the 3MF addon is installed, enabled, and its API is registered.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True if the 3MF API is available for use.</p>
-</dd>
-</dl>
-</dd></dl>
-
+<p><strong>Alternative — direct try/except</strong> (no helper needed):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">io_mesh_3mf.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">import_3mf</span><span class="p">,</span> <span class="n">export_3mf</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">import_3mf</span> <span class="o">=</span> <span class="n">export_3mf</span> <span class="o">=</span> <span class="kc">None</span>
+</pre></div>
+</div>
+<p>Both approaches survive Blender restarts.  The helper adds automatic
+addon-path resolution via <code class="docutils literal notranslate"><span class="pre">addon_utils</span></code> when a direct import isn’t
+possible (e.g. the extension repo prefix varies between installs).</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="io_mesh_3mf.threemf_discovery.get_threemf_api">
 <span class="sig-name descname"><span class="pre">get_threemf_api</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/threemf_discovery.html#get_threemf_api"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.threemf_discovery.get_threemf_api" title="Link to this definition">¶</a></dt>
-<dd><p>Get the 3MF API module if available.</p>
+<dd><p>Return the 3MF API module, or <em>None</em> if the addon isn’t available.</p>
+<p>This is the <strong>recommended single entry point</strong>.  It resolves the
+addon’s import path automatically, caches the result, and ensures
+the module is registered for fast subsequent lookups.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>The io_mesh_3mf.api module, or None if not available.</p>
+<dd class="field-odd"><p>The <code class="docutils literal notranslate"><span class="pre">io_mesh_3mf.api</span></code> module, or <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
 </dd>
 </dl>
 <p>Example:</p>
@@ -392,12 +402,25 @@ enabled, making it discoverable without parsing addon directories.</p>
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="io_mesh_3mf.threemf_discovery.get_threemf_version">
-<span class="sig-name descname"><span class="pre">get_threemf_version</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.14)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/threemf_discovery.html#get_threemf_version"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.threemf_discovery.get_threemf_version" title="Link to this definition">¶</a></dt>
-<dd><p>Get the 3MF API version tuple (major, minor, patch).</p>
+<dt class="sig sig-object py" id="io_mesh_3mf.threemf_discovery.is_threemf_available">
+<span class="sig-name descname"><span class="pre">is_threemf_available</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/threemf_discovery.html#is_threemf_available"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.threemf_discovery.is_threemf_available" title="Link to this definition">¶</a></dt>
+<dd><p>Check whether the 3MF addon is installed and enabled.</p>
+<p>Equivalent to <code class="docutils literal notranslate"><span class="pre">get_threemf_api()</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">None</span></code> but reads better
+in boolean contexts.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>Version tuple like (1, 0, 0), or None if not available.</p>
+<dd class="field-odd"><p>True if the 3MF API can be used.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="io_mesh_3mf.threemf_discovery.get_threemf_version">
+<span class="sig-name descname"><span class="pre">get_threemf_version</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.14)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/threemf_discovery.html#get_threemf_version"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.threemf_discovery.get_threemf_version" title="Link to this definition">¶</a></dt>
+<dd><p>Return the 3MF API version tuple <code class="docutils literal notranslate"><span class="pre">(major,</span> <span class="pre">minor,</span> <span class="pre">patch)</span></code>, or <em>None</em>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Version tuple like <code class="docutils literal notranslate"><span class="pre">(1,</span> <span class="pre">0,</span> <span class="pre">0)</span></code>, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if unavailable.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -408,10 +431,10 @@ enabled, making it discoverable without parsing addon directories.</p>
 <dd><p>Check if the installed 3MF API meets a minimum version requirement.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>minimum</strong> – Tuple of (major, minor, patch) minimum version.</p>
+<dd class="field-odd"><p><strong>minimum</strong> – Tuple of <code class="docutils literal notranslate"><span class="pre">(major,</span> <span class="pre">minor,</span> <span class="pre">patch)</span></code> minimum version.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>True if the API version &gt;= minimum, False otherwise.</p>
+<dd class="field-even"><p>True if the API version &gt;= <em>minimum</em>, False otherwise.</p>
 </dd>
 </dl>
 <p>Example:</p>
@@ -425,13 +448,19 @@ enabled, making it discoverable without parsing addon directories.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="io_mesh_3mf.threemf_discovery.has_threemf_capability">
 <span class="sig-name descname"><span class="pre">has_threemf_capability</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">capability</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/threemf_discovery.html#has_threemf_capability"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.threemf_discovery.has_threemf_capability" title="Link to this definition">¶</a></dt>
-<dd><p>Check if a specific 3MF API capability is available.</p>
-<p>Use this for forward-compatible feature detection. Capabilities include:
-- “import”, “export”, “inspect”, “batch”
-- “callbacks” (on_progress, on_warning, on_object_created)
-- “target_collection”, “orca_format”, “prusa_format”
-- “paint_mode”, “project_template”, “object_settings”
-- “building_blocks” (colors, types, segmentation sub-namespaces)</p>
+<dd><p>Check if a specific API capability is supported.</p>
+<p>Use this for forward-compatible feature detection instead of version
+checks.  New capabilities may be added in minor versions.</p>
+<p>Capabilities include:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;import&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;export&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;inspect&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;batch&quot;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;callbacks&quot;</span></code> (on_progress, on_warning, on_object_created)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;target_collection&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;orca_format&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;prusa_format&quot;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;paint_mode&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;project_template&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;object_settings&quot;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;building_blocks&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;global_scale&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;compression&quot;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;thumbnail&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;use_components&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;auto_smooth&quot;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;subdivision_depth&quot;</span></code></p></li>
+</ul>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>capability</strong> – Capability name string.</p>
@@ -501,7 +530,8 @@ enabled, making it discoverable without parsing addon directories.</p>
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">API Discovery</a><ul>
-<li><a class="reference internal" href="#direct-discovery-from-api">Direct Discovery (from <code class="docutils literal notranslate"><span class="pre">api</span></code>)</a><ul>
+<li><a class="reference internal" href="#direct-import-recommended">Direct Import (recommended)</a></li>
+<li><a class="reference internal" href="#discovery-functions-from-api">Discovery Functions (from <code class="docutils literal notranslate"><span class="pre">api</span></code>)</a><ul>
 <li><a class="reference internal" href="#io_mesh_3mf.api.is_available"><code class="docutils literal notranslate"><span class="pre">is_available()</span></code></a></li>
 <li><a class="reference internal" href="#io_mesh_3mf.api.get_api"><code class="docutils literal notranslate"><span class="pre">get_api()</span></code></a></li>
 <li><a class="reference internal" href="#io_mesh_3mf.api.has_capability"><code class="docutils literal notranslate"><span class="pre">has_capability()</span></code></a></li>
@@ -509,8 +539,8 @@ enabled, making it discoverable without parsing addon directories.</p>
 </ul>
 </li>
 <li><a class="reference internal" href="#standalone-discovery-helper">Standalone Discovery Helper</a><ul>
-<li><a class="reference internal" href="#io_mesh_3mf.threemf_discovery.is_threemf_available"><code class="docutils literal notranslate"><span class="pre">is_threemf_available()</span></code></a></li>
 <li><a class="reference internal" href="#io_mesh_3mf.threemf_discovery.get_threemf_api"><code class="docutils literal notranslate"><span class="pre">get_threemf_api()</span></code></a></li>
+<li><a class="reference internal" href="#io_mesh_3mf.threemf_discovery.is_threemf_available"><code class="docutils literal notranslate"><span class="pre">is_threemf_available()</span></code></a></li>
 <li><a class="reference internal" href="#io_mesh_3mf.threemf_discovery.get_threemf_version"><code class="docutils literal notranslate"><span class="pre">get_threemf_version()</span></code></a></li>
 <li><a class="reference internal" href="#io_mesh_3mf.threemf_discovery.check_threemf_version"><code class="docutils literal notranslate"><span class="pre">check_threemf_version()</span></code></a></li>
 <li><a class="reference internal" href="#io_mesh_3mf.threemf_discovery.has_threemf_capability"><code class="docutils literal notranslate"><span class="pre">has_threemf_capability()</span></code></a></li>
@@ -527,7 +557,7 @@ enabled, making it discoverable without parsing addon directories.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=4ebf8126"></script>
+</div><script src="_static/documentation_options.js?v=e3eff1ea"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Recipes" href="recipes.html"><link rel="prev" title="3MF Format — API Documentation" href="index.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>Getting Started - 3MF Format API — v1.0.0</title>
+        <title>Getting Started - 3MF Format API — v1.3.0</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -167,7 +167,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">3MF Format API — v1.0.0</div></a>
+      <a href="index.html"><div class="brand">3MF Format API — v1.3.0</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -188,7 +188,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">3MF Format API — v1.0.0</span>
+  <span class="sidebar-brand-text">3MF Format API — v1.3.0</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -310,6 +310,39 @@ instead.</p>
 <li><p>Geometry-only objects → Standard exporter, geometry only</p></li>
 <li><p>If <em>project_template</em> or <em>object_settings</em> is provided → Orca exporter</p></li>
 </ul>
+</section>
+<section id="modifier-parts-orca-bambustudio">
+<h2>Modifier Parts (Orca / BambuStudio)<a class="headerlink" href="#modifier-parts-orca-bambustudio" title="Link to this heading">¶</a></h2>
+<p>Orca Slicer and BambuStudio support <strong>modifier meshes</strong> — child objects that
+override print settings for a region of the parent without adding visible
+geometry.  The addon stores the part type as a custom property on the Blender
+<strong>Object</strong> (not Mesh):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">obj</span><span class="p">[</span><span class="s2">&quot;3mf_part_subtype&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;modifier_part&quot;</span>
+</pre></div>
+</div>
+<p>Valid subtypes:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;normal_part&quot;</span></code> — standard geometry (default when property is absent)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;modifier_part&quot;</span></code> — settings modifier (infill, walls, etc.)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;support_enforcer&quot;</span></code> — force supports in this region</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;support_blocker&quot;</span></code> — suppress supports in this region</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;negative_part&quot;</span></code> — subtract this volume from the parent</p></li>
+</ul>
+<p>These are automatically imported from Orca/BambuStudio <code class="docutils literal notranslate"><span class="pre">.3mf</span></code> files and
+written back on export.  You can also set them via the <strong>3MF Metadata</strong> sidebar
+panel (Part Type dropdown) or the API:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">io_mesh_3mf.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">export_3mf</span><span class="p">,</span> <span class="n">inspect_3mf</span>
+
+<span class="c1"># Tag an object as a modifier before export</span>
+<span class="n">bpy</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;Cylinder&quot;</span><span class="p">][</span><span class="s2">&quot;3mf_part_subtype&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;support_enforcer&quot;</span>
+<span class="n">export_3mf</span><span class="p">(</span><span class="s2">&quot;output.3mf&quot;</span><span class="p">,</span> <span class="n">use_orca_format</span><span class="o">=</span><span class="s2">&quot;AUTO&quot;</span><span class="p">)</span>
+
+<span class="c1"># Inspect modifier parts without importing</span>
+<span class="n">info</span> <span class="o">=</span> <span class="n">inspect_3mf</span><span class="p">(</span><span class="s2">&quot;model.3mf&quot;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">info</span><span class="o">.</span><span class="n">part_subtypes</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Part </span><span class="si">{</span><span class="n">part</span><span class="p">[</span><span class="s1">&#39;part_id&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">part</span><span class="p">[</span><span class="s1">&#39;subtype&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">part</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
 </section>
 <section id="callbacks">
 <h2>Callbacks<a class="headerlink" href="#callbacks" title="Link to this heading">¶</a></h2>
@@ -463,6 +496,7 @@ It increments independently of the addon release version.</p></li>
 <li><a class="reference internal" href="#">Getting Started</a><ul>
 <li><a class="reference internal" href="#quick-start">Quick Start</a></li>
 <li><a class="reference internal" href="#export-format-reference">Export Format Reference</a></li>
+<li><a class="reference internal" href="#modifier-parts-orca-bambustudio">Modifier Parts (Orca / BambuStudio)</a></li>
 <li><a class="reference internal" href="#callbacks">Callbacks</a></li>
 <li><a class="reference internal" href="#error-handling">Error Handling</a></li>
 <li><a class="reference internal" href="#cli-usage">CLI Usage</a></li>
@@ -478,7 +512,7 @@ It increments independently of the addon release version.</p></li>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=4ebf8126"></script>
+</div><script src="_static/documentation_options.js?v=e3eff1ea"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

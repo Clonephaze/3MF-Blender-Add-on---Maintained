@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>io_mesh_3mf.api - 3MF Format API — v1.0.0</title>
+        <title>io_mesh_3mf.api - 3MF Format API — v1.3.0</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -166,7 +166,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../../index.html"><div class="brand">3MF Format API — v1.0.0</div></a>
+      <a href="../../index.html"><div class="brand">3MF Format API — v1.3.0</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -187,7 +187,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
   
-  <span class="sidebar-brand-text">3MF Format API — v1.0.0</span>
+  <span class="sidebar-brand-text">3MF Format API — v1.3.0</span>
   
 </a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -326,28 +326,29 @@
 <span class="c1"># API Version &amp; Registry</span>
 <span class="c1"># ═══════════════════════════════════════════════════════════════════════════</span>
 <span class="c1">#</span>
-<span class="c1"># This module self-registers in bpy.app.driver_namespace so other addons can</span>
-<span class="c1"># discover and use the 3MF API without parsing addon directories.</span>
+<span class="c1"># Discovery strategies (from simplest to most robust):</span>
 <span class="c1">#</span>
-<span class="c1"># Usage from another addon:</span>
+<span class="c1"># 1. Direct import — if you can import this module, the API is available:</span>
 <span class="c1">#</span>
-<span class="c1">#     import bpy</span>
-<span class="c1">#     threemf_api = bpy.app.driver_namespace.get(&quot;io_mesh_3mf&quot;)</span>
-<span class="c1">#     if threemf_api is not None:</span>
-<span class="c1">#         result = threemf_api.import_3mf(&quot;/path/to/model.3mf&quot;)</span>
+<span class="c1">#        try:</span>
+<span class="c1">#            from io_mesh_3mf.api import import_3mf, export_3mf</span>
+<span class="c1">#        except ImportError:</span>
+<span class="c1">#            import_3mf = export_3mf = None</span>
 <span class="c1">#</span>
-<span class="c1"># Or using the provided discovery helper (see API.md):</span>
+<span class="c1"># 2. Driver-namespace lookup — works after register() has been called:</span>
 <span class="c1">#</span>
-<span class="c1">#     from io_mesh_3mf.api import get_api, is_available</span>
-<span class="c1">#     if is_available():</span>
-<span class="c1">#         api = get_api()</span>
-<span class="c1">#         result = api.import_3mf(&quot;/path/to/model.3mf&quot;)</span>
+<span class="c1">#        threemf_api = bpy.app.driver_namespace.get(&quot;io_mesh_3mf&quot;)</span>
+<span class="c1">#</span>
+<span class="c1"># 3. Standalone helper — copy threemf_discovery.py into your addon:</span>
+<span class="c1">#</span>
+<span class="c1">#        from .threemf_discovery import get_threemf_api</span>
+<span class="c1">#        api = get_threemf_api()  # None if not installed</span>
 
 <span class="c1">#: API version following semantic versioning (MAJOR.MINOR.PATCH).</span>
 <span class="c1">#: - MAJOR: Breaking changes to existing functions/signatures</span>
 <span class="c1">#: - MINOR: New features, backward-compatible</span>
 <span class="c1">#: - PATCH: Bug fixes only</span>
-<span class="n">API_VERSION</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+<span class="n">API_VERSION</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
 
 <span class="c1">#: Human-readable version string</span>
 <span class="n">API_VERSION_STRING</span> <span class="o">=</span> <span class="s2">&quot;.&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">API_VERSION</span><span class="p">)</span>
@@ -367,30 +368,56 @@
     <span class="s2">&quot;project_template&quot;</span><span class="p">,</span>    <span class="c1"># Custom Orca project template</span>
     <span class="s2">&quot;object_settings&quot;</span><span class="p">,</span>     <span class="c1"># Per-object Orca settings</span>
     <span class="s2">&quot;building_blocks&quot;</span><span class="p">,</span>     <span class="c1"># colors, types, segmentation sub-namespaces</span>
+    <span class="s2">&quot;global_scale&quot;</span><span class="p">,</span>        <span class="c1"># Scale multiplier parameter (import &amp; export)</span>
+    <span class="s2">&quot;compression&quot;</span><span class="p">,</span>         <span class="c1"># Configurable ZIP compression level (export)</span>
+    <span class="s2">&quot;thumbnail&quot;</span><span class="p">,</span>           <span class="c1"># Thumbnail generation (export)</span>
+    <span class="s2">&quot;use_components&quot;</span><span class="p">,</span>      <span class="c1"># Component instancing for linked duplicates (export)</span>
+    <span class="s2">&quot;auto_smooth&quot;</span><span class="p">,</span>         <span class="c1"># Auto smooth-by-angle on import</span>
+    <span class="s2">&quot;subdivision_depth&quot;</span><span class="p">,</span>   <span class="c1"># Paint segmentation subdivision depth control</span>
+    <span class="s2">&quot;flatten_hierarchy&quot;</span><span class="p">,</span>    <span class="c1"># Option to flatten parented meshes into top-level build items (export)</span>
+    <span class="s2">&quot;modifier_parts&quot;</span><span class="p">,</span>       <span class="c1"># Orca/BambuStudio modifier part subtypes (import, export, inspect)</span>
+    <span class="s2">&quot;progress_window&quot;</span><span class="p">,</span>      <span class="c1"># show_progress_window param on export_3mf() opens the browser card</span>
 <span class="p">})</span>
 
 <span class="c1">#: Registry key in bpy.app.driver_namespace</span>
 <span class="n">_REGISTRY_KEY</span> <span class="o">=</span> <span class="s2">&quot;io_mesh_3mf&quot;</span>
 
+<span class="c1"># Tracks whether unregister() explicitly disabled the API for this session.</span>
+<span class="c1"># Prevents is_available() from re-registering after the addon is disabled.</span>
+<span class="n">_explicitly_disabled</span> <span class="o">=</span> <span class="kc">False</span>
+
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_register_api</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Register this API module in bpy.app.driver_namespace for discovery.&quot;&quot;&quot;</span>
+    <span class="k">global</span> <span class="n">_explicitly_disabled</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+    <span class="n">_explicitly_disabled</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="n">bpy</span><span class="o">.</span><span class="n">app</span><span class="o">.</span><span class="n">driver_namespace</span><span class="p">[</span><span class="n">_REGISTRY_KEY</span><span class="p">]</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="vm">__name__</span><span class="p">]</span>
     <span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Registered 3MF API v</span><span class="si">{</span><span class="n">API_VERSION_STRING</span><span class="si">}</span><span class="s2"> in driver_namespace&quot;</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_unregister_api</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Remove the API from bpy.app.driver_namespace.&quot;&quot;&quot;</span>
+    <span class="k">global</span> <span class="n">_explicitly_disabled</span>
+    <span class="n">_explicitly_disabled</span> <span class="o">=</span> <span class="kc">True</span>
     <span class="n">bpy</span><span class="o">.</span><span class="n">app</span><span class="o">.</span><span class="n">driver_namespace</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">_REGISTRY_KEY</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="is_available">
 <a class="viewcode-back" href="../../discovery.html#io_mesh_3mf.api.is_available">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">is_available</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if the 3MF API is registered and available.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if the 3MF API is loaded and available.</span>
 
-<span class="sd">    :return: True if the API is registered in bpy.app.driver_namespace.</span>
+<span class="sd">    If you can import this function, the underlying code is available.</span>
+<span class="sd">    This call ensures the module is registered in</span>
+<span class="sd">    ``bpy.app.driver_namespace`` so that :func:`get_api` and the</span>
+<span class="sd">    standalone discovery helper (:mod:`~io_mesh_3mf.threemf_discovery`)</span>
+<span class="sd">    can find it.</span>
+
+<span class="sd">    Returns ``False`` only when the addon has been explicitly disabled</span>
+<span class="sd">    via ``unregister()`` in the current session.</span>
+
+<span class="sd">    :return: True if the API is ready to use.</span>
 
 <span class="sd">    Example::</span>
 
@@ -398,6 +425,19 @@
 <span class="sd">        if is_available():</span>
 <span class="sd">            print(&quot;3MF API is ready&quot;)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Fast path — already registered.</span>
+    <span class="k">if</span> <span class="n">_REGISTRY_KEY</span> <span class="ow">in</span> <span class="n">bpy</span><span class="o">.</span><span class="n">app</span><span class="o">.</span><span class="n">driver_namespace</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="c1"># Addon was explicitly disabled this session (unregister called).</span>
+    <span class="k">if</span> <span class="n">_explicitly_disabled</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="c1"># driver_namespace was lost (e.g. Blender restart cleared it, or</span>
+    <span class="c1"># module-level auto-register ran before Blender was ready).  Re-register</span>
+    <span class="c1"># — safe because if we&#39;re executing this code the module IS loaded.</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">_register_api</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
     <span class="k">return</span> <span class="n">_REGISTRY_KEY</span> <span class="ow">in</span> <span class="n">bpy</span><span class="o">.</span><span class="n">app</span><span class="o">.</span><span class="n">driver_namespace</span></div>
 
 
@@ -405,9 +445,14 @@
 <div class="viewcode-block" id="get_api">
 <a class="viewcode-back" href="../../discovery.html#io_mesh_3mf.api.get_api">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">get_api</span><span class="p">():</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get the registered 3MF API module.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get the 3MF API module.</span>
 
-<span class="sd">    :return: The io_mesh_3mf.api module, or None if not registered.</span>
+<span class="sd">    Ensures the module is registered in ``bpy.app.driver_namespace``</span>
+<span class="sd">    first (handles Blender restart / load-order edge cases), then</span>
+<span class="sd">    returns it.</span>
+
+<span class="sd">    :return: The ``io_mesh_3mf.api`` module, or ``None`` if the addon</span>
+<span class="sd">             is disabled.</span>
 <span class="sd">    :rtype: module | None</span>
 
 <span class="sd">    Example::</span>
@@ -417,7 +462,9 @@
 <span class="sd">        if api:</span>
 <span class="sd">            result = api.import_3mf(&quot;/model.3mf&quot;)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="n">bpy</span><span class="o">.</span><span class="n">app</span><span class="o">.</span><span class="n">driver_namespace</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">_REGISTRY_KEY</span><span class="p">)</span></div>
+    <span class="k">if</span> <span class="n">is_available</span><span class="p">():</span>
+        <span class="k">return</span> <span class="n">bpy</span><span class="o">.</span><span class="n">app</span><span class="o">.</span><span class="n">driver_namespace</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">_REGISTRY_KEY</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">None</span></div>
 
 
 
@@ -588,6 +635,14 @@
 <span class="sd">        num_objects: Total number of ``&lt;object&gt;`` resources.</span>
 <span class="sd">        num_triangles_total: Sum of all triangle counts across objects.</span>
 <span class="sd">        num_vertices_total: Sum of all vertex counts across objects.</span>
+<span class="sd">        part_subtypes: Per-part subtype info from ``model_settings.config``</span>
+<span class="sd">            (Orca/BambuStudio only).  Each entry is a dict with keys:</span>
+
+<span class="sd">            - ``&quot;part_id&quot;`` — part ID string</span>
+<span class="sd">            - ``&quot;subtype&quot;`` — ``&quot;normal_part&quot;`` | ``&quot;modifier_part&quot;`` |</span>
+<span class="sd">              ``&quot;support_enforcer&quot;`` | ``&quot;support_blocker&quot;``</span>
+<span class="sd">            - ``&quot;name&quot;`` — part name (or ``&quot;&quot;`` if unnamed)</span>
+
 <span class="sd">        warnings: Accumulated warnings during inspection.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
@@ -604,6 +659,7 @@
     <span class="n">num_objects</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="n">num_triangles_total</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="n">num_vertices_total</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">part_subtypes</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
     <span class="n">warnings</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span></div>
 
 
@@ -772,6 +828,34 @@
             <span class="n">result</span><span class="o">.</span><span class="n">num_vertices_total</span> <span class="o">+=</span> <span class="n">num_verts</span>
 
     <span class="n">result</span><span class="o">.</span><span class="n">num_objects</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">objects</span><span class="p">)</span>
+
+    <span class="c1"># --- Parse model_settings.config for part subtypes (Orca/BambuStudio) ---</span>
+    <span class="n">config_path</span> <span class="o">=</span> <span class="s2">&quot;Metadata/model_settings.config&quot;</span>
+    <span class="k">if</span> <span class="n">config_path</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">archive_files</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">archive</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">config_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">config_root</span> <span class="o">=</span> <span class="n">xml</span><span class="o">.</span><span class="n">etree</span><span class="o">.</span><span class="n">ElementTree</span><span class="o">.</span><span class="n">fromstring</span><span class="p">(</span>
+                    <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;UTF-8&quot;</span><span class="p">)</span>
+                <span class="p">)</span>
+            <span class="k">for</span> <span class="n">obj_elem</span> <span class="ow">in</span> <span class="n">config_root</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s2">&quot;.//object&quot;</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">part_elem</span> <span class="ow">in</span> <span class="n">obj_elem</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s2">&quot;part&quot;</span><span class="p">):</span>
+                    <span class="n">part_id</span> <span class="o">=</span> <span class="n">part_elem</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+                    <span class="n">subtype</span> <span class="o">=</span> <span class="n">part_elem</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;subtype&quot;</span><span class="p">,</span> <span class="s2">&quot;normal_part&quot;</span><span class="p">)</span>
+                    <span class="n">part_name</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+                    <span class="k">for</span> <span class="n">meta</span> <span class="ow">in</span> <span class="n">part_elem</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s2">&quot;metadata&quot;</span><span class="p">):</span>
+                        <span class="k">if</span> <span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;key&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span>
+                            <span class="n">part_name</span> <span class="o">=</span> <span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+                            <span class="k">break</span>
+                    <span class="n">result</span><span class="o">.</span><span class="n">part_subtypes</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                        <span class="s2">&quot;part_id&quot;</span><span class="p">:</span> <span class="n">part_id</span><span class="p">,</span>
+                        <span class="s2">&quot;subtype&quot;</span><span class="p">:</span> <span class="n">subtype</span><span class="p">,</span>
+                        <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">part_name</span><span class="p">,</span>
+                    <span class="p">})</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Could not parse model_settings.config: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
     <span class="n">archive</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
     <span class="k">return</span> <span class="n">result</span></div>
 
@@ -796,6 +880,7 @@
     <span class="n">auto_smooth_angle</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5236</span><span class="p">,</span>
     <span class="n">paint_uv_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;SMART&quot;</span><span class="p">,</span>
     <span class="n">paint_texture_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">scene_unit</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;KEEP&quot;</span><span class="p">,</span>
     <span class="n">target_collection</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">on_progress</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ProgressCallback</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">on_warning</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">WarningCallback</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -820,6 +905,10 @@
 <span class="sd">    :param paint_uv_method: ``&quot;SMART&quot;`` (default) or ``&quot;LIGHTMAP&quot;``.</span>
 <span class="sd">        Smart UV groups adjacent faces; Lightmap gives each face unique space.</span>
 <span class="sd">    :param paint_texture_size: Override texture resolution (0 = auto).</span>
+<span class="sd">    :param scene_unit: Set the Blender scene unit after import.</span>
+<span class="sd">        ``&quot;KEEP&quot;`` (default) leaves scene units unchanged.</span>
+<span class="sd">        ``&quot;FILE&quot;`` sets units to match the unit declared in the 3MF file.</span>
+<span class="sd">        Any Blender length unit identifier (e.g. ``&quot;MILLIMETERS&quot;``, ``&quot;INCHES&quot;``) sets it directly.</span>
 <span class="sd">    :param target_collection: Name of an existing Blender collection to place</span>
 <span class="sd">        imported objects into.  If *None*, objects are added to the active</span>
 <span class="sd">        collection.  If the named collection does not exist it will be created</span>
@@ -968,8 +1057,11 @@
         <span class="c1"># Extension activation.</span>
         <span class="n">_activate_extensions_api</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">root</span><span class="p">)</span>
 
-        <span class="c1"># Unit scale.</span>
+        <span class="c1"># Apply requested scene unit before computing scale.</span>
         <span class="n">context</span> <span class="o">=</span> <span class="n">bpy</span><span class="o">.</span><span class="n">context</span>
+        <span class="n">_apply_scene_unit_api</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">root</span><span class="p">,</span> <span class="n">scene_unit</span><span class="p">)</span>
+
+        <span class="c1"># Unit scale.</span>
         <span class="n">scale_unit</span> <span class="o">=</span> <span class="n">_import_unit_scale</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">root</span><span class="p">,</span> <span class="n">global_scale</span><span class="p">)</span>
 
         <span class="c1"># Reset per-model resource dictionaries.</span>
@@ -979,12 +1071,22 @@
         <span class="n">ctx</span><span class="o">.</span><span class="n">resource_texture_groups</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="n">ctx</span><span class="o">.</span><span class="n">orca_filament_colors</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="n">ctx</span><span class="o">.</span><span class="n">object_default_extruders</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">part_subtypes</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">part_groups</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">part_metadata</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">wrapper_metadata</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">part_names</span> <span class="o">=</span> <span class="p">{}</span>
 
         <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
             <span class="n">on_progress</span><span class="p">(</span><span class="mi">20</span><span class="p">,</span> <span class="s2">&quot;Reading filament colours…&quot;</span><span class="p">)</span>
 
         <span class="c1"># Read filament colours (single archive open, priority order).</span>
         <span class="n">read_all_slicer_colors</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">filepath</span><span class="p">)</span>
+
+        <span class="c1"># Read modifier part subtypes from Orca/BambuStudio model_settings.</span>
+        <span class="k">if</span> <span class="n">ctx</span><span class="o">.</span><span class="n">vendor_format</span> <span class="o">==</span> <span class="s2">&quot;orca&quot;</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">.import_3mf.slicer.colors</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_orca_part_subtypes</span>
+            <span class="n">read_orca_part_subtypes</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">filepath</span><span class="p">)</span>
 
         <span class="c1"># Metadata.</span>
         <span class="k">for</span> <span class="n">metadata_node</span> <span class="ow">in</span> <span class="n">root</span><span class="o">.</span><span class="n">iterfind</span><span class="p">(</span><span class="s2">&quot;./3mf:metadata&quot;</span><span class="p">,</span> <span class="n">MODEL_NAMESPACES</span><span class="p">):</span>
@@ -1084,6 +1186,7 @@
     <span class="n">compression_level</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
     <span class="n">use_orca_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;AUTO&quot;</span><span class="p">,</span>
     <span class="n">use_components</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">flatten_hierarchy</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">mmu_slicer_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ORCA&quot;</span><span class="p">,</span>
     <span class="n">subdivision_depth</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">7</span><span class="p">,</span>
     <span class="n">thumbnail_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;AUTO&quot;</span><span class="p">,</span>
@@ -1093,12 +1196,13 @@
     <span class="n">object_settings</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">on_progress</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ProgressCallback</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">on_warning</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">WarningCallback</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">show_progress_window</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExportResult</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Export Blender objects to a 3MF file.</span>
 
 <span class="sd">    This is the headless/programmatic counterpart to the ``Export3MF``</span>
-<span class="sd">    operator.  It skips UI-specific behaviour (progress bars, status text)</span>
-<span class="sd">    but runs the exact same export pipeline.</span>
+<span class="sd">    operator.  It skips UI-specific behaviour by default, but the browser</span>
+<span class="sd">    progress card can be requested via *show_progress_window*.</span>
 
 <span class="sd">    :param filepath: Destination path for the ``.3mf`` file.</span>
 <span class="sd">    :param objects: Explicit list of ``bpy.types.Object`` to export.</span>
@@ -1121,6 +1225,12 @@
 <span class="sd">        *object_settings* is provided, the Orca exporter is used</span>
 <span class="sd">        automatically even in ``AUTO`` mode.</span>
 <span class="sd">    :param use_components: Use component instances for linked duplicates.</span>
+<span class="sd">    :param flatten_hierarchy: When *True*, child meshes parented to an Empty</span>
+<span class="sd">        are written directly as top-level build items with their combined</span>
+<span class="sd">        world transform instead of wrapped in a component container.  Some</span>
+<span class="sd">        printing services reject files that use 3MF ``&lt;component&gt;``</span>
+<span class="sd">        references; enable this to maximize compatibility.  Default *False*</span>
+<span class="sd">        because it discards the parent–child hierarchy.</span>
 <span class="sd">    :param mmu_slicer_format: ``&quot;ORCA&quot;`` | ``&quot;PRUSA&quot;`` (only relevant when</span>
 <span class="sd">        *use_orca_format* is ``&quot;PAINT&quot;``).</span>
 <span class="sd">    :param subdivision_depth: Maximum recursive subdivision depth for paint</span>
@@ -1159,6 +1269,12 @@
 
 <span class="sd">    :param on_progress: Optional ``(percentage: int, message: str)`` callback.</span>
 <span class="sd">    :param on_warning: Optional ``(message: str)`` callback for warnings.</span>
+<span class="sd">    :param show_progress_window: When *True*, open the 3MF browser progress</span>
+<span class="sd">        card (same one shown by the Blender file-dialog operator).  Respects</span>
+<span class="sd">        the ``Show Progress Window`` addon preference.  Useful when calling</span>
+<span class="sd">        from another addon that wants the card without going through the</span>
+<span class="sd">        operator (e.g. ``export_3mf(path, ..., show_progress_window=True)``).</span>
+<span class="sd">        The *on_progress* callback still fires in addition if provided.</span>
 <span class="sd">    :return: :class:`ExportResult` with status, written count, and filepath.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">.export_3mf.context</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportContext</span><span class="p">,</span> <span class="n">ExportOptions</span>
@@ -1172,19 +1288,44 @@
     <span class="n">filepath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">ExportResult</span><span class="p">(</span><span class="n">filepath</span><span class="o">=</span><span class="n">filepath</span><span class="p">)</span>
 
+    <span class="c1"># ── Optional browser progress card ───────────────────────────────────────</span>
+    <span class="n">_pw</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">show_progress_window</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.progress</span><span class="w"> </span><span class="kn">import</span> <span class="n">ProgressWindow</span><span class="p">,</span> <span class="n">PHASES</span><span class="p">,</span> <span class="n">should_show_progress</span>
+        <span class="n">_filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">should_show_progress</span><span class="p">(</span><span class="s2">&quot;export&quot;</span><span class="p">,</span> <span class="n">tri_count</span><span class="o">=</span><span class="mi">999_999</span><span class="p">,</span> <span class="n">has_paint</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                <span class="n">thumbnail_render</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+            <span class="n">_pw</span> <span class="o">=</span> <span class="n">ProgressWindow</span><span class="p">()</span>
+            <span class="n">_pw</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">bpy</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="s2">&quot;export&quot;</span><span class="p">,</span> <span class="n">_filename</span><span class="p">,</span>
+                      <span class="n">phases</span><span class="o">=</span><span class="n">PHASES</span><span class="p">[</span><span class="s2">&quot;export&quot;</span><span class="p">],</span> <span class="n">can_cancel</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="c1"># Wrap on_progress so both the caller&#39;s callback and the window update</span>
+        <span class="n">_caller_on_progress</span> <span class="o">=</span> <span class="n">on_progress</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">on_progress</span><span class="p">(</span><span class="n">pct</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># type: ignore[misc]</span>
+            <span class="k">if</span> <span class="n">_pw</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="c1"># Map the coarse on_progress int% into ProgressWindow.update()</span>
+                <span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+                <span class="n">_phases</span> <span class="o">=</span> <span class="n">PHASES</span><span class="p">[</span><span class="s2">&quot;export&quot;</span><span class="p">]</span>
+                <span class="n">_n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">_phases</span><span class="p">)</span>
+                <span class="n">_phase_idx</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">pct</span> <span class="o">/</span> <span class="mi">100</span> <span class="o">*</span> <span class="n">_n</span><span class="p">),</span> <span class="n">_n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="n">_pw</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">pct</span> <span class="o">/</span> <span class="mi">100</span><span class="p">,</span> <span class="n">_phase_idx</span><span class="p">,</span> <span class="n">msg</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">_caller_on_progress</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">_caller_on_progress</span><span class="p">(</span><span class="n">pct</span><span class="p">,</span> <span class="n">msg</span><span class="p">)</span>
+
     <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
         <span class="n">on_progress</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;Starting export…&quot;</span><span class="p">)</span>
 
     <span class="n">options</span> <span class="o">=</span> <span class="n">ExportOptions</span><span class="p">(</span>
         <span class="n">use_selection</span><span class="o">=</span><span class="n">use_selection</span><span class="p">,</span>
         <span class="n">export_hidden</span><span class="o">=</span><span class="n">export_hidden</span><span class="p">,</span>
-        <span class="n">skip_disabled</span><span class="o">=</span><span class="n">skip_disabled</span><span class="p">,</span>
+        <span class="n">include_disabled</span><span class="o">=</span><span class="ow">not</span> <span class="n">skip_disabled</span><span class="p">,</span>
         <span class="n">global_scale</span><span class="o">=</span><span class="n">global_scale</span><span class="p">,</span>
         <span class="n">use_mesh_modifiers</span><span class="o">=</span><span class="n">use_mesh_modifiers</span><span class="p">,</span>
         <span class="n">coordinate_precision</span><span class="o">=</span><span class="n">coordinate_precision</span><span class="p">,</span>
         <span class="n">compression_level</span><span class="o">=</span><span class="n">compression_level</span><span class="p">,</span>
         <span class="n">use_orca_format</span><span class="o">=</span><span class="n">use_orca_format</span><span class="p">,</span>
         <span class="n">use_components</span><span class="o">=</span><span class="n">use_components</span><span class="p">,</span>
+        <span class="n">flatten_hierarchy</span><span class="o">=</span><span class="n">flatten_hierarchy</span><span class="p">,</span>
         <span class="n">mmu_slicer_format</span><span class="o">=</span><span class="n">mmu_slicer_format</span><span class="p">,</span>
         <span class="n">subdivision_depth</span><span class="o">=</span><span class="n">subdivision_depth</span><span class="p">,</span>
         <span class="n">thumbnail_mode</span><span class="o">=</span><span class="n">thumbnail_mode</span><span class="p">,</span>
@@ -1228,6 +1369,8 @@
     <span class="c1"># Create archive.</span>
     <span class="n">archive</span> <span class="o">=</span> <span class="n">create_archive</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="n">ctx</span><span class="o">.</span><span class="n">safe_report</span><span class="p">,</span> <span class="n">ctx</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">compression_level</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">archive</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">_pw</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">_pw</span><span class="o">.</span><span class="n">finish</span><span class="p">()</span>
         <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;CANCELLED&quot;</span>
         <span class="k">return</span> <span class="n">result</span>
 
@@ -1235,9 +1378,15 @@
     <span class="n">context</span> <span class="o">=</span> <span class="n">bpy</span><span class="o">.</span><span class="n">context</span>
     <span class="k">if</span> <span class="n">objects</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">blender_objects</span> <span class="o">=</span> <span class="n">objects</span>
+        <span class="c1"># The caller explicitly chose these objects — bypass visibility and</span>
+        <span class="c1"># render-disable filters so the exporter doesn&#39;t silently skip them.</span>
+        <span class="n">options</span><span class="o">.</span><span class="n">export_hidden</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">options</span><span class="o">.</span><span class="n">include_disabled</span> <span class="o">=</span> <span class="kc">True</span>
     <span class="k">elif</span> <span class="n">use_selection</span><span class="p">:</span>
         <span class="n">blender_objects</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">selected_objects</span>
-        <span class="n">mesh_objects</span> <span class="o">=</span> <span class="n">collect_mesh_objects</span><span class="p">(</span><span class="n">blender_objects</span><span class="p">,</span> <span class="n">export_hidden</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">mesh_objects</span> <span class="o">=</span> <span class="n">collect_mesh_objects</span><span class="p">(</span>
+            <span class="n">blender_objects</span><span class="p">,</span> <span class="n">export_hidden</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">include_disabled</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">mesh_objects</span><span class="p">:</span>
             <span class="n">error</span><span class="p">(</span><span class="s2">&quot;Export cancelled: No mesh objects in selection&quot;</span><span class="p">)</span>
             <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;CANCELLED&quot;</span>
@@ -1251,7 +1400,11 @@
     <span class="c1"># Non-manifold check.</span>
     <span class="c1"># Use collect_mesh_objects to walk into Empty hierarchies (e.g. when</span>
     <span class="c1"># the caller passes a parent Empty grouping several mesh children).</span>
-    <span class="n">mesh_objects</span> <span class="o">=</span> <span class="n">collect_mesh_objects</span><span class="p">(</span><span class="n">blender_objects</span><span class="p">,</span> <span class="n">export_hidden</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">mesh_objects</span> <span class="o">=</span> <span class="n">collect_mesh_objects</span><span class="p">(</span>
+        <span class="n">blender_objects</span><span class="p">,</span>
+        <span class="n">export_hidden</span><span class="o">=</span><span class="n">options</span><span class="o">.</span><span class="n">export_hidden</span><span class="p">,</span>
+        <span class="n">include_disabled</span><span class="o">=</span><span class="n">options</span><span class="o">.</span><span class="n">include_disabled</span><span class="p">,</span>
+    <span class="p">)</span>
     <span class="k">if</span> <span class="n">mesh_objects</span><span class="p">:</span>
         <span class="n">non_manifold</span> <span class="o">=</span> <span class="n">check_non_manifold_geometry</span><span class="p">(</span><span class="n">mesh_objects</span><span class="p">,</span> <span class="n">use_mesh_modifiers</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">non_manifold</span><span class="p">:</span>
@@ -1332,6 +1485,8 @@
         <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">status_set</span><span class="p">))</span> <span class="k">if</span> <span class="n">status_set</span> <span class="k">else</span> <span class="s2">&quot;FINISHED&quot;</span>
     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
         <span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Export failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">_pw</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">_pw</span><span class="o">.</span><span class="n">finish</span><span class="p">()</span>
         <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;CANCELLED&quot;</span>
         <span class="n">result</span><span class="o">.</span><span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
         <span class="k">return</span> <span class="n">result</span>
@@ -1340,6 +1495,9 @@
 
     <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
         <span class="n">on_progress</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;Export complete&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">_pw</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">_pw</span><span class="o">.</span><span class="n">finish</span><span class="p">()</span>
 
     <span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;API: Exported </span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">num_written</span><span class="si">}</span><span class="s2"> objects to </span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">result</span></div>
@@ -1590,6 +1748,28 @@
         <span class="p">})</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_apply_scene_unit_api</span><span class="p">(</span>
+    <span class="n">context</span><span class="p">:</span> <span class="n">bpy</span><span class="o">.</span><span class="n">types</span><span class="o">.</span><span class="n">Context</span><span class="p">,</span>
+    <span class="n">root</span><span class="p">:</span> <span class="n">xml</span><span class="o">.</span><span class="n">etree</span><span class="o">.</span><span class="n">ElementTree</span><span class="o">.</span><span class="n">Element</span><span class="p">,</span>
+    <span class="n">scene_unit</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Apply the scene_unit setting to context.scene.unit_settings.&quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.import_3mf.operator</span><span class="w"> </span><span class="kn">import</span> <span class="n">_THREEMF_TO_BLENDER_UNIT</span><span class="p">,</span> <span class="n">_BLENDER_UNIT_SYSTEM</span>
+    <span class="k">if</span> <span class="n">scene_unit</span> <span class="o">==</span> <span class="s2">&quot;KEEP&quot;</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.common.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">MODEL_DEFAULT_UNIT</span>
+    <span class="k">if</span> <span class="n">scene_unit</span> <span class="o">==</span> <span class="s2">&quot;FILE&quot;</span><span class="p">:</span>
+        <span class="n">threemf_unit</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;unit&quot;</span><span class="p">,</span> <span class="n">MODEL_DEFAULT_UNIT</span><span class="p">)</span>
+        <span class="n">target</span> <span class="o">=</span> <span class="n">_THREEMF_TO_BLENDER_UNIT</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">threemf_unit</span><span class="p">,</span> <span class="s2">&quot;MILLIMETERS&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">target</span> <span class="o">=</span> <span class="n">scene_unit</span>
+    <span class="n">system</span> <span class="o">=</span> <span class="n">_BLENDER_UNIT_SYSTEM</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="s2">&quot;METRIC&quot;</span><span class="p">)</span>
+    <span class="n">context</span><span class="o">.</span><span class="n">scene</span><span class="o">.</span><span class="n">unit_settings</span><span class="o">.</span><span class="n">system</span> <span class="o">=</span> <span class="n">system</span>
+    <span class="n">context</span><span class="o">.</span><span class="n">scene</span><span class="o">.</span><span class="n">unit_settings</span><span class="o">.</span><span class="n">length_unit</span> <span class="o">=</span> <span class="n">target</span>
+    <span class="n">context</span><span class="o">.</span><span class="n">scene</span><span class="o">.</span><span class="n">unit_settings</span><span class="o">.</span><span class="n">scale_length</span> <span class="o">=</span> <span class="mf">1.0</span>
+    <span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;API: Scene units set to </span><span class="si">{</span><span class="n">target</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">system</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+
+
 <span class="k">def</span><span class="w"> </span><span class="nf">_import_unit_scale</span><span class="p">(</span>
     <span class="n">context</span><span class="p">:</span> <span class="n">bpy</span><span class="o">.</span><span class="n">types</span><span class="o">.</span><span class="n">Context</span><span class="p">,</span>
     <span class="n">root</span><span class="p">:</span> <span class="n">xml</span><span class="o">.</span><span class="n">etree</span><span class="o">.</span><span class="n">ElementTree</span><span class="o">.</span><span class="n">Element</span><span class="p">,</span>
@@ -1682,7 +1862,7 @@
       
     </aside>
   </div>
-</div><script src="../../_static/documentation_options.js?v=4ebf8126"></script>
+</div><script src="../../_static/documentation_options.js?v=e3eff1ea"></script>
     <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
