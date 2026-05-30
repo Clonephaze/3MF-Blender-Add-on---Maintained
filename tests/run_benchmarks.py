@@ -164,15 +164,15 @@ def _warn_callback(warnings_list):
 # ---------------------------------------------------------------------------
 
 _COL = {
-    "op":      12,
-    "mode":    10,
-    "file":    30,
-    "time":    10,
-    "objects":  8,
-    "verts":   14,
-    "tris":    14,
-    "size":    10,
-    "warns":    6,
+    "op": 12,
+    "mode": 10,
+    "file": 30,
+    "time": 10,
+    "objects": 8,
+    "verts": 14,
+    "tris": 14,
+    "size": 10,
+    "warns": 6,
 }
 
 
