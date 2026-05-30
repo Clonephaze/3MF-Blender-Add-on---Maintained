@@ -91,9 +91,10 @@ def _stream_model_to_file(f, root: xml.etree.ElementTree.Element) -> None:
     map (populated by ``register_namespace()`` calls earlier in the export).
     """
     # Build uri→prefix from ElementTree's internal registry.
+    # _namespace_map stores {uri: prefix}, so copy it directly.
     try:
         from xml.etree.ElementTree import _namespace_map  # type: ignore[attr-defined]
-        uri_to_prefix: dict = {v: k for k, v in _namespace_map.items()}
+        uri_to_prefix: dict = dict(_namespace_map)
     except (ImportError, AttributeError):
         uri_to_prefix = {MODEL_NAMESPACE: ""}
 
