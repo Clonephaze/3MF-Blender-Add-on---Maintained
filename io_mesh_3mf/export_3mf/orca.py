@@ -26,6 +26,7 @@ import io
 import json
 import os
 import re
+import time
 import uuid
 import xml.etree.ElementTree
 import zipfile
@@ -33,6 +34,7 @@ from typing import List, Optional, Set
 
 import bpy
 import mathutils
+import numpy as np
 
 from ..common.colors import hex_to_rgb
 from ..common.constants import (
@@ -44,17 +46,19 @@ from ..common.constants import (
     RELS_NAMESPACE,
 )
 from ..common.extensions import PRODUCTION_EXTENSION, ORCA_EXTENSION
-from ..common.logging import debug, warn, error
+from ..common.logging import debug, timing_debug, warn, error
 from ..common.xml import format_transformation
 
+from .geometry import _raw_geometry_cache
 from .materials import (
     ORCA_FILAMENT_CODES,
     collect_face_colors,
     get_triangle_color,
+    material_to_hex_color,
 )
 from .components import collect_mesh_objects
 from .segmentation import texture_to_segmentation
-from .standard import BaseExporter
+from .standard import BaseExporter, _stream_model_to_file
 from .thumbnail import write_thumbnail
 from ..import_3mf.archive import get_stashed_config
 from ..slicer_profiles import get_profile_config
@@ -279,10 +283,14 @@ class OrcaExporter(BaseExporter):
         for idx, blender_object in enumerate(mesh_objects):
             # Don't update progress here in PAINT mode - let segmentation callback handle it
             if ctx.options.use_orca_format != "PAINT":
-                progress = int(((idx + 1) / total_mesh_objects) * 95)
+                # Scale to 5–44% so we stay within the Geometry phase (phase 1).
+                # Using the full 0–95 range caused later objects to bleed into
+                # Materials/Segmentation/Thumbnail phases on the browser card.
+                progress = 5 + int(((idx + 1) / total_mesh_objects) * 39)
                 ctx._progress_update(
                     progress,
                     f"Exporting {idx + 1}/{total_mesh_objects}: {blender_object.name}",
+                    phase=1,  # Geometry
                 )
             object_counter = idx + 1
             wrapper_id = object_counter * 2
@@ -483,19 +491,30 @@ class OrcaExporter(BaseExporter):
         # Mesh element
         mesh_elem = xml.etree.ElementTree.SubElement(obj_elem, "mesh")
 
-        # Vertices
-        vertices_elem = xml.etree.ElementTree.SubElement(mesh_elem, "vertices")
+        # Vertices — bulk extract via foreach_get + numpy char formatting.
+        # No SubElement nodes needed; the streaming writer injects the raw XML string.
         decimals = ctx.options.coordinate_precision
-        for vertex in mesh.vertices:
-            xml.etree.ElementTree.SubElement(
-                vertices_elem,
-                "vertex",
-                attrib={
-                    "x": f"{vertex.co.x:.{decimals}}",
-                    "y": f"{vertex.co.y:.{decimals}}",
-                    "z": f"{vertex.co.z:.{decimals}}",
-                },
-            )
+        _t_vert0 = time.perf_counter()
+        n_verts = len(mesh.vertices)
+        co_flat = np.empty(n_verts * 3, dtype=np.float64)
+        mesh.vertices.foreach_get("co", co_flat)
+        co = co_flat.reshape(n_verts, 3)
+        _t_vert1 = time.perf_counter()
+        timing_debug(f"orca write_vertices foreach_get ({n_verts} verts)", (_t_vert1 - _t_vert0) * 1000)
+        fmt = f"%.{decimals}g"
+        xs = np.char.mod(fmt, co[:, 0]).tolist()
+        ys = np.char.mod(fmt, co[:, 1]).tolist()
+        zs = np.char.mod(fmt, co[:, 2]).tolist()
+        _t_vert2 = time.perf_counter()
+        timing_debug(f"orca write_vertices str format ({n_verts} verts)", (_t_vert2 - _t_vert1) * 1000)
+        vparts = ["<vertices>"]
+        vappend = vparts.append
+        for i in range(n_verts):
+            vappend(f'<vertex x="{xs[i]}" y="{ys[i]}" z="{zs[i]}"/>')
+        vparts.append("</vertices>")
+        _raw_geometry_cache.setdefault(id(mesh_elem), {})["vertices"] = "".join(vparts)
+        _t_vert3 = time.perf_counter()
+        timing_debug(f"orca write_vertices build raw XML ({n_verts} verts)", (_t_vert3 - _t_vert2) * 1000)
 
         # Generate segmentation strings from UV texture if in PAINT mode.
         # Non-normal parts (modifiers, support, negative) get no paint data.
@@ -560,12 +579,13 @@ class OrcaExporter(BaseExporter):
                     def orca_seg_progress(current, total_val, message):
                         if total_val > 0:
                             seg_pct = current / total_val
-                            # Each object gets its share of the 15-90% range
-                            obj_start = 15 + ((obj_index / total_objects) * 75)
-                            obj_end = 15 + (((obj_index + 1) / total_objects) * 75)
+                            # Each object gets its share of the 65–89% range
+                            # (Segmentation phase = phase 3, cumulative 65–90%).
+                            obj_start = 65 + ((obj_index / total_objects) * 24)
+                            obj_end = 65 + (((obj_index + 1) / total_objects) * 24)
                             overall = int(obj_start + (seg_pct * (obj_end - obj_start)))
                             ctx._progress_update(
-                                overall, f"{blender_object.name}: {message}"
+                                overall, f"{blender_object.name}: {message}", phase=3
                             )
 
                     try:
@@ -599,50 +619,91 @@ class OrcaExporter(BaseExporter):
                 subdivided_mesh=mesh,
             )
 
-        # Triangles with paint_color
-        triangles_elem = xml.etree.ElementTree.SubElement(mesh_elem, "triangles")
-        for tri_idx, triangle in enumerate(mesh.loop_triangles):
-            tri_attribs = {
-                "v1": str(triangle.vertices[0]),
-                "v2": str(triangle.vertices[1]),
-                "v3": str(triangle.vertices[2]),
-            }
+        # Triangles with paint_color — bulk extract + pre-computed slot fragments.
+        # foreach_get avoids the per-triangle Blender wrapper overhead.
+        _t_tri0 = time.perf_counter()
+        n_tris = len(mesh.loop_triangles)
+        verts_flat = np.empty(n_tris * 3, dtype=np.int32)
+        mesh.loop_triangles.foreach_get("vertices", verts_flat)
+        mat_flat = np.empty(n_tris, dtype=np.int32)
+        mesh.loop_triangles.foreach_get("material_index", mat_flat)
+        verts_list = verts_flat.reshape(n_tris, 3).tolist()
+        mat_list = mat_flat.tolist()
+        _t_tri1 = time.perf_counter()
+        timing_debug(f"orca write_triangles foreach_get ({n_tris} tris)", (_t_tri1 - _t_tri0) * 1000)
+
+        # Pre-compute per-slot paint code fragment — O(n_slots) instead of O(n_triangles).
+        n_slots = len(eval_object.material_slots)
+        slot_paint_frags = []
+        if is_normal_part:
+            for slot_idx in range(n_slots):
+                frag = ""
+                if slot_idx < len(mesh.materials):
+                    mat = mesh.materials[slot_idx]
+                    if mat is not None:
+                        hex_color = material_to_hex_color(mat)
+                        if hex_color and hex_color in ctx.vertex_colors:
+                            filament_index = ctx.vertex_colors[hex_color]
+                            if filament_index < len(ORCA_FILAMENT_CODES):
+                                paint_code = ORCA_FILAMENT_CODES[filament_index]
+                                if paint_code:
+                                    frag = f' paint_color="{paint_code}"'
+                slot_paint_frags.append(frag)
+        else:
+            slot_paint_frags = [""] * n_slots
+
+        has_segmentation = bool(segmentation_strings)
+        has_seam = bool(seam_strings)
+        has_support = bool(support_strings)
+        tparts = ["<triangles>"]
+        tappend = tparts.append
+
+        for tri_idx in range(n_tris):
+            v = verts_list[tri_idx]
+            base_tri = f'<triangle v1="{v[0]}" v2="{v[1]}" v3="{v[2]}"'
 
             # Check for segmentation string first (PAINT mode with UV texture)
-            if segmentation_strings and tri_idx in segmentation_strings:
-                seg_string = segmentation_strings[tri_idx]
-                if seg_string:
-                    tri_attribs["paint_color"] = seg_string
-                    # Seam / support are independent of color
-                    if seam_strings and tri_idx in seam_strings and seam_strings[tri_idx]:
-                        tri_attribs["paint_seam"] = seam_strings[tri_idx]
-                    if support_strings and tri_idx in support_strings and support_strings[tri_idx]:
-                        tri_attribs["paint_supports"] = support_strings[tri_idx]
-                    xml.etree.ElementTree.SubElement(
-                        triangles_elem, "triangle", attrib=tri_attribs
-                    )
+            if has_segmentation:
+                seg_str = segmentation_strings.get(tri_idx)
+                if seg_str:
+                    seam_part = ""
+                    sup_part = ""
+                    if has_seam:
+                        seam = seam_strings.get(tri_idx)
+                        if seam:
+                            seam_part = f' paint_seam="{seam}"'
+                    if has_support:
+                        sup = support_strings.get(tri_idx)
+                        if sup:
+                            sup_part = f' paint_supports="{sup}"'
+                    tappend(f'{base_tri} paint_color="{seg_str}"{seam_part}{sup_part}/>')
                     continue
 
-            # Fall back to simple paint_color from face material colors
-            # (skip for non-normal parts — they carry no paint data)
-            if is_normal_part:
-                triangle_color = get_triangle_color(mesh, triangle, blender_object, eval_object)
-                if triangle_color and triangle_color in ctx.vertex_colors:
-                    filament_index = ctx.vertex_colors[triangle_color]
-                    if filament_index < len(ORCA_FILAMENT_CODES):
-                        paint_code = ORCA_FILAMENT_CODES[filament_index]
-                        if paint_code:
-                            tri_attribs["paint_color"] = paint_code
+            # Fallback: pre-computed slot paint fragment
+            paint_frag = ""
+            if is_normal_part and n_slots > 0:
+                slot_idx = mat_list[tri_idx]
+                if slot_idx < n_slots:
+                    paint_frag = slot_paint_frags[slot_idx]
 
-            # Seam / support for non-segmentation triangles
-            if seam_strings and tri_idx in seam_strings and seam_strings[tri_idx]:
-                tri_attribs["paint_seam"] = seam_strings[tri_idx]
-            if support_strings and tri_idx in support_strings and support_strings[tri_idx]:
-                tri_attribs["paint_supports"] = support_strings[tri_idx]
+            seam_part = ""
+            sup_part = ""
+            if has_seam:
+                seam = seam_strings.get(tri_idx)
+                if seam:
+                    seam_part = f' paint_seam="{seam}"'
+            if has_support:
+                sup = support_strings.get(tri_idx)
+                if sup:
+                    sup_part = f' paint_supports="{sup}"'
 
-            xml.etree.ElementTree.SubElement(
-                triangles_elem, "triangle", attrib=tri_attribs
-            )
+            tappend(f'{base_tri}{paint_frag}{seam_part}{sup_part}/>')
+
+        tparts.append("</triangles>")
+        _raw_geometry_cache.setdefault(id(mesh_elem), {})["triangles"] = "".join(tparts)
+        _t_tri2 = time.perf_counter()
+        timing_debug(f"orca write_triangles loop ({n_tris} tris)", (_t_tri2 - _t_tri1) * 1000)
+        timing_debug(f"orca write_object_model geometry TOTAL", (_t_tri2 - _t_vert0) * 1000)
 
         # Empty build (geometry is in this file, build is in main model)
         xml.etree.ElementTree.SubElement(root, "build")
@@ -650,15 +711,11 @@ class OrcaExporter(BaseExporter):
         # Clean up mesh
         eval_object.to_mesh_clear()
 
-        # Write to archive
+        # Write to archive using the streaming writer — bypasses ElementTree's
+        # Python-level DOM walk and injects the pre-built geometry strings directly.
         archive_path = object_path.lstrip("/")
-        document = xml.etree.ElementTree.ElementTree(root)
-        buffer = io.BytesIO()
-        document.write(buffer, xml_declaration=True, encoding="UTF-8")
-        xml_content = buffer.getvalue().decode("UTF-8")
-
         with archive.open(archive_path, "w") as f:
-            f.write(xml_content.encode("UTF-8"))
+            _stream_model_to_file(f, root)
 
         debug(f"Wrote object model: {archive_path}")
 
@@ -968,19 +1025,32 @@ class OrcaExporter(BaseExporter):
             return None
 
         mesh.calc_loop_triangles()
+        n_tris = len(mesh.loop_triangles)
+        if n_tris == 0:
+            eval_obj.to_mesh_clear()
+            return None
 
-        # Count colours by triangle
-        color_counts: dict[str, int] = {}
-        for tri in mesh.loop_triangles:
-            color = get_triangle_color(mesh, tri, blender_object, eval_obj)
-            if color:
-                color_counts[color] = color_counts.get(color, 0) + 1
+        n_slots = len(eval_obj.material_slots)
+        if n_slots == 0:
+            eval_obj.to_mesh_clear()
+            return None
+
+        # Bulk-extract material slot indices in one C call, then use bincount to
+        # find the most-used slot without a Python loop over all triangles.
+        mat_flat = np.empty(n_tris, dtype=np.int32)
+        mesh.loop_triangles.foreach_get("material_index", mat_flat)
+        counts = np.bincount(mat_flat, minlength=n_slots)
+        dominant_slot = int(np.argmax(counts))
+
+        dominant_color = None
+        if dominant_slot < len(mesh.materials):
+            mat = mesh.materials[dominant_slot]
+            if mat is not None:
+                dominant_color = material_to_hex_color(mat)
 
         eval_obj.to_mesh_clear()
 
-        if not color_counts:
-            return None
-        return max(color_counts, key=color_counts.get)
+        return dominant_color
 
     def generate_project_settings(self) -> dict:
         """Generate project_settings.config by loading template and updating filament colors.

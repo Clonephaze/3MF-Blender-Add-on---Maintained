@@ -22,6 +22,8 @@ when the user does not select Orca or PrusaSlicer paint-segmentation output.
 from __future__ import annotations
 
 import collections
+import re
+import time
 import xml.etree.ElementTree
 import zipfile
 from typing import List, Set, Tuple, TYPE_CHECKING
@@ -31,13 +33,13 @@ import mathutils
 
 from ..common.constants import MODEL_NAMESPACE, MODEL_LOCATION
 from ..common.extensions import TRIANGLE_SETS_EXTENSION, MATERIALS_EXTENSION
-from ..common.logging import debug, warn
+from ..common.logging import debug, timing_debug, warn
 from ..common.metadata import Metadata
 from ..common.xml import format_transformation
 
 from .archive import write_core_properties
 from .components import collect_mesh_objects, detect_linked_duplicates, should_use_components
-from .geometry import write_vertices, write_triangles, write_passthrough_triangles, write_metadata
+from .geometry import write_vertices, write_triangles, write_passthrough_triangles, write_metadata, get_raw_geometry, clear_raw_geometry
 from .materials import (
     write_materials,
     get_triangle_color,
@@ -56,6 +58,122 @@ from .triangle_sets import write_triangle_sets
 
 if TYPE_CHECKING:
     from .context import ExportContext
+
+
+_CLARK_RE = re.compile(r"\{([^}]*)\}(.*)")
+
+# These namespace URIs are implicitly declared in XML and must never have an
+# explicit xmlns:... declaration added by the streaming writer.
+_IMPLICIT_NS = frozenset({
+    "http://www.w3.org/XML/1998/namespace",   # xml:
+    "http://www.w3.org/2000/xmlns/",          # xmlns:
+})
+
+
+def _stream_model_to_file(f, root: xml.etree.ElementTree.Element) -> None:
+    """Write the 3MF model XML to a binary file-like object *f* without using
+    ElementTree's Python-level serialiser.
+
+    ElementTree's ``write()`` walks every DOM node in Python — for a 2M-triangle
+    mesh that means 3–4 M recursive Python calls taking 15–20 s.  This writer
+    replaces that by:
+      - Serialising only the small structural elements (resources, materials,
+        metadata, build items) through a fast recursive string builder.
+      - For ``<mesh>`` elements whose geometry was prepared by ``write_vertices``
+        and ``write_triangles``, injecting the pre-built raw XML strings
+        (stored as ``_raw_vertices_xml`` and ``_raw_triangles_xml`` on the
+        element) directly, bypassing the DOM entirely.
+
+    Namespace declarations are derived from ElementTree's registered namespace
+    map (populated by ``register_namespace()`` calls earlier in the export).
+    """
+    # Build uri→prefix from ElementTree's internal registry.
+    try:
+        from xml.etree.ElementTree import _namespace_map  # type: ignore[attr-defined]
+        uri_to_prefix: dict = {v: k for k, v in _namespace_map.items()}
+    except (ImportError, AttributeError):
+        uri_to_prefix = {MODEL_NAMESPACE: ""}
+
+    def _qname(tag: str) -> str:
+        """Convert ``{uri}local`` Clark notation to a serialisable qualified name."""
+        m = _CLARK_RE.match(tag)
+        if not m:
+            return tag
+        uri, local = m.group(1), m.group(2)
+        prefix = uri_to_prefix.get(uri)
+        if prefix:
+            return f"{prefix}:{local}"
+        return local  # default namespace — no prefix
+
+    def _attr_escape(v: str) -> str:
+        return v.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")
+
+    def _text_escape(v: str) -> str:
+        return v.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    def _collect_ns(elem, seen: set) -> set:
+        """Collect all namespace URIs referenced by tags and attributes."""
+        m = _CLARK_RE.match(elem.tag or "")
+        if m:
+            seen.add(m.group(1))
+        for k in elem.attrib:
+            m = _CLARK_RE.match(k)
+            if m:
+                seen.add(m.group(1))
+        for child in elem:
+            _collect_ns(child, seen)
+        return seen
+
+    def _write_element(elem, is_root: bool = False) -> None:
+        tag_str = _qname(elem.tag)
+
+        attr_parts: list = []
+
+        if is_root:
+            # Emit namespace declarations on the root element.
+            ns_uris = _collect_ns(elem, set())
+            for uri in sorted(ns_uris):
+                if uri in _IMPLICIT_NS:
+                    continue
+                prefix = uri_to_prefix.get(uri)
+                if prefix is None:
+                    continue
+                if prefix == "":
+                    attr_parts.append(f'xmlns="{uri}"')
+                else:
+                    attr_parts.append(f'xmlns:{prefix}="{uri}"')
+
+        for k, v in elem.attrib.items():
+            attr_parts.append(f'{_qname(k)}="{_attr_escape(v)}"')
+
+        attr_str = (" " + " ".join(attr_parts)) if attr_parts else ""
+
+        raw_v, raw_t = get_raw_geometry(elem)
+        has_content = raw_v is not None or len(elem) > 0 or elem.text
+
+        if has_content:
+            f.write(f"<{tag_str}{attr_str}>".encode("utf-8"))
+            if elem.text:
+                f.write(_text_escape(elem.text).encode("utf-8"))
+            if raw_v is not None:
+                # Geometry written as pre-built strings — the main speedup.
+                f.write(raw_v.encode("utf-8"))
+                if raw_t is not None:
+                    f.write(raw_t.encode("utf-8"))
+                clear_raw_geometry(elem)
+            # Always recurse into DOM children (handles triangle_sets,
+            # metadatagroup, and passthrough <triangles> from write_passthrough_triangles).
+            for child in elem:
+                _write_element(child)
+            f.write(f"</{tag_str}>".encode("utf-8"))
+        else:
+            f.write(f"<{tag_str}{attr_str}/>".encode("utf-8"))
+
+        if elem.tail:
+            f.write(_text_escape(elem.tail).encode("utf-8"))
+
+    f.write(b"<?xml version='1.0' encoding='UTF-8'?>\n")
+    _write_element(root, is_root=True)
 
 
 def _is_object_excluded(obj: bpy.types.Object, ctx) -> bool:
@@ -374,10 +492,10 @@ class StandardExporter(BaseExporter):
         if passthrough_written:
             ctx.extension_manager.activate(MATERIALS_EXTENSION.namespace)
 
-        ctx._progress_update(15, "Writing objects...")
-        ctx._progress_range = (15, 95)
+        ctx._progress_update(5, "Writing objects...", phase=1)
+        _t_objects = time.perf_counter()
         self.write_objects(root, resources_element, blender_objects, global_scale)
-        ctx._progress_range = None
+        timing_debug("StandardExporter.write_objects TOTAL", (time.perf_counter() - _t_objects) * 1000)
 
         # Re-register namespaces now that all extensions have been activated.
         # The initial registration (above) runs before material detection, so
@@ -392,9 +510,11 @@ class StandardExporter(BaseExporter):
         if required_ext_string:
             root.set("requiredextensions", required_ext_string)
 
-        document = xml.etree.ElementTree.ElementTree(root)
+        ctx._progress_update(95, "Writing model XML...")
+        _t_xml = time.perf_counter()
         with archive.open(MODEL_LOCATION, "w", force_zip64=True) as f:
-            document.write(f, xml_declaration=True, encoding="UTF-8")
+            _stream_model_to_file(f, root)
+        timing_debug("XML serialise + write to archive", (time.perf_counter() - _t_xml) * 1000)
 
         write_core_properties(archive)
         write_thumbnail(archive, ctx, list(blender_objects))
@@ -476,13 +596,14 @@ class StandardExporter(BaseExporter):
 
             processed_objects += 1
             if total_objects > 0:
-                progress_range = ctx._progress_range or (15, 95)
-                progress_min, progress_max = progress_range
-                progress = progress_min + int(
-                    (processed_objects / total_objects) * (progress_max - progress_min)
-                )
+                # Scale to 5–44% so all objects stay within the Geometry phase
+                # (phase 1, cumulative 5–45%). Using the full range caused later
+                # objects to appear in Materials/Segmentation on the browser card.
+                progress = 5 + int((processed_objects / total_objects) * 39)
                 ctx._progress_update(
-                    progress, f"Writing {processed_objects}/{total_objects} objects..."
+                    progress,
+                    f"Writing {processed_objects}/{total_objects} objects...",
+                    phase=1,  # Geometry
                 )
 
             # When flatten_hierarchy is enabled, EMPTYs are dissolved:
@@ -654,6 +775,7 @@ class StandardExporter(BaseExporter):
             dependency_graph = bpy.context.evaluated_depsgraph_get()
             blender_object = blender_object.evaluated_get(dependency_graph)
 
+        _t_mesh = time.perf_counter()
         try:
             mesh = blender_object.to_mesh()
         except RuntimeError:
@@ -672,6 +794,7 @@ class StandardExporter(BaseExporter):
             return None, mesh_transformation
 
         mesh.calc_loop_triangles()
+        timing_debug(f"to_mesh + calc_loop_triangles '{object_name}'", (time.perf_counter() - _t_mesh) * 1000)
 
         # Adaptive pre-subdivision for PAINT mode: split large faces so each
         # triangle can be encoded at full segmentation depth without blocky
@@ -797,12 +920,14 @@ class StandardExporter(BaseExporter):
                                     most_common_material_list_index
                                 )
 
+            _t_verts = time.perf_counter()
             write_vertices(
                 mesh_element,
                 mesh.vertices,
                 ctx.options.use_orca_format,
                 ctx.options.coordinate_precision,
             )
+            timing_debug(f"write_vertices wall '{object_name}'", (time.perf_counter() - _t_verts) * 1000)
 
             # Generate segmentation strings from UV texture if in PAINT mode
             segmentation_strings = {}
@@ -813,17 +938,23 @@ class StandardExporter(BaseExporter):
                 f", has_uv={bool(mesh.uv_layers.active)}"
             )
             if ctx.options.use_orca_format == "PAINT" and mesh.uv_layers.active:
+                _t_seg = time.perf_counter()
                 segmentation_strings = self._extract_segmentation(
                     original_object, blender_object, mesh
                 )
+                timing_debug(f"_extract_segmentation '{object_name}'", (time.perf_counter() - _t_seg) * 1000)
+                _t_seam = time.perf_counter()
                 seam_strings = self._extract_auxiliary_segmentation(
                     original_object, blender_object, mesh, "SEAM",
                     subdivided_mesh=mesh,
                 )
+                timing_debug(f"_extract_auxiliary SEAM '{object_name}'", (time.perf_counter() - _t_seam) * 1000)
+                _t_sup = time.perf_counter()
                 support_strings = self._extract_auxiliary_segmentation(
                     original_object, blender_object, mesh, "SUPPORT",
                     subdivided_mesh=mesh,
                 )
+                timing_debug(f"_extract_auxiliary SUPPORT '{object_name}'", (time.perf_counter() - _t_sup) * 1000)
 
             debug(
                 f"[standard] Calling write_triangles with {len(segmentation_strings)} segmentation strings"
@@ -835,6 +966,7 @@ class StandardExporter(BaseExporter):
                     ctx.options.use_orca_format, ctx.options.coordinate_precision,
                 )
             else:
+                _t_tris = time.perf_counter()
                 write_triangles(
                     mesh_element,
                     mesh.loop_triangles,
@@ -854,6 +986,7 @@ class StandardExporter(BaseExporter):
                     seam_strings=seam_strings,
                     support_strings=support_strings,
                 )
+                timing_debug(f"write_triangles caller overhead '{object_name}'", (time.perf_counter() - _t_tris) * 1000)
 
             # Write triangle sets if present (auto-export utility metadata)
             # Skipped when PAINT mode is active since segmentation data replaces it
@@ -968,8 +1101,9 @@ class StandardExporter(BaseExporter):
         def seg_progress(current, total, message):
             if total > 0:
                 seg_pct = current / total
-                overall = int(15 + (seg_pct * 80))  # 15-95% range
-                ctx._progress_update(overall, message)
+                # Segmentation phase = phase 3, cumulative 65–90%
+                overall = int(65 + (seg_pct * 24))
+                ctx._progress_update(overall, message, phase=3)
 
         try:
             segmentation_strings = texture_to_segmentation(

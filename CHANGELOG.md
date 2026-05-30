@@ -1,3 +1,25 @@
+2.7.0 — Progress Window, UV Map Paint Option & Export Performance
+====
+
+Features
+----
+* **Native progress window** — A browser-based progress card appears during long exports and texture bakes, showing phase name, progress bar, elapsed time, and filament swatches. Opens as a compact standalone window (Edge/Chrome in app mode) positioned in the bottom-left corner. Can be freely dragged after it appears.
+* **"Use Existing UV Map" paint option** — A new `Use Existing UV Map` choice in the UV Method selector (alongside Smart UV Project and Lightmap Pack) lets users supply a hand-crafted UV layer instead of having one generated. The chosen layer's UV data is copied into the canonical `MMU_Paint` layer with no dissolve pass and no UV projection, preserving the original layer untouched. An autocomplete field (native Blender 4.2+ `search=` callback) lists available layers on the active mesh. If the named layer is not found, the pipeline falls back to Smart UV Project with a warning. Available in the MMU Paint sidebar initialise section, the bake confirmation dialog, and the node-editor bake panel.
+
+Bug Fixes
+----
+* **Thin text and fine detail missing from segmentation export (Issue #28)** — The early-exit uniformity check in `_analyze_recursive` previously sampled only 10 fixed points before treating a triangle as single-color. Letter strokes narrower than the probe spacing passed through undetected, causing whole triangles to be written as background color. The check now uses a barycentric grid whose density scales with the triangle's UV pixel footprint (`N = clamp(pixel_span × 0.5, 6, 40)`), guaranteeing a sample spacing of ≤ 2 px regardless of mesh density. The grid short-circuits on the first mixed pixel, so performance impact on solid-color regions is negligible.
+
+Performance
+----
+* **Geometry export significantly faster (AUTO/Paint mode)** — `OrcaExporter.write_object_model` now uses `foreach_get` + numpy bulk extraction for both vertices and triangles, eliminating per-vertex and per-triangle Python wrapper overhead. Per-slot paint code fragments are pre-computed once (O(n_slots)) instead of resolving `material_to_hex_color` on every triangle (O(n_triangles)). The per-object XML files are written directly to the archive via the streaming writer instead of buffering through `io.BytesIO`.
+
+API
+----
+* **API version bumped to 1.3.0** — new `"progress_window"` capability flag.
+
+----
+
 2.6.0 — FullSpectrum Round-Trip & MMU Mix Colors
 ====
 

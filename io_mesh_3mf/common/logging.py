@@ -24,17 +24,43 @@ Usage::
     error(f"Failed to write: {e}")       # Always prints  ERROR: ...
 """
 
-__all__ = ["DEBUG_MODE", "debug", "warn", "error", "safe_report"]
+__all__ = ["DEBUG_MODE", "debug", "warn", "error", "safe_report", "timing_debug"]
 
 
 DEBUG_MODE = False
 """Set to True to enable verbose console output for development/debugging."""
 
 
+def _is_blender_debug() -> bool:
+    """Return True if Blender was launched with --debug or --debug-all."""
+    try:
+        import bpy
+        return bpy.app.debug
+    except (ImportError, AttributeError):
+        return False
+
+
 def debug(*args, **kwargs):
-    """Print to console only when DEBUG_MODE is enabled."""
-    if DEBUG_MODE:
+    """Print to console only when DEBUG_MODE is enabled or Blender is in --debug mode."""
+    if DEBUG_MODE or _is_blender_debug():
         print(*args, **kwargs)
+
+
+def timing_debug(label: str, elapsed_ms: float) -> None:
+    """Print a [3MF TIMING] line when Blender is in --debug mode or DEBUG_MODE is True.
+
+    Use this for performance-critical sections so timing is always available
+    without touching source code — just relaunch Blender with ``--debug``.
+
+    Example output::
+
+        [3MF TIMING] write_vertices foreach_get (50000 verts): 0.8ms
+        [3MF TIMING] write_vertices str format (50000 verts): 12.4ms
+        [3MF TIMING] write_vertices SubElement loop (50000 verts): 45.1ms
+        [3MF TIMING] write_vertices TOTAL (50000 verts): 58.3ms
+    """
+    if DEBUG_MODE or _is_blender_debug():
+        print(f"[3MF TIMING] {label}: {elapsed_ms:.2f}ms")
 
 
 def warn(*args, **kwargs):

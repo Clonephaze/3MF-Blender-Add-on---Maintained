@@ -23,13 +23,42 @@ Functions for writing mesh geometry to the 3MF XML model:
 """
 
 import bmesh
+import numpy as np
+import time
 import xml.etree.ElementTree
 from typing import Optional, Dict, List
 
 import bpy
 
 from ..common.constants import MODEL_NAMESPACE
-from ..common.logging import debug, warn
+
+# ---------------------------------------------------------------------------
+# Raw geometry side-cache
+# ---------------------------------------------------------------------------
+# xml.etree.ElementTree.Element uses __slots__ and does not allow arbitrary
+# attribute assignment.  We use a plain dict keyed by id(mesh_element) to
+# pass pre-built raw XML strings to the streaming writer in standard.py.
+# Entries MUST be cleared after each element is written to prevent unbounded
+# growth across multiple exports in the same Blender session.
+_raw_geometry_cache: Dict[int, Dict[str, str]] = {}
+
+
+def get_raw_geometry(mesh_element: xml.etree.ElementTree.Element):
+    """Return ``(raw_vertices_xml, raw_triangles_xml)`` for *mesh_element*.
+
+    Either value may be ``None`` if the corresponding function did not run
+    (e.g. empty mesh, or passthrough triangles path).
+    """
+    data = _raw_geometry_cache.get(id(mesh_element))
+    if data:
+        return data.get("vertices"), data.get("triangles")
+    return None, None
+
+
+def clear_raw_geometry(mesh_element: xml.etree.ElementTree.Element) -> None:
+    """Remove the cached raw geometry for *mesh_element* after it has been written."""
+    _raw_geometry_cache.pop(id(mesh_element), None)
+from ..common.logging import debug, timing_debug, warn
 from ..common.metadata import Metadata
 from .materials import (
     ORCA_FILAMENT_CODES,
@@ -104,33 +133,63 @@ def write_vertices(
     coordinate_precision: int,
 ) -> None:
     """
-    Writes a list of vertices into the specified mesh element.
+    Writes vertex geometry into the specified mesh element.
+
+    Instead of building ElementTree sub-elements, the geometry is pre-built as a
+    raw XML string and stored on ``mesh_element._raw_vertices_xml``.  The streaming
+    writer in ``standard.py`` injects it directly, bypassing ElementTree's
+    Python-level DOM serialiser.
 
     :param mesh_element: The <mesh> element of the 3MF document.
     :param vertices: A list of Blender vertices to add.
-    :param use_orca_format: Material export mode — affects namespace handling.
-    :param coordinate_precision: Number of decimal places for coordinates.
+    :param use_orca_format: Material export mode (unused, kept for API compat).
+    :param coordinate_precision: Number of significant figures for coordinates.
     """
-    vertices_element = xml.etree.ElementTree.SubElement(
-        mesh_element, f"{{{MODEL_NAMESPACE}}}vertices"
-    )
+    n = len(vertices)
+    if n == 0:
+        return
 
-    vertex_name = f"{{{MODEL_NAMESPACE}}}vertex"
-    if use_orca_format in ("PAINT", "BASEMATERIAL"):
-        x_name = "x"
-        y_name = "y"
-        z_name = "z"
-    else:
-        x_name = f"{{{MODEL_NAMESPACE}}}x"
-        y_name = f"{{{MODEL_NAMESPACE}}}y"
-        z_name = f"{{{MODEL_NAMESPACE}}}z"
+    _t0 = time.perf_counter()
 
+    # Bulk-extract all vertex coordinates in one C call, avoiding the per-vertex
+    # Blender wrapper overhead that dominates for large meshes.
+    coords_flat = np.empty(n * 3, dtype=np.float64)
+    vertices.foreach_get("co", coords_flat)
+    coords = coords_flat.reshape(n, 3)
+
+    _t1 = time.perf_counter()
+    timing_debug(f"write_vertices foreach_get ({n} verts)", (_t1 - _t0) * 1000)
+
+    # Vectorized float→string using numpy's C-level char operations.
+    # np.char.mod is ~3–5× faster than a Python list-comprehension for large arrays.
     decimals = coordinate_precision
-    for vertex in vertices:
-        vertex_element = xml.etree.ElementTree.SubElement(vertices_element, vertex_name)
-        vertex_element.attrib[x_name] = f"{vertex.co[0]:.{decimals}}"
-        vertex_element.attrib[y_name] = f"{vertex.co[1]:.{decimals}}"
-        vertex_element.attrib[z_name] = f"{vertex.co[2]:.{decimals}}"
+    fmt = f"%.{decimals}g"
+    x_strs = np.char.mod(fmt, coords[:, 0]).tolist()
+    y_strs = np.char.mod(fmt, coords[:, 1]).tolist()
+    z_strs = np.char.mod(fmt, coords[:, 2]).tolist()
+
+    _t2 = time.perf_counter()
+    timing_debug(f"write_vertices str format ({n} verts)", (_t2 - _t1) * 1000)
+
+    # Build the raw <vertices> XML string directly, bypassing ElementTree's
+    # Python-level DOM so the final document.write() doesn't need to walk N nodes.
+    # Attribute names are always unqualified — they inherit the default namespace
+    # from the enclosing <model xmlns="..."> declaration, which is semantically
+    # equivalent to the namespaced form ElementTree would have generated.
+    parts = ["<vertices>"]
+    append = parts.append
+    for i in range(n):
+        append(f'<vertex x="{x_strs[i]}" y="{y_strs[i]}" z="{z_strs[i]}"/>')
+    parts.append("</vertices>")
+
+    # Store in the side-cache so the streaming writer in standard.py can
+    # inject it without DOM overhead.  (Element objects have __slots__ and
+    # do not allow arbitrary attribute assignment.)
+    _raw_geometry_cache.setdefault(id(mesh_element), {})["vertices"] = "".join(parts)
+
+    _t3 = time.perf_counter()
+    timing_debug(f"write_vertices build raw XML ({n} verts)", (_t3 - _t2) * 1000)
+    timing_debug(f"write_vertices TOTAL ({n} verts)", (_t3 - _t0) * 1000)
 
 
 def write_triangles(
@@ -151,13 +210,17 @@ def write_triangles(
     support_strings: Optional[Dict[int, str]] = None,
 ) -> None:
     """
-    Writes a list of triangles into the specified mesh element.
+    Writes triangle geometry into the specified mesh element.
+
+    Instead of building ElementTree sub-elements, the geometry is pre-built as a
+    raw XML string and stored on ``mesh_element._raw_triangles_xml``.  The
+    streaming writer in ``standard.py`` injects it directly.
 
     :param mesh_element: The <mesh> element of the 3MF document.
     :param triangles: A list of triangles.
-    :param object_material_list_index: The index of the material that the object was written with.
+    :param object_material_list_index: Index of the material the object was written with.
     :param material_slots: List of materials belonging to the object.
-    :param material_name_to_index: Mapping from material name to index.
+    :param material_name_to_index: Mapping from material name to index in the basematerials resource.
     :param use_orca_format: Material export mode — 'PAINT', 'BASEMATERIAL', or 'STANDARD'.
     :param mmu_slicer_format: The target slicer format ('ORCA' or 'PRUSA').
     :param vertex_colors: Dictionary of color hex to filament index.
@@ -174,136 +237,192 @@ def write_triangles(
         f" seg_strings={len(segmentation_strings) if segmentation_strings else 0}"
     )
 
-    triangles_element = xml.etree.ElementTree.SubElement(
-        mesh_element, f"{{{MODEL_NAMESPACE}}}triangles"
-    )
-
-    triangle_name = f"{{{MODEL_NAMESPACE}}}triangle"
-    if use_orca_format in ("PAINT", "BASEMATERIAL"):
-        v1_name = "v1"
-        v2_name = "v2"
-        v3_name = "v3"
-        p1_name = "p1"
-        p2_name = "p2"
-        p3_name = "p3"
-        pid_name = "pid"
-    else:
-        v1_name = f"{{{MODEL_NAMESPACE}}}v1"
-        v2_name = f"{{{MODEL_NAMESPACE}}}v2"
-        v3_name = f"{{{MODEL_NAMESPACE}}}v3"
-        p1_name = f"{{{MODEL_NAMESPACE}}}p1"
-        p2_name = f"{{{MODEL_NAMESPACE}}}p2"
-        p3_name = f"{{{MODEL_NAMESPACE}}}p3"
-        pid_name = f"{{{MODEL_NAMESPACE}}}pid"
+    # Always use plain (unqualified) attribute names in the raw XML string.
+    # Attribute names are not in a namespace — they inherit the element's default
+    # namespace which the streaming writer declares on the root <model> element.
+    p1_name = "p1"
+    p2_name = "p2"
+    p3_name = "p3"
+    pid_name = "pid"
 
     # Get active UV layer for texture coordinate export
     uv_layer = None
     if mesh and texture_groups and mesh.uv_layers.active:
         uv_layer = mesh.uv_layers.active
 
+    n_tris = len(triangles)
     seg_strings_written = 0
 
-    for tri_idx, triangle in enumerate(triangles):
-        triangle_element = xml.etree.ElementTree.SubElement(
-            triangles_element, triangle_name
-        )
-        triangle_element.attrib[v1_name] = str(triangle.vertices[0])
-        triangle_element.attrib[v2_name] = str(triangle.vertices[1])
-        triangle_element.attrib[v3_name] = str(triangle.vertices[2])
+    if n_tris == 0:
+        return
 
-        # Handle segmentation strings from UV texture (PAINT mode)
-        if segmentation_strings and tri_idx in segmentation_strings:
-            seg_string = segmentation_strings[tri_idx]
-            if seg_string:
-                if mmu_slicer_format == "PRUSA":
-                    ns_attr = "{http://schemas.slic3r.org/3mf/2017/06}mmu_segmentation"
-                    triangle_element.attrib[ns_attr] = seg_string
-                    seg_strings_written += 1
-                else:
-                    triangle_element.attrib["paint_color"] = seg_string
-                    seg_strings_written += 1
+    _t0 = time.perf_counter()
 
-                # Seam / support attributes are independent of color paint
-                if seam_strings and tri_idx in seam_strings and seam_strings[tri_idx]:
-                    triangle_element.attrib["paint_seam"] = seam_strings[tri_idx]
-                if support_strings and tri_idx in support_strings and support_strings[tri_idx]:
-                    triangle_element.attrib["paint_supports"] = support_strings[tri_idx]
+    # --- Pre-computation phase: bulk-extract mesh data to avoid per-triangle
+    # Blender wrapper overhead in the hot loop. ---
+
+    # Bulk-extract all triangle vertex indices (flat: n_tris * 3)
+    verts_flat = np.empty(n_tris * 3, dtype=np.int32)
+    triangles.foreach_get("vertices", verts_flat)
+    # tolist() gives Python ints; map(str, ...) is fastest for batch int→str
+    verts_strs = list(map(str, verts_flat.tolist()))
+
+    # Bulk-extract per-triangle material slot indices
+    mat_flat = np.empty(n_tris, dtype=np.int32)
+    triangles.foreach_get("material_index", mat_flat)
+    mat_indices_list = mat_flat.tolist()
+
+    _t1 = time.perf_counter()
+    timing_debug(f"write_triangles foreach_get verts+mat ({n_tris} tris)", (_t1 - _t0) * 1000)
+
+    # Pre-compute per-slot attribute dicts so the hot loop avoids repeated
+    # material_slots[i].material.name lookups and dict rebuilds per triangle.
+    # slot_attribs[i]: None | group_data_dict (texture, has "group_id") | {attr: val}
+    n_slots = len(material_slots)
+    slot_attribs: List = [None] * n_slots
+    for slot_idx in range(n_slots):
+        slot_mat = material_slots[slot_idx].material
+        if slot_mat is None:
+            continue
+        name = str(slot_mat.name)
+        if uv_layer and texture_groups and name in texture_groups:
+            # Texture path — store group_data dict directly.
+            # Identified in the loop by presence of "group_id" key.
+            slot_attribs[slot_idx] = texture_groups[name]
+        elif name in material_name_to_index:
+            mat_idx_val = material_name_to_index[name]
+            attrs: Dict[str, str] = {p1_name: str(mat_idx_val)}
+            if basematerials_resource_id:
+                attrs[pid_name] = str(basematerials_resource_id)
+            slot_attribs[slot_idx] = attrs
+
+    # Pre-fetch all UV loop data when texture groups are present, replacing
+    # per-triangle uv_layer.data[loop_idx].uv wrapper access.
+    uv_data_arr = None
+    uv_loops_list = None
+    if uv_layer:
+        n_loops = len(uv_layer.data)
+        uv_flat = np.empty(n_loops * 2, dtype=np.float32)
+        uv_layer.data.foreach_get("uv", uv_flat)
+        uv_data_arr = uv_flat.reshape(n_loops, 2)
+        loops_flat = np.empty(n_tris * 3, dtype=np.int32)
+        triangles.foreach_get("loops", loops_flat)
+        uv_loops_list = loops_flat.tolist()
+
+    _t2 = time.perf_counter()
+    timing_debug(f"write_triangles pre-compute (slots + UV fetch)", (_t2 - _t1) * 1000)
+
+    # Hoist per-iteration conditionals that don't change between triangles
+    has_segmentation = bool(segmentation_strings)
+    is_basematerial_vc = (
+        use_orca_format == "BASEMATERIAL"
+        and bool(vertex_colors)
+        and mesh is not None
+        and blender_object is not None
+    )
+    is_prusa = mmu_slicer_format == "PRUSA"
+    prusa_seg_attr = "slic3rpe:mmu_segmentation"
+
+    # Pre-compute per-slot attribute string fragments so the hot loop emits
+    # complete XML strings rather than building dicts and calling attrib.update().
+    # Each entry is: None | group_data dict (texture) | str (plain frag like ' pid="2" p1="3"')
+    slot_frags: List = [None] * n_slots
+    for slot_idx in range(n_slots):
+        cached = slot_attribs[slot_idx]
+        if cached is None or "group_id" in cached:
+            slot_frags[slot_idx] = cached  # None or texture group_data dict
+        else:
+            # Render the attribute fragment.  Attribute names are always
+            # unqualified in raw XML output — they inherit the default namespace.
+            pid_val = cached.get(pid_name) or cached.get("pid")
+            p1_val = cached.get(p1_name) or cached.get("p1")
+            frag = ""
+            if pid_val is not None:
+                frag += f' pid="{pid_val}"'
+            if p1_val is not None:
+                frag += f' p1="{p1_val}"'
+            slot_frags[slot_idx] = frag if frag else None
+
+    # --- Build raw <triangles> XML string directly, bypassing ElementTree DOM ---
+    # This avoids creating 2M+ Python Element objects and lets the streaming
+    # writer inject the text block without a per-node serialisation walk.
+    parts = ["<triangles>"]
+    append = parts.append
+    v = verts_strs  # local alias
+
+    for tri_idx in range(n_tris):
+        base = tri_idx * 3
+        v0, v1_, v2_ = v[base], v[base + 1], v[base + 2]
+
+        # --- PAINT mode: segmentation strings ---
+        if has_segmentation:
+            seg_str = segmentation_strings.get(tri_idx)
+            if seg_str:
+                seg_strings_written += 1
+                seg_part = f' {prusa_seg_attr}="{seg_str}"' if is_prusa else f' paint_color="{seg_str}"'
+                seam = seam_strings.get(tri_idx) if seam_strings else None
+                sup = support_strings.get(tri_idx) if support_strings else None
+                seam_part = f' paint_seam="{seam}"' if seam else ""
+                sup_part = f' paint_supports="{sup}"' if sup else ""
+                append(f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}"{seg_part}{seam_part}{sup_part}/>')
                 continue
 
-        # Handle multi-material color zones (BASEMATERIAL mode only)
-        if (
-            use_orca_format == "BASEMATERIAL"
-            and vertex_colors
-            and mesh
-            and blender_object
-        ):
+        # --- BASEMATERIAL mode with vertex colors ---
+        if is_basematerial_vc:
+            triangle = triangles[tri_idx]
             triangle_color = get_triangle_color(mesh, triangle, blender_object)
             if triangle_color and triangle_color in vertex_colors:
                 colorgroup_id = vertex_colors[triangle_color]
-
-                if mmu_slicer_format == "PRUSA":
+                if is_prusa:
                     if colorgroup_id < len(ORCA_FILAMENT_CODES):
                         paint_code = ORCA_FILAMENT_CODES[colorgroup_id]
                         if paint_code:
-                            ns_attr = "{http://schemas.slic3r.org/3mf/2017/06}mmu_segmentation"
-                            triangle_element.attrib[ns_attr] = paint_code
+                            append(f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}" {prusa_seg_attr}="{paint_code}"/>')
+                            continue
                 else:
-                    triangle_element.attrib[pid_name] = str(colorgroup_id)
-                    triangle_element.attrib[p1_name] = "0"
-
+                    paint_extra = ""
                     if colorgroup_id < len(ORCA_FILAMENT_CODES):
                         paint_code = ORCA_FILAMENT_CODES[colorgroup_id]
                         if paint_code:
-                            triangle_element.attrib["paint_color"] = paint_code
-        elif triangle.material_index < len(material_slots):
-            triangle_material = material_slots[triangle.material_index].material
-            if triangle_material is not None:
-                triangle_material_name = str(triangle_material.name)
+                            paint_extra = f' paint_color="{paint_code}"'
+                    append(f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}" pid="{colorgroup_id}" p1="0"{paint_extra}/>')
+                    continue
+            append(f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}"/>')
+        else:
+            # --- Standard material path (pre-computed slot fragments) ---
+            mat_slot_idx = mat_indices_list[tri_idx]
+            extra = ""
+            if mat_slot_idx < n_slots:
+                frag = slot_frags[mat_slot_idx]
+                if frag is not None:
+                    if isinstance(frag, str):
+                        extra = frag
+                    else:
+                        # Texture UV path — frag is the group_data dict
+                        loop0 = uv_loops_list[base]
+                        loop1 = uv_loops_list[base + 1]
+                        loop2 = uv_loops_list[base + 2]
+                        uv1 = uv_data_arr[loop0]
+                        uv2 = uv_data_arr[loop1]
+                        uv3 = uv_data_arr[loop2]
+                        gid = frag["group_id"]
+                        i1 = get_or_create_tex2coord(frag, float(uv1[0]), float(uv1[1]))
+                        i2 = get_or_create_tex2coord(frag, float(uv2[0]), float(uv2[1]))
+                        i3 = get_or_create_tex2coord(frag, float(uv3[0]), float(uv3[1]))
+                        extra = f' pid="{gid}" p1="{i1}" p2="{i2}" p3="{i3}"'
 
-                # Textured material — use texture2dgroup with UV indices
-                if (
-                    texture_groups
-                    and triangle_material_name in texture_groups
-                    and uv_layer
-                ):
-                    group_data = texture_groups[triangle_material_name]
-                    group_id = group_data["group_id"]
-                    triangle_element.attrib[pid_name] = group_id
+            seam = seam_strings.get(tri_idx) if seam_strings else None
+            sup = support_strings.get(tri_idx) if support_strings else None
+            seam_part = f' paint_seam="{seam}"' if seam else ""
+            sup_part = f' paint_supports="{sup}"' if sup else ""
+            append(f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}"{extra}{seam_part}{sup_part}/>')
 
-                    uv_data = uv_layer.data
-                    loop_indices = triangle.loops
+    parts.append("</triangles>")
+    _raw_geometry_cache.setdefault(id(mesh_element), {})["triangles"] = "".join(parts)
 
-                    uv1 = uv_data[loop_indices[0]].uv
-                    uv2 = uv_data[loop_indices[1]].uv
-                    uv3 = uv_data[loop_indices[2]].uv
-
-                    idx1 = get_or_create_tex2coord(group_data, uv1[0], uv1[1])
-                    idx2 = get_or_create_tex2coord(group_data, uv2[0], uv2[1])
-                    idx3 = get_or_create_tex2coord(group_data, uv3[0], uv3[1])
-
-                    triangle_element.attrib[p1_name] = str(idx1)
-                    triangle_element.attrib[p2_name] = str(idx2)
-                    triangle_element.attrib[p3_name] = str(idx3)
-
-                elif triangle_material_name in material_name_to_index:
-                    material_index = material_name_to_index[triangle_material_name]
-                    # Always write per-triangle pid/p1 so slicers like
-                    # Orca see the color even for single-material objects.
-                    # Previously this was gated by
-                    #   ``material_index != object_material_list_index``
-                    # which meant single-colour objects got no per-triangle
-                    # attributes and Orca ignored the object-level pid.
-                    if basematerials_resource_id:
-                        triangle_element.attrib[pid_name] = str(
-                            basematerials_resource_id
-                        )
-                    triangle_element.attrib[p1_name] = str(material_index)
-
-        # Seam / support for triangles not handled by the segmentation branch
-        if seam_strings and tri_idx in seam_strings and seam_strings[tri_idx]:
-            triangle_element.attrib["paint_seam"] = seam_strings[tri_idx]
-        if support_strings and tri_idx in support_strings and support_strings[tri_idx]:
-            triangle_element.attrib["paint_supports"] = support_strings[tri_idx]
+    _t3 = time.perf_counter()
+    timing_debug(f"write_triangles main loop ({n_tris} tris)", (_t3 - _t2) * 1000)
+    timing_debug(f"write_triangles TOTAL ({n_tris} tris)", (_t3 - _t0) * 1000)
 
     if segmentation_strings:
         debug(

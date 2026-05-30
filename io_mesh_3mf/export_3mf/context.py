@@ -109,7 +109,6 @@ class ExportContext:
     # --- Progress state -----------------------------------------------------
     _progress_context: object = None
     _progress_value: int = 0
-    _progress_range: Optional[Tuple[int, int]] = None
     # Browser progress window (None when disabled / below threshold)
     progress: Optional["ProgressWindow"] = None
 
@@ -140,8 +139,19 @@ class ExportContext:
             if hasattr(window_manager, "status_text_set"):
                 window_manager.status_text_set(message)
 
-    def _progress_update(self, value: int, message: Optional[str] = None) -> None:
-        """Update progress bar (monotonically increasing)."""
+    def _progress_update(self, value: int, message: Optional[str] = None, phase: Optional[int] = None) -> None:
+        """Update progress bar (monotonically increasing).
+
+        :param value: Progress value 0–100 for Blender's window manager bar.
+        :param message: Status text shown in the header.
+        :param phase: If given, pin the browser card to this phase index instead
+            of auto-deriving it from ``value``.  Use this whenever the raw 0–100
+            value doesn't accurately reflect which named phase is active (e.g.
+            per-object geometry loops that span the full 0–95 range).
+            Phase indices match PHASES["export"]:
+              0=Preparing, 1=Geometry, 2=Materials, 3=Segmentation,
+              4=Thumbnail, 5=Packaging
+        """
         context = self._progress_context
         if not context:
             return
@@ -153,19 +163,21 @@ class ExportContext:
         if message and window_manager and hasattr(window_manager, "status_text_set"):
             window_manager.status_text_set(message)
         # Forward to browser progress window
-        # Map the 0-100 Blender progress value to a phase index and percent.
-        # Export phases (weights): Preparing=5, Geometry=40, Materials=20,
-        #   Segmentation=25, Thumbnail=5, Packaging=5
         if self.progress is not None:
-            # Approximate phase boundaries by cumulative weight
-            _PHASE_BREAKS = [5, 45, 65, 90, 95, 100]  # cumulative %
-            phase_idx = 0
-            for i, threshold in enumerate(_PHASE_BREAKS):
-                if new_value < threshold:
-                    phase_idx = i
-                    break
+            if phase is not None:
+                phase_idx = phase
             else:
-                phase_idx = len(_PHASE_BREAKS) - 1
+                # Auto-derive phase from cumulative weight boundaries.
+                # Export phases (weights): Preparing=5, Geometry=40, Materials=20,
+                #   Segmentation=25, Thumbnail=5, Packaging=5
+                _PHASE_BREAKS = [5, 45, 65, 90, 95, 100]  # cumulative %
+                phase_idx = 0
+                for i, threshold in enumerate(_PHASE_BREAKS):
+                    if new_value < threshold:
+                        phase_idx = i
+                        break
+                else:
+                    phase_idx = len(_PHASE_BREAKS) - 1
             self.progress.update(new_value / 100.0, phase_idx, message or "")
 
     def _progress_end(self) -> None:

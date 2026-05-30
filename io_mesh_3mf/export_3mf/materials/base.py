@@ -319,21 +319,25 @@ def collect_face_colors(
             f"Object {blender_object.name}: {len(mesh.vertices)} vertices, {len(mesh.polygons)} faces"
         )
 
-        # Get all materials used by faces
-        # Use the evaluated object's material slots when available, because
-        # Geometry Nodes "Set Material" nodes only create slots on the
-        # evaluated depsgraph copy.
+        # Get all colors actually used by this mesh's faces.
+        # Instead of iterating every polygon, we only need to check the
+        # material slots that are actually referenced by at least one face.
+        # foreach_get pulls all material indices in one C call, then we
+        # deduplicate with a set — far cheaper than a per-face Python loop.
         slot_source = eval_object if use_mesh_modifiers else blender_object
-        for face in mesh.polygons:
-            if face.material_index < len(slot_source.material_slots):
-                material = slot_source.material_slots[face.material_index].material
-                if material:
-                    color = material_to_hex_color(material)
-                    if color:
-                        unique_colors.add(color)
-                        debug(
-                            f"Face {face.index}: material={material.name}, color={color}"
-                        )
+        n_slots = len(slot_source.material_slots)
+        if n_slots > 0:
+            import numpy as np
+            mat_indices = np.empty(len(mesh.polygons), dtype=np.int32)
+            mesh.polygons.foreach_get("material_index", mat_indices)
+            used_slot_indices = set(mat_indices.tolist())
+            for slot_idx in used_slot_indices:
+                if slot_idx < n_slots:
+                    material = slot_source.material_slots[slot_idx].material
+                    if material:
+                        color = material_to_hex_color(material)
+                        if color:
+                            unique_colors.add(color)
 
         eval_object.to_mesh_clear()
 
