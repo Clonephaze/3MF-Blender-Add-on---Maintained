@@ -13,10 +13,12 @@ Bug Fixes
 Performance
 ----
 * **Geometry export significantly faster (AUTO/Paint mode)** — `OrcaExporter.write_object_model` now uses `foreach_get` + numpy bulk extraction for both vertices and triangles, eliminating per-vertex and per-triangle Python wrapper overhead. Per-slot paint code fragments are pre-computed once (O(n_slots)) instead of resolving `material_to_hex_color` on every triangle (O(n_triangles)). The per-object XML files are written directly to the archive via the streaming writer instead of buffering through `io.BytesIO`.
+* **Faster mesh creation on import** — `create_mesh_from_data` now uses numpy bulk `foreach_set` calls instead of `mesh.from_pydata`. Vertex coordinates and triangle indices are converted to flat C arrays in one shot and pushed to Blender's mesh data via ~5 C-level calls instead of per-element Python iteration. ~5% faster import on large meshes and significantly less memory overhead.
 
 API
 ----
 * **API version bumped to 1.3.0** — new `"progress_window"` capability flag.
+* **`export_3mf()` gains `show_progress_window` parameter** — passing `show_progress_window=True` opens the browser progress card from a programmatic call, identical to what the file-dialog operator shows. Respects the *Show Progress Window* addon preference. The `on_progress` callback still fires in addition if provided.
 
 ----
 

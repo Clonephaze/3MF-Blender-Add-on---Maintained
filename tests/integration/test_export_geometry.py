@@ -16,6 +16,7 @@ from io_mesh_3mf.common.constants import MODEL_NAMESPACE
 from io_mesh_3mf.export_3mf.geometry import (
     write_vertices,
     check_non_manifold_geometry,
+    get_raw_geometry,
 )
 
 
@@ -42,9 +43,10 @@ class TestWriteVertices(Blender3mfTestCase):
         mesh_element = self._create_mesh_element()
         write_vertices(mesh_element, mesh.vertices, "STANDARD", 6)
 
-        verts_elem = mesh_element.find(f"{{{MODEL_NAMESPACE}}}vertices")
-        self.assertIsNotNone(verts_elem)
-        vertex_elements = verts_elem.findall(f"{{{MODEL_NAMESPACE}}}vertex")
+        raw_v, _ = get_raw_geometry(mesh_element)
+        self.assertIsNotNone(raw_v)
+        verts_elem = ET.fromstring(raw_v)
+        vertex_elements = verts_elem.findall("vertex")
         self.assertEqual(len(vertex_elements), 8)
 
     def test_coordinates_present(self):
@@ -55,11 +57,11 @@ class TestWriteVertices(Blender3mfTestCase):
         mesh_element = self._create_mesh_element()
         write_vertices(mesh_element, mesh.vertices, "PAINT", 6)
 
-        verts_elem = mesh_element.find(f"{{{MODEL_NAMESPACE}}}vertices")
-        vertex_elements = verts_elem.findall(f"{{{MODEL_NAMESPACE}}}vertex")
+        raw_v, _ = get_raw_geometry(mesh_element)
+        verts_elem = ET.fromstring(raw_v)
+        vertex_elements = verts_elem.findall("vertex")
 
         for ve in vertex_elements:
-            # In PAINT mode, attributes are unqualified ("x" not "{ns}x")
             self.assertIn("x", ve.attrib)
             self.assertIn("y", ve.attrib)
             self.assertIn("z", ve.attrib)
@@ -72,8 +74,9 @@ class TestWriteVertices(Blender3mfTestCase):
         mesh_element = self._create_mesh_element()
         write_vertices(mesh_element, mesh.vertices, "PAINT", 3)
 
-        verts_elem = mesh_element.find(f"{{{MODEL_NAMESPACE}}}vertices")
-        ve = verts_elem.findall(f"{{{MODEL_NAMESPACE}}}vertex")[0]
+        raw_v, _ = get_raw_geometry(mesh_element)
+        verts_elem = ET.fromstring(raw_v)
+        ve = verts_elem.findall("vertex")[0]
         x_val = ve.attrib["x"]
         # At most 3 decimal digits
         if "." in x_val:
@@ -81,17 +84,21 @@ class TestWriteVertices(Blender3mfTestCase):
             self.assertLessEqual(len(decimal_part), 3)
 
     def test_standard_mode_namespaced_attrs(self):
-        """In STANDARD mode, attributes should be namespace-qualified."""
+        """Vertex attributes are always unqualified in the raw geometry cache."""
         bpy.ops.mesh.primitive_cube_add()
         mesh = bpy.context.object.data
 
         mesh_element = self._create_mesh_element()
         write_vertices(mesh_element, mesh.vertices, "STANDARD", 6)
 
-        verts_elem = mesh_element.find(f"{{{MODEL_NAMESPACE}}}vertices")
-        ve = verts_elem.findall(f"{{{MODEL_NAMESPACE}}}vertex")[0]
-        # In STANDARD mode, attributes are {namespace}x
-        self.assertIn(f"{{{MODEL_NAMESPACE}}}x", ve.attrib)
+        raw_v, _ = get_raw_geometry(mesh_element)
+        verts_elem = ET.fromstring(raw_v)
+        ve = verts_elem.findall("vertex")[0]
+        # Raw geometry always uses unqualified attributes; they inherit the
+        # default namespace from the enclosing <model xmlns="..."> element.
+        self.assertIn("x", ve.attrib)
+        self.assertIn("y", ve.attrib)
+        self.assertIn("z", ve.attrib)
 
 
 # ============================================================================

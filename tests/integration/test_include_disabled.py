@@ -178,7 +178,10 @@ class TestPrusaIncludeDisabled(Blender3mfTestCase):
         )
         self.assertIn("FINISHED", result)
 
-        # Prusa uses single model file — verify both objects are present
+        # Prusa uses single model file — verify the combined mesh is present.
+        # PrusaExporter merges all objects into one combined <object>, so we
+        # expect exactly 1 mesh object whose triangle count exceeds a single
+        # cube (12 triangles) — confirming the disabled cube was included.
         with zipfile.ZipFile(str(self.temp_file), "r") as archive:
             model_data = archive.read("3D/3dmodel.model")
             root = ET.fromstring(model_data)
@@ -188,8 +191,14 @@ class TestPrusaIncludeDisabled(Blender3mfTestCase):
             ]
             self.assertGreaterEqual(
                 len(mesh_objects),
-                2,
-                "Both objects (enabled + disabled) should have mesh data",
+                1,
+                "Prusa combines all objects into one mesh object",
+            )
+            triangles = root.findall(f".//{{{MODEL_NS}}}triangle")
+            self.assertGreater(
+                len(triangles),
+                12,
+                "Combined mesh should have more triangles than a single cube (disabled object must be included)",
             )
 
 
