@@ -111,7 +111,7 @@ from .common.units import (
 #: - MAJOR: Breaking changes to existing functions/signatures
 #: - MINOR: New features, backward-compatible
 #: - PATCH: Bug fixes only
-API_VERSION = (1, 3, 0)
+API_VERSION = (1, 3, 1)
 
 #: Human-readable version string
 API_VERSION_STRING = ".".join(str(v) for v in API_VERSION)
@@ -1073,6 +1073,11 @@ def export_3mf(
         extension_manager=ExtensionManager(),
     )
 
+    # Wire the progress window into the context so internal _progress_update()
+    # calls (inside the exporter) drive the browser card live.
+    if _pw is not None:
+        ctx.progress = _pw
+
     # Wire up custom project template path.
     if project_template is not None:
         ctx.project_template_path = os.path.abspath(project_template)
@@ -1176,7 +1181,8 @@ def export_3mf(
         )
 
     # Dispatch to exporter.
-    try:
+    try:  # noqa: SIM105  (must keep _pw.finish() in finally)
+      try:
         if use_orca_format == "PAINT":
             if mmu_slicer_format == "ORCA":
                 exporter = OrcaExporter(ctx)
@@ -1217,21 +1223,20 @@ def export_3mf(
 
         status_set = exporter.execute(context, archive, blender_objects, scale)
         result.status = next(iter(status_set)) if status_set else "FINISHED"
-    except Exception as e:
+      except Exception as e:
         error(f"Export failed: {e}")
-        if _pw is not None:
-            _pw.finish()
         result.status = "CANCELLED"
         result.warnings.append(str(e))
         return result
+    finally:
+        if _pw is not None:
+            _pw.finish()
+        ctx.progress = None
 
     result.num_written = ctx.num_written
 
     if on_progress:
         on_progress(100, "Export complete")
-
-    if _pw is not None:
-        _pw.finish()
 
     debug(f"API: Exported {ctx.num_written} objects to {filepath}")
     return result

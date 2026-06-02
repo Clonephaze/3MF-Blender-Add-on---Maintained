@@ -1,3 +1,13 @@
+2.7.1 — Progress Window Fixes
+====
+
+API Bug Fixes
+----
+* **Progress card showed no data and never updated when called via API** — `ctx.progress` was never assigned the `ProgressWindow` instance in `export_3mf()`, so all internal `_progress_update()` calls from the exporter had nowhere to send data. The window now receives live phase and percentage updates.
+* **Progress window never closed when called via API** — `_pw.finish()` was placed after the `return result` statement (dead code) on the success path. Moved into a `finally` block so it always runs regardless of success or failure.
+
+----
+
 2.7.0 — Progress Window, UV Map Paint Option & Export Performance
 ====
 

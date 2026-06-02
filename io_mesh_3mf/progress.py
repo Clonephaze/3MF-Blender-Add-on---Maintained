@@ -68,7 +68,7 @@ from typing import List, Optional, Tuple
 
 import bpy
 
-from .common.logging import warn, debug
+from .common.logging import warn
 
 # ---------------------------------------------------------------------------
 # Phase definitions
@@ -112,7 +112,6 @@ PHASES: dict[str, List[Tuple[str, int]]] = {
 # Preference helpers
 # ---------------------------------------------------------------------------
 
-
 def _get_addon_package() -> str:
     """Return the top-level addon package name."""
     pkg = __package__ or ""
@@ -155,38 +154,22 @@ def should_show_progress(op_type: str, **hints) -> bool:
     :return: ``True`` if the window should be spawned, ``False`` otherwise.
     """
     if not _get_progress_pref():
-        debug("ProgressWindow: skipped — 'Show Progress Window' preference is disabled")
         return False
     if bpy.app.background:
-        debug("ProgressWindow: skipped — running in background mode")
         return False
 
     if op_type == "bake_cycles":
         return True
     if op_type == "bake_vc":
-        result = hints.get("face_count", 0) > 10_000
-        if not result:
-            warn(f"ProgressWindow: skipped bake_vc — face_count={hints.get('face_count', 0)} (threshold 10 000)")
-        return result
+        return hints.get("face_count", 0) > 10_000
     if op_type == "export":
-        result = (
+        return (
             hints.get("has_paint", False)
             or hints.get("tri_count", 0) > 50_000
             or hints.get("thumbnail_render", False)
         )
-        if not result:
-            warn(
-                f"ProgressWindow: skipped export — "
-                f"tri_count={hints.get('tri_count', 0)} (threshold 50 000), "
-                f"has_paint={hints.get('has_paint', False)}, "
-                f"thumbnail_render={hints.get('thumbnail_render', False)}"
-            )
-        return result
     if op_type == "import":
-        result = hints.get("file_size_bytes", 0) > 5_000_000
-        if not result:
-            warn(f"ProgressWindow: skipped import — file_size={hints.get('file_size_bytes', 0)} bytes (threshold 5 MB)")
-        return result
+        return hints.get("file_size_bytes", 0) > 5_000_000
     if op_type == "batch":
         return True
     return False
@@ -206,6 +189,7 @@ class ProgressWindow:
 
     _json_path: pathlib.Path = pathlib.Path(tempfile.gettempdir()) / "3mf_progress.json"
     _cancel_path: pathlib.Path = pathlib.Path(tempfile.gettempdir()) / "3mf_progress.cancel"
+    _port_path: pathlib.Path = pathlib.Path(tempfile.gettempdir()) / "3mf_progress_port.json"
 
     def __init__(self) -> None:
         self._proc: Optional[subprocess.Popen] = None
@@ -247,11 +231,12 @@ class ProgressWindow:
         :param filament_colors: Optional list of ``"#RRGGBB"`` strings shown as
             filament swatches (bake operations).
         """
-        # Clear stale cancel flag from a previous run.
-        try:
-            self._cancel_path.unlink()
-        except FileNotFoundError:
-            pass
+        # Clear stale IPC files from a previous run.
+        for p in (self._cancel_path, self._port_path):
+            try:
+                p.unlink()
+            except FileNotFoundError:
+                pass
 
         self._start_time = time.time()
         self._active = True
@@ -273,30 +258,42 @@ class ProgressWindow:
         self._write_state(initial_state)
 
         script = pathlib.Path(__file__).parent / "progress_win.py"
-        if not script.exists():
-            warn(f"ProgressWindow: progress_win.py not found at {script}")
-            self._active = False
-            return
-
-        # Redirect subprocess stderr to a temp log so crashes are diagnosable.
-        # Check $TEMP/3mf_progress_err.txt if the window doesn't appear.
-        log_path = pathlib.Path(tempfile.gettempdir()) / "3mf_progress_err.txt"
         creationflags = 0x08000000 if sys.platform == "win32" else 0
         try:
-            log_file = open(log_path, "w", encoding="utf-8")
             self._proc = subprocess.Popen(
                 [sys.executable, str(script), str(self._json_path)],
                 creationflags=creationflags,
-                stdout=log_file,
-                stderr=log_file,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
-            log_file.close()
         except Exception as e:
             warn(f"ProgressWindow: could not spawn subprocess: {e}")
             self._active = False
             return
-        debug(f"ProgressWindow: spawned subprocess PID {self._proc.pid} for '{operation}'")
-        warn(f"ProgressWindow: progress window launched — check {log_path} if it doesn't appear")
+
+        # Wait up to 2 s for the subprocess HTTP server to be ready, then
+        # open the browser from Blender's main thread via bpy.ops.wm.url_open.
+        # (Opening from inside the subprocess fails silently on macOS — see
+        #  the architecture note in the module docstring.)
+        deadline = time.time() + 2.0
+        opened = False
+        while time.time() < deadline:
+            if self._port_path.exists():
+                try:
+                    port_data = json.loads(self._port_path.read_text(encoding="utf-8"))
+                    port = int(port_data["port"])
+                    # If the subprocess already launched a Chromium --app window,
+                    # don't open a second full browser tab.
+                    if not port_data.get("browser_opened", False):
+                        bpy.ops.wm.url_open(url=f"http://127.0.0.1:{port}/")
+                    opened = True
+                    break
+                except Exception:
+                    pass
+            time.sleep(0.05)
+
+        if not opened:
+            warn("ProgressWindow: timed out waiting for server — window may not appear")
 
     def update(
         self,

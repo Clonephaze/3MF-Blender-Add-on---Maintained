@@ -36,7 +36,7 @@ import bpy.types
 
 from ..common.colors import hex_to_rgb as _rgb_from_hex
 from ..common.colors import rgb_to_hex as _hex_from_rgb
-from ..common.logging import debug, error
+from ..common.logging import debug, error, warn
 from ..progress import ProgressWindow, PHASES, should_show_progress
 
 from .quantize import (  # noqa: F401 â€” re-exported for backward compat
@@ -175,8 +175,6 @@ def _ensure_uv_unwrap(obj, context):
 
     bpy.ops.object.mode_set(mode=prev_mode)
     return prev_active_name
-
-
 def _get_texture_size(mesh, override_size=0):
     """Determine texture size based on triangle count or user override."""
     if override_size > 0:

@@ -70,9 +70,9 @@ _HTML = """<!DOCTYPE html>
   }
 
   html, body {
-    width: 100%; height: 100%;
+    width: 100%;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
     background: var(--bg);
     color: var(--text-1);
@@ -362,36 +362,6 @@ _HTML = """<!DOCTYPE html>
     transform: none;
   }
 
-  /* ── Tab-mode info banner (hidden in app mode) ── */
-  .tab-info {
-    display: none;  /* shown by JS when not in app mode */
-    margin-bottom: 14px;
-    padding: 10px 12px;
-    background: rgba(59,126,246,0.07);
-    border: 1px solid rgba(59,126,246,0.18);
-    border-radius: 7px;
-    font-size: 11px;
-    color: var(--text-2);
-    line-height: 1.55;
-  }
-  .tab-info.visible { display: block; }
-  .tab-info strong { color: var(--text-1); font-weight: 600; }
-  .tab-info .tip {
-    margin-top: 7px;
-    padding-top: 7px;
-    border-top: 1px solid rgba(255,255,255,0.06);
-    color: var(--text-3);
-    font-size: 10.5px;
-  }
-  .tab-info .tip code {
-    font-family: var(--mono);
-    font-size: 10px;
-    background: rgba(255,255,255,0.06);
-    padding: 1px 4px;
-    border-radius: 3px;
-    color: var(--text-2);
-  }
-
   /* ── Done overlay ── */
   .done-flash {
     position: fixed;
@@ -411,41 +381,10 @@ _HTML = """<!DOCTYPE html>
   }
 
   .done-flash.visible { opacity: 1; pointer-events: all; }
-
-  /* ── App-mode: card fills the window edge-to-edge, no floating-card look ── */
-  @media (display-mode: standalone) {
-    html, body { align-items: stretch; justify-content: stretch; }
-    .card {
-      max-width: 100%;
-      max-height: none;
-      height: 100vh;
-      border-radius: 0;
-      border-left: none;
-      border-right: none;
-      border-bottom: none;
-      box-shadow: none;
-    }
-  }
 </style>
 </head>
 <body>
 <div class="card">
-
-  <!-- Tab-mode info banner (hidden in --app mode, shown in regular tab) -->
-  <div class="tab-info" id="tab-info">
-    <strong>3MF Format — Live Progress</strong><br>
-    This tab opened automatically because a long-running 3MF operation is in
-    progress in Blender. It will close itself when the operation completes.<br>
-    <div class="tip">
-      For a compact floating card instead of a full tab, install
-      <strong>Chrome</strong> or <strong>Edge</strong> — they support
-      a frameless app-window mode.<br>
-      To disable this window entirely: <strong>Blender → Edit → Preferences →
-      Add-ons → 3MF Format → Advanced → Show Progress Window</strong>
-      and toggle it off. You can also use the <code>on_progress</code>
-      callback in the Python API for headless use.
-    </div>
-  </div>
 
   <!-- Header -->
   <div class="header">
@@ -500,25 +439,10 @@ _HTML = """<!DOCTYPE html>
 
   // ── SVG icon paths per operation type ──
   const OP_ICONS = {
-    export: (
-        '<path d="M5 1v6M2.5 4.5L5 7l2.5-2.5M1 8v1.5A.5.5 0 001.5 10h7a.5.5 0 00.5-.5V8"'
-        ' stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>'
-    ),
-    import: (
-        '<path d="M5 9V3M2.5 5.5L5 3l2.5 2.5M1 8v1.5A.5.5 0 001.5 10h7a.5.5 0 00.5-.5V8"'
-        ' stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>'
-    ),
-    bake_cycles: (
-        '<circle cx="5" cy="5" r="2" stroke="currentColor" stroke-width="1.3"/>'
-        '<path d="M5 1v1M5 8v1M1 5h1M8 5h1M2.05 2.05l.71.71M7.24 7.24l.71.71M7.24 2.76l-.71.71M2.76 7.24l-.71.71"'
-        ' stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>'
-    ),
-    bake_vc: (
-        '<path d="M2 7.5C2 5.567 3.343 4 5 4s3 1.567 3 3.5"'
-        ' stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>'
-        '<circle cx="5" cy="3" r="1.2" stroke="currentColor" stroke-width="1.2"/>'
-        '<path d="M1 9h8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>'
-    ),
+    export: '<path d="M5 1v6M2.5 4.5L5 7l2.5-2.5M1 8v1.5A.5.5 0 001.5 10h7a.5.5 0 00.5-.5V8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+    import: '<path d="M5 9V3M2.5 5.5L5 3l2.5 2.5M1 8v1.5A.5.5 0 001.5 10h7a.5.5 0 00.5-.5V8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+    bake_cycles: '<circle cx="5" cy="5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M5 1v1M5 8v1M1 5h1M8 5h1M2.05 2.05l.71.71M7.24 7.24l.71.71M7.24 2.76l-.71.71M2.76 7.24l-.71.71" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+    bake_vc:     '<path d="M2 7.5C2 5.567 3.343 4 5 4s3 1.567 3 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="5" cy="3" r="1.2" stroke="currentColor" stroke-width="1.2"/><path d="M1 9h8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
   };
 
   const OP_LABELS = {
@@ -550,18 +474,21 @@ _HTML = """<!DOCTYPE html>
   let done         = false;
   let elapsedStart = Date.now();
 
-  // ── Independent elapsed timer — pure local clock, 0.1 s tick ──
+  // ── Independent elapsed timer (1 s tick) ──
+  let elapsedServer = 0;
   setInterval(function () {
     if (done) return;
-    const s = (Date.now() - elapsedStart) / 1000;
-    elElapsed.textContent = formatElapsed(s);
-  }, 100);
+    const local = (Date.now() - elapsedStart) / 1000;
+    // Use server elapsed when available (more accurate), local as fallback
+    const val = elapsedServer > 0 ? elapsedServer + 0.25 : local;
+    elElapsed.textContent = formatElapsed(val);
+  }, 250);
 
   function formatElapsed(s) {
     if (s < 60) return s.toFixed(1) + 's';
     const m = Math.floor(s / 60);
-    const sec = (s % 60).toFixed(1);
-    return m + 'm ' + (parseFloat(sec) < 10 ? '0' : '') + sec + 's';
+    const sec = Math.floor(s % 60);
+    return m + 'm ' + (sec < 10 ? '0' : '') + sec + 's';
   }
 
   // ── Build stepper DOM ──
@@ -577,8 +504,7 @@ _HTML = """<!DOCTYPE html>
             '<circle cx="2.5" cy="2.5" r="2" stroke="currentColor" stroke-width="1" opacity="0.3"/>' +
           '</svg>' +
           '<svg class="step-check" width="7" height="6" viewBox="0 0 7 6" fill="none">' +
-            '<path d="M1 3l2 2 3-4" stroke="rgba(59,126,246,0.7)"'
-            ' stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="M1 3l2 2 3-4" stroke="rgba(59,126,246,0.7)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' +
           '</svg>' +
         '</div>' +
         '<span class="step-label" title="' + name + '">' + name + '</span>';
@@ -659,6 +585,10 @@ _HTML = """<!DOCTYPE html>
     // Message
     elMessage.textContent = d.message || d.phase || '';
 
+    // Elapsed from server
+    elapsedServer = d.elapsed || 0;
+    elElapsed.textContent = formatElapsed(elapsedServer);
+
     // Completion
     if (!d.active) {
       done = true;
@@ -698,24 +628,6 @@ _HTML = """<!DOCTYPE html>
     });
   }
 
-  // ── App-mode detection ──
-  // display-mode: standalone is true when launched via --app=URL (Chromium).
-  // In tab mode we show an info banner explaining what this page is and how to
-  // disable it, and we remove the max-height cap so the banner has room.
-  var isAppMode = window.matchMedia('(display-mode: standalone)').matches;
-
-  if (!isAppMode) {
-    document.getElementById('tab-info').classList.add('visible');
-    // Remove the max-height constraint so the banner fits without clipping
-    document.querySelector('.card').style.maxHeight = 'none';
-  }
-
-  // Position once on initial load — user can freely move the window after
-  window.addEventListener('load', function () {
-    if (!isAppMode) return;
-    var mx = 24, my = 48;
-    window.moveTo(mx, screen.availHeight - window.outerHeight - my);
-  });
   // Start polling
   poll();
 })();
@@ -737,48 +649,75 @@ def _free_port() -> int:
 
 
 def _find_chromium() -> str | None:
-    """Return path to Edge, Chrome, or Chromium (supports --app mode), or None."""
-    if sys.platform == "darwin":
+    """Return a path to Chrome, Edge, or Chromium that supports --app, or None.
+
+    Checks (in order):
+      1. Windows registry — both HKCU and HKLM, for Edge and Chrome
+      2. Well-known install locations including per-user %LOCALAPPDATA% paths
+      3. macOS application bundle paths
+      4. Linux PATH entries
+    """
+    if sys.platform == "win32":
+        import winreg  # type: ignore
+
+        # Registry: exe name → registry value name to look up
+        _reg_names = ["msedge.exe", "chrome.exe", "brave.exe"]
+        _reg_hives = [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]
+        _reg_base = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths"
+
+        for hive in _reg_hives:
+            for exe in _reg_names:
+                try:
+                    key = winreg.OpenKey(hive, rf"{_reg_base}\{exe}")
+                    path, _ = winreg.QueryValueEx(key, "")
+                    winreg.CloseKey(key)
+                    if path and os.path.exists(path):
+                        return path
+                except Exception:
+                    pass
+
+        # Per-user install paths (%LOCALAPPDATA%)
+        local_app = os.environ.get("LOCALAPPDATA", "")
+        program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+        program_files_x86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+
+        candidates = [
+            # Edge — per-user (most common on modern Windows 10/11)
+            os.path.join(local_app, r"Microsoft\Edge\Application\msedge.exe"),
+            # Edge — system-wide
+            os.path.join(program_files, r"Microsoft\Edge\Application\msedge.exe"),
+            os.path.join(program_files_x86, r"Microsoft\Edge\Application\msedge.exe"),
+            # Chrome — per-user
+            os.path.join(local_app, r"Google\Chrome\Application\chrome.exe"),
+            # Chrome — system-wide
+            os.path.join(program_files, r"Google\Chrome\Application\chrome.exe"),
+            os.path.join(program_files_x86, r"Google\Chrome\Application\chrome.exe"),
+            # Brave — per-user
+            os.path.join(local_app, r"BraveSoftware\Brave-Browser\Application\brave.exe"),
+            # Brave — system-wide
+            os.path.join(program_files, r"BraveSoftware\Brave-Browser\Application\brave.exe"),
+        ]
+        for p in candidates:
+            if p and os.path.exists(p):
+                return p
+
+    elif sys.platform == "darwin":
         for p in [
             "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-            "/Applications/Chromium.app/Contents/MacOS/Chromium",
             "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",
             "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
         ]:
             if os.path.exists(p):
                 return p
-        return None
 
-    if sys.platform != "win32":
+    else:
         import shutil
-        for name in ("google-chrome", "chromium-browser", "chromium", "microsoft-edge"):
+        for name in ("google-chrome", "microsoft-edge", "chromium-browser", "chromium", "brave-browser"):
             found = shutil.which(name)
             if found:
                 return found
-        return None
 
-    # Windows: registry first, then well-known paths
-    candidates = [
-        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
-        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-    ]
-    try:
-        import winreg  # type: ignore
-        key = winreg.OpenKey(
-            winreg.HKEY_LOCAL_MACHINE,
-            r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe",
-        )
-        path, _ = winreg.QueryValueEx(key, "")
-        winreg.CloseKey(key)
-        if path and os.path.exists(path):
-            return path
-    except Exception:
-        pass
-    for p in candidates:
-        if os.path.exists(p):
-            return p
     return None
 
 
@@ -800,11 +739,7 @@ class _Handler(BaseHTTPRequestHandler):
             try:
                 body = self.__class__.json_path.read_bytes()
             except Exception:
-                body = (
-                    b'{"active":true,"percent":0,"phase":"","phases":[],'
-                    b'"phase_index":0,"message":"","elapsed":0,'
-                    b'"can_cancel":false,"filament_colors":[]}'
-                )
+                body = b'{"active":true,"percent":0,"phase":"","phases":[],"phase_index":0,"message":"","elapsed":0,"can_cancel":false,"filament_colors":[]}'
             self._respond(200, "application/json; charset=utf-8", body)
         else:
             self.send_response(404)
@@ -845,6 +780,7 @@ class _Handler(BaseHTTPRequestHandler):
 def _run(json_path_str: str) -> None:
     json_path = pathlib.Path(json_path_str)
     cancel_path = json_path.parent / "3mf_progress.cancel"
+    port_path = json_path.parent / "3mf_progress_port.json"
 
     port = _free_port()
 
@@ -861,44 +797,43 @@ def _run(json_path_str: str) -> None:
     t.start()
 
     url = f"http://127.0.0.1:{port}/"
-    print(f"3MF Progress URL: {url}", flush=True)  # copy this into any browser for testing
 
-    # Pass --force-tab as argv[2] to skip Chromium and open in the default browser
-    force_tab = len(sys.argv) > 2 and sys.argv[2] == "--force-tab"
-
-    # Calculate exact window height from initial state — no JS resizing needed.
-    # Breakdown (px): Edge title bar ~34 | card v-padding 28 | header 33 |
-    #   stepper 37 | progress bar 12 | message row 25 | swatches +27 | cancel +35
-    try:
-        _init = json.loads(json_path.read_text(encoding="utf-8"))
-        _has_swatches = bool(_init.get("filament_colors"))
-        _can_cancel = _init.get("can_cancel", False)
-    except Exception:
-        _has_swatches = False
-        _can_cancel = False
-    win_h = 200
-    if _has_swatches:
-        win_h += 27
-    if _can_cancel:
-        win_h += 35
-
-    # Open the browser from this subprocess — Blender's main thread never
-    # calls url_open (see progress.py).  Prefer Chromium --app for a
-    # frameless card; fall back to webbrowser.open for a regular tab.
-    browser = None if force_tab else _find_chromium()
-    if browser:
-        subprocess.Popen([
-            browser,
-            f"--app={url}",
-            f"--window-size=440,{win_h}",
-            "--no-first-run",
-            "--no-default-browser-check",
-            "--disable-extensions",
-            "--disable-background-networking",
-        ])
+    # ── Open the progress card ────────────────────────────────────────────────
+    # Primary: launch a Chromium-based browser with --app=URL so the card
+    # appears as a frameless floating window (no tabs, no address bar).
+    # Fallback: webbrowser.open() — opens a new tab in whatever the user has
+    # set as their default browser.  Either way this subprocess handles it
+    # entirely; Blender's main thread does NOT need to call url_open.
+    chromium = _find_chromium()
+    if chromium:
+        try:
+            subprocess.Popen(
+                [
+                    chromium,
+                    f"--app={url}",
+                    "--window-size=440,175",
+                    "--disable-extensions",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                    "--disable-background-networking",
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            import webbrowser
+            webbrowser.open(url)
     else:
         import webbrowser
         webbrowser.open(url)
+
+    # Signal Blender that the server is ready.  browser_opened is always True
+    # from Blender's perspective — the subprocess has already handled opening
+    # the browser, so bpy.ops.wm.url_open must NOT be called.
+    port_path.write_text(
+        json.dumps({"port": port, "browser_opened": True}),
+        encoding="utf-8",
+    )
 
     # ── Wait until the operation completes ──────────────────────────────────
     while True:

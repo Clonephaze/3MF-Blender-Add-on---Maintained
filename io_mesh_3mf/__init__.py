@@ -423,8 +423,6 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         col.prop(self, "default_thumbnail_mode")
         if self.default_thumbnail_mode == "AUTO":
             col.prop(self, "default_thumbnail_resolution")
-        col.separator()
-        col.prop(self, "show_progress_window", icon="WINDOW")
 
     def _draw_import(self, layout):
         col = layout.column(align=True)
@@ -491,6 +489,11 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
             else:
                 box.label(text="No profiles saved", icon="INFO")
             box.operator("threemf.load_slicer_profile", icon="FILEBROWSER")
+
+        # ---- Progress Window ----
+        layout.separator()
+        box = layout.box()
+        box.prop(self, "show_progress_window", icon="WINDOW")
 
         # ---- Mixed Filaments (FullSpectrum) ----
         layout.separator()
