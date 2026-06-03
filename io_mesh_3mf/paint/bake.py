@@ -69,6 +69,7 @@ from .vertex_colors import (  # noqa: F401 â€” re-exported for backward com
 #  UV / Texture Helpers
 # ---------------------------------------------------------------------------
 
+
 def _ensure_uv_unwrap(obj, context):
     """Ensure the object has a dedicated MMU_Paint UV layer.
 
@@ -141,8 +142,10 @@ def _ensure_uv_unwrap(obj, context):
         bm = bmesh.new()
         bm.from_mesh(mesh)
         bmesh.ops.dissolve_limit(
-            bm, angle_limit=0.00873,
-            verts=bm.verts, edges=bm.edges,
+            bm,
+            angle_limit=0.00873,
+            verts=bm.verts,
+            edges=bm.edges,
         )
         bm.to_mesh(mesh)
         bm.free()
@@ -175,6 +178,8 @@ def _ensure_uv_unwrap(obj, context):
 
     bpy.ops.object.mode_set(mode=prev_mode)
     return prev_active_name
+
+
 def _get_texture_size(mesh, override_size=0):
     """Determine texture size based on triangle count or user override."""
     if override_size > 0:
@@ -228,6 +233,7 @@ def _get_filament_colors_from_settings(context):
 # ---------------------------------------------------------------------------
 #  Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _cleanup_per_mat_state(per_mat_state):
     """Remove all temporary bake nodes and restore original wiring for every material.
@@ -285,6 +291,7 @@ def _cleanup_per_mat_state(per_mat_state):
 # ---------------------------------------------------------------------------
 #  Operators
 # ---------------------------------------------------------------------------
+
 
 class MMU_OT_bake_to_mmu(bpy.types.Operator):
     """Bake the active material to a quantized MMU paint texture for 3MF export"""
@@ -356,8 +363,11 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
             pal_box = layout.box()
             pal_box.label(text="Filament Palette", icon="COLOR")
             flow = pal_box.grid_flow(
-                row_major=True, columns=0, even_columns=True,
-                even_rows=True, align=True,
+                row_major=True,
+                columns=0,
+                even_columns=True,
+                even_rows=True,
+                align=True,
             )
             for item in settings.init_filaments:
                 swatch = flow.row(align=True)
@@ -366,16 +376,20 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
                 swatch.prop(item, "color", text="")
 
             # Show mixed (virtual) filaments that will also be included.
-            active_mixes = [
-                mf for mf in settings.mixed_filaments
-                if mf.enabled and not mf.deleted
-            ] if getattr(settings, "has_mixed_filaments", False) else []
+            active_mixes = (
+                [mf for mf in settings.mixed_filaments if mf.enabled and not mf.deleted]
+                if getattr(settings, "has_mixed_filaments", False)
+                else []
+            )
             if active_mixes:
                 pal_box.separator(factor=0.5)
                 pal_box.label(text="+ Mixed Filaments (included):", icon="IPO_LINEAR")
                 mix_flow = pal_box.grid_flow(
-                    row_major=True, columns=0, even_columns=True,
-                    even_rows=True, align=True,
+                    row_major=True,
+                    columns=0,
+                    even_columns=True,
+                    even_rows=True,
+                    align=True,
                 )
                 for mf in active_mixes:
                     swatch = mix_flow.row(align=True)
@@ -437,13 +451,21 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
 
         try:
             return self._execute_body(
-                context, obj, mesh, settings, filament_colors, vc_attr_name, _pw,
+                context,
+                obj,
+                mesh,
+                settings,
+                filament_colors,
+                vc_attr_name,
+                _pw,
             )
         finally:
             if _pw is not None:
                 _pw.finish()
 
-    def _execute_body(self, context, obj, mesh, settings, filament_colors, vc_attr_name, _pw):
+    def _execute_body(
+        self, context, obj, mesh, settings, filament_colors, vc_attr_name, _pw
+    ):
         """Inner bake logic, wrapped by execute() for clean progress window teardown."""
         if vc_attr_name:
             debug(f"Bake to MMU: vertex color fast path, attr='{vc_attr_name}'")
@@ -455,7 +477,9 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
             # A â€” Per-face filament assignment (vectorised, instant)
             self.report({"INFO"}, "Assigning filament colours per face...")
             face_filaments = _compute_face_filaments(
-                mesh, vc_attr_name, filament_colors,
+                mesh,
+                vc_attr_name,
+                filament_colors,
             )
             if face_filaments is None:
                 self.report({"ERROR"}, "Failed to read vertex color data")
@@ -487,7 +511,9 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
                     src_flat = np.zeros(num_loops * 2, dtype=np.float64)
                     src_layer.data.foreach_get("uv", src_flat)
                     mmu_layer.data.foreach_set("uv", src_flat)
-                    debug(f"Bake to MMU (VC): copied UV from '{src_layer.name}' -> 'MMU_Paint'")
+                    debug(
+                        f"Bake to MMU (VC): copied UV from '{src_layer.name}' -> 'MMU_Paint'"
+                    )
 
             if uv_method != "EXISTING":
                 prev_mode = obj.mode
@@ -514,11 +540,11 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
                 bpy.ops.object.mode_set(mode=prev_mode)
             wm.progress_update(40)
             if _pw is not None:
-                _pw.update(0.2, 1, 'Assigning colors...')
+                _pw.update(0.2, 1, "Assigning colors...")
                 if _pw.is_cancel_requested():
                     wm.progress_end()
-                    self.report({'WARNING'}, 'Bake cancelled')
-                    return {'CANCELLED'}
+                    self.report({"WARNING"}, "Bake cancelled")
+                    return {"CANCELLED"}
 
             # C â€” Texture size
             tex_size = _get_texture_size(mesh, int(self.texture_size))
@@ -529,7 +555,11 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
             palette = np.array(filament_colors, dtype=np.float32)
             face_rgb = palette[face_filaments]
             pixels = _rasterize_face_colors(
-                mesh, "MMU_Paint", face_rgb, tex_size, tex_size,
+                mesh,
+                "MMU_Paint",
+                face_rgb,
+                tex_size,
+                tex_size,
             )
             if pixels is None:
                 self.report({"ERROR"}, "Failed to rasterize face colours")
@@ -537,11 +567,11 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
                 return {"CANCELLED"}
             wm.progress_update(60)
             if _pw is not None:
-                _pw.update(0.6, 2, 'Quantizing...')
+                _pw.update(0.6, 2, "Quantizing...")
                 if _pw.is_cancel_requested():
                     wm.progress_end()
-                    self.report({'WARNING'}, 'Bake cancelled')
-                    return {'CANCELLED'}
+                    self.report({"WARNING"}, "Bake cancelled")
+                    return {"CANCELLED"}
 
             # E â€” Per-pixel quantize (always â€” region method is overkill
             #     here since the texture already contains near-exact
@@ -551,7 +581,7 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
             debug(f"Bake to MMU (VC): pixel quantize changed {changed} px")
             wm.progress_update(85)
             if _pw is not None:
-                _pw.update(0.85, 3, 'Finalizing...')
+                _pw.update(0.85, 3, "Finalizing...")
 
             # F â€” Create image + finalize
             image_name = f"{mesh.name}_MMU_Paint"
@@ -559,7 +589,10 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
             if existing:
                 bpy.data.images.remove(existing)
             image = bpy.data.images.new(
-                image_name, width=tex_size, height=tex_size, alpha=True,
+                image_name,
+                width=tex_size,
+                height=tex_size,
+                alpha=True,
             )
             image.pixels.foreach_set(pixels.ravel())
             image.update()
@@ -567,8 +600,15 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
             wm.progress_update(90)
 
             return self._finalize_mmu_paint(
-                context, obj, mesh, settings, image, image_name,
-                filament_colors, tex_size, changed,
+                context,
+                obj,
+                mesh,
+                settings,
+                image,
+                image_name,
+                filament_colors,
+                tex_size,
+                changed,
             )
 
         # --- Step 1: Ensure UV unwrap ---
@@ -582,10 +622,10 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
         if prev_uv_name and mesh.uv_layers.get(prev_uv_name):
             mesh.uv_layers[prev_uv_name].active_render = True
         if _pw is not None:
-            _pw.update(0.15, 1, 'Setting up bake...')
+            _pw.update(0.15, 1, "Setting up bake...")
             if _pw.is_cancel_requested():
-                self.report({'WARNING'}, 'Bake cancelled')
-                return {'CANCELLED'}
+                self.report({"WARNING"}, "Bake cancelled")
+                return {"CANCELLED"}
 
         # --- Step 2: Determine texture size ---
         tex_size = _get_texture_size(mesh, int(self.texture_size))
@@ -664,17 +704,17 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
             if principled and output_node:
                 # Remember what was wired into Material Output â†’ Surface
                 for link in links:
-                    if (
-                        link.to_node == output_node
-                        and link.to_socket.name == "Surface"
-                    ):
+                    if link.to_node == output_node and link.to_socket.name == "Surface":
                         state["original_surface_socket"] = link.from_socket
                         break
 
                 # Find what drives Base Color
                 base_color_source = None
                 for link in links:
-                    if link.to_node == principled and link.to_socket.name == "Base Color":
+                    if (
+                        link.to_node == principled
+                        and link.to_socket.name == "Base Color"
+                    ):
                         base_color_source = link.from_socket
                         break
 
@@ -697,8 +737,10 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
                     rgb_node = nodes.new("ShaderNodeRGB")
                     rgb_node.name = "_MMU_Temp_RGB"
                     rgb_node.outputs[0].default_value = (
-                        default_color[0], default_color[1],
-                        default_color[2], 1.0,
+                        default_color[0],
+                        default_color[1],
+                        default_color[2],
+                        1.0,
                     )
                     rgb_node.location = (
                         emit_node.location.x - 200,
@@ -738,7 +780,9 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
                         )
                         links.new(uv_node.outputs["UV"], uv_input)
                         state["temp_uv_nodes"].append(uv_node)
-                        debug(f"Bake to MMU: pinned '{node.name}' UV to '{prev_uv_name}'")
+                        debug(
+                            f"Bake to MMU: pinned '{node.name}' UV to '{prev_uv_name}'"
+                        )
 
             _per_mat_state.append(state)
 
@@ -756,7 +800,8 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
                 if state["emit_node"]:
                     if state["original_surface_socket"]:
                         output_node = [
-                            n for n in nodes
+                            n
+                            for n in nodes
                             if n.type == "OUTPUT_MATERIAL" and n.is_active_output
                         ][0]
                         links.new(
@@ -816,14 +861,14 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
         # --- Step 7: Bake ---
         self.report({"INFO"}, "Baking texture...")
         if _pw is not None:
-            _pw.update(0.25, 2, 'Baking...')
+            _pw.update(0.25, 2, "Baking...")
             if _pw.is_cancel_requested():
                 _cleanup_per_mat_state(_per_mat_state)
                 cycles.samples = original_samples
                 cycles.device = original_device
                 context.scene.render.engine = original_engine
-                self.report({'WARNING'}, 'Bake cancelled')
-                return {'CANCELLED'}
+                self.report({"WARNING"}, "Bake cancelled")
+                return {"CANCELLED"}
         try:
             bake_kwargs = {
                 "type": bake_type,
@@ -866,10 +911,10 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
         # --- Step 9: Quantize the baked texture ---
         self.report({"INFO"}, "Quantizing to filament colors...")
         if _pw is not None:
-            _pw.update(0.8, 3, 'Quantizing...')
+            _pw.update(0.8, 3, "Quantizing...")
             if _pw.is_cancel_requested():
-                self.report({'WARNING'}, 'Bake cancelled')
-                return {'CANCELLED'}
+                self.report({"WARNING"}, "Bake cancelled")
+                return {"CANCELLED"}
         wm = context.window_manager
         wm.progress_begin(0, 100)
         wm.progress_update(5)
@@ -889,8 +934,10 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
 
             def _bake_progress(pct):
                 wm.progress_update(10 + int(pct * 0.75))
+
             changed = _quantize_by_regions(
-                pixels, filament_colors,
+                pixels,
+                filament_colors,
                 similarity_threshold=settings.region_similarity,
                 min_region_size=settings.min_region_size,
                 progress_callback=_bake_progress,
@@ -908,7 +955,8 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
         if settings.use_spatial_smoothing:
             self.report({"INFO"}, "Applying UV spatial smoothing (experimental)...")
             flipped = _apply_majority_filter(
-                pixels, filament_colors,
+                pixels,
+                filament_colors,
                 kernel_size=settings.smoothing_kernel_size,
                 passes=settings.smoothing_passes,
             )
@@ -923,13 +971,28 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
 
         # Finalize: replace material, set properties, switch to paint
         return self._finalize_mmu_paint(
-            context, obj, mesh, settings, image, image_name,
-            filament_colors, tex_size, changed,
+            context,
+            obj,
+            mesh,
+            settings,
+            image,
+            image_name,
+            filament_colors,
+            tex_size,
+            changed,
         )
 
     def _finalize_mmu_paint(
-        self, context, obj, mesh, settings, image, image_name,
-        filament_colors, tex_size, changed,
+        self,
+        context,
+        obj,
+        mesh,
+        settings,
+        image,
+        image_name,
+        filament_colors,
+        tex_size,
+        changed,
     ):
         """Shared finalization for both the Cycles bake and vertex-color fast paths."""
         # --- Replace material with MMU paint material ---
@@ -978,6 +1041,7 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
         # --- Sync the paint panel ---
         settings.loaded_mesh_name = ""  # Force reload
         from .helpers import _sync_filaments_from_mesh
+
         _sync_filaments_from_mesh(context)
 
         # Set active node so texture paint can find the image
@@ -986,6 +1050,7 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
         # --- Switch to Texture Paint mode ---
         bpy.ops.object.mode_set(mode="TEXTURE_PAINT")
         from .helpers import _configure_paint_brush
+
         _configure_paint_brush(context)
 
         ts = context.tool_settings
@@ -995,6 +1060,7 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
         # Set brush to first filament color
         if len(settings.filaments) > 0:
             from .helpers import _set_brush_color
+
             _set_brush_color(context, settings.filaments[0].color[:])
 
         self.report(
@@ -1031,6 +1097,7 @@ class MMU_OT_quantize_texture(bpy.types.Operator):
 
         # Get the paint image
         from .helpers import _get_paint_image
+
         image = _get_paint_image(obj)
         if image is None:
             self.report({"ERROR"}, "No paint texture found")
@@ -1050,7 +1117,9 @@ class MMU_OT_quantize_texture(bpy.types.Operator):
             except (ValueError, SyntaxError):
                 self.report({"ERROR"}, "Failed to parse filament colors")
                 return {"CANCELLED"}
-            filament_colors = [_rgb_from_hex(colors_dict[idx]) for idx in sorted(colors_dict.keys())]
+            filament_colors = [
+                _rgb_from_hex(colors_dict[idx]) for idx in sorted(colors_dict.keys())
+            ]
             if len(filament_colors) < 2:
                 self.report({"ERROR"}, "Need at least 2 filament colors")
                 return {"CANCELLED"}
@@ -1070,11 +1139,14 @@ class MMU_OT_quantize_texture(bpy.types.Operator):
         wm.progress_update(5)
 
         if settings.quantize_method == "REGION":
+
             def _quant_progress(pct):
                 wm.progress_update(5 + int(pct * 0.85))
+
             uv_name = mesh.uv_layers.active.name if mesh.uv_layers.active else None
             changed = _quantize_by_regions(
-                pixels, filament_colors,
+                pixels,
+                filament_colors,
                 similarity_threshold=settings.region_similarity,
                 min_region_size=settings.min_region_size,
                 progress_callback=_quant_progress,
@@ -1090,7 +1162,8 @@ class MMU_OT_quantize_texture(bpy.types.Operator):
         flipped = 0
         if settings.use_spatial_smoothing:
             flipped = _apply_majority_filter(
-                pixels, filament_colors,
+                pixels,
+                filament_colors,
                 kernel_size=settings.smoothing_kernel_size,
                 passes=settings.smoothing_passes,
             )
@@ -1110,6 +1183,7 @@ class MMU_OT_quantize_texture(bpy.types.Operator):
 # ---------------------------------------------------------------------------
 #  Shared panel draw function
 # ---------------------------------------------------------------------------
+
 
 def _draw_bake_panel(layout, context):
     """
@@ -1200,17 +1274,21 @@ def _draw_bake_panel(layout, context):
             # Detect + Reset row
             util_row = pal_box.row(align=True)
             util_row.operator(
-                "mmu.detect_material_colors", icon="MATERIAL",
+                "mmu.detect_material_colors",
+                icon="MATERIAL",
             )
             util_row.operator("mmu.reset_init_filaments", icon="FILE_REFRESH")
 
         # Mixed filaments section — collapsible, hidden by default.  Users can
         # define blended virtual slots before baking; the bake pipeline includes
         # these colors automatically via _get_filament_colors_from_settings().
-        mix_header, mix_body = layout.panel("mmu_bake_mixed_filaments", default_closed=True)
+        mix_header, mix_body = layout.panel(
+            "mmu_bake_mixed_filaments", default_closed=True
+        )
         mix_header.label(text="Mixed Filaments", icon="IPO_LINEAR")
         if mix_body:
             from .helpers import draw_add_mix_form
+
             if settings.has_mixed_filaments and settings.mixed_filaments:
                 row = mix_body.row()
                 row.template_list(
@@ -1280,6 +1358,7 @@ def _draw_bake_panel(layout, context):
 # ---------------------------------------------------------------------------
 #  Panels
 # ---------------------------------------------------------------------------
+
 
 class NODE_PT_mmu_bake(bpy.types.Panel):
     """Bake to MMU Paint Shader Editor sidebar panel."""

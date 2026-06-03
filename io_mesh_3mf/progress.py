@@ -112,6 +112,7 @@ PHASES: dict[str, List[Tuple[str, int]]] = {
 # Preference helpers
 # ---------------------------------------------------------------------------
 
+
 def _get_addon_package() -> str:
     """Return the top-level addon package name."""
     pkg = __package__ or ""
@@ -133,6 +134,7 @@ def _get_progress_pref() -> bool:
 # ---------------------------------------------------------------------------
 # Threshold heuristic
 # ---------------------------------------------------------------------------
+
 
 def should_show_progress(op_type: str, **hints) -> bool:
     """Decide whether the progress window should be shown for a given operation.
@@ -179,6 +181,7 @@ def should_show_progress(op_type: str, **hints) -> bool:
 # ProgressWindow
 # ---------------------------------------------------------------------------
 
+
 class ProgressWindow:
     """Manages a floating browser progress card for a long-running operation.
 
@@ -188,8 +191,12 @@ class ProgressWindow:
     """
 
     _json_path: pathlib.Path = pathlib.Path(tempfile.gettempdir()) / "3mf_progress.json"
-    _cancel_path: pathlib.Path = pathlib.Path(tempfile.gettempdir()) / "3mf_progress.cancel"
-    _port_path: pathlib.Path = pathlib.Path(tempfile.gettempdir()) / "3mf_progress_port.json"
+    _cancel_path: pathlib.Path = (
+        pathlib.Path(tempfile.gettempdir()) / "3mf_progress.cancel"
+    )
+    _port_path: pathlib.Path = (
+        pathlib.Path(tempfile.gettempdir()) / "3mf_progress_port.json"
+    )
 
     def __init__(self) -> None:
         self._proc: Optional[subprocess.Popen] = None

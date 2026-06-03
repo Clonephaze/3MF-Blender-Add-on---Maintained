@@ -118,29 +118,31 @@ API_VERSION_STRING = ".".join(str(v) for v in API_VERSION)
 
 #: Capability flags for feature detection. Other addons can check these
 #: to determine what functionality is available without version parsing.
-API_CAPABILITIES = frozenset({
-    "import",              # import_3mf() available
-    "export",              # export_3mf() available
-    "inspect",             # inspect_3mf() available
-    "batch",               # batch_import/batch_export available
-    "callbacks",           # on_progress, on_warning, on_object_created
-    "target_collection",   # import to specific collection
-    "orca_format",         # Orca/BambuStudio export format
-    "prusa_format",        # PrusaSlicer export format
-    "paint_mode",          # MMU paint segmentation
-    "project_template",    # Custom Orca project template
-    "object_settings",     # Per-object Orca settings
-    "building_blocks",     # colors, types, segmentation sub-namespaces
-    "global_scale",        # Scale multiplier parameter (import & export)
-    "compression",         # Configurable ZIP compression level (export)
-    "thumbnail",           # Thumbnail generation (export)
-    "use_components",      # Component instancing for linked duplicates (export)
-    "auto_smooth",         # Auto smooth-by-angle on import
-    "subdivision_depth",   # Paint segmentation subdivision depth control
-    "flatten_hierarchy",    # Option to flatten parented meshes into top-level build items (export)
-    "modifier_parts",       # Orca/BambuStudio modifier part subtypes (import, export, inspect)
-    "progress_window",      # show_progress_window param on export_3mf() opens the browser card
-})
+API_CAPABILITIES = frozenset(
+    {
+        "import",  # import_3mf() available
+        "export",  # export_3mf() available
+        "inspect",  # inspect_3mf() available
+        "batch",  # batch_import/batch_export available
+        "callbacks",  # on_progress, on_warning, on_object_created
+        "target_collection",  # import to specific collection
+        "orca_format",  # Orca/BambuStudio export format
+        "prusa_format",  # PrusaSlicer export format
+        "paint_mode",  # MMU paint segmentation
+        "project_template",  # Custom Orca project template
+        "object_settings",  # Per-object Orca settings
+        "building_blocks",  # colors, types, segmentation sub-namespaces
+        "global_scale",  # Scale multiplier parameter (import & export)
+        "compression",  # Configurable ZIP compression level (export)
+        "thumbnail",  # Thumbnail generation (export)
+        "use_components",  # Component instancing for linked duplicates (export)
+        "auto_smooth",  # Auto smooth-by-angle on import
+        "subdivision_depth",  # Paint segmentation subdivision depth control
+        "flatten_hierarchy",  # Option to flatten parented meshes into top-level build items (export)
+        "modifier_parts",  # Orca/BambuStudio modifier part subtypes (import, export, inspect)
+        "progress_window",  # show_progress_window param on export_3mf() opens the browser card
+    }
+)
 
 #: Registry key in bpy.app.driver_namespace
 _REGISTRY_KEY = "io_mesh_3mf"
@@ -154,6 +156,7 @@ def _register_api() -> None:
     """Register this API module in bpy.app.driver_namespace for discovery."""
     global _explicitly_disabled
     import sys
+
     _explicitly_disabled = False
     bpy.app.driver_namespace[_REGISTRY_KEY] = sys.modules[__name__]
     debug(f"Registered 3MF API v{API_VERSION_STRING} in driver_namespace")
@@ -302,6 +305,7 @@ __all__ = [
 # Result dataclasses
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class ImportResult:
     """Return value from :func:`import_3mf`.
@@ -422,6 +426,7 @@ ObjectCreatedCallback = Callable[..., None]
 # inspect_3mf  — read-only archive inspection (no Blender objects created)
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def inspect_3mf(filepath: str) -> InspectResult:
     """Inspect a 3MF file without importing anything into Blender.
 
@@ -499,6 +504,7 @@ def inspect_3mf(filepath: str) -> InspectResult:
 
         # Vendor detection (lightweight — check namespace presence).
         from .import_3mf.slicer import detect_vendor
+
         detected = detect_vendor(root)
         if detected and result.vendor_format is None:
             result.vendor_format = detected
@@ -508,9 +514,7 @@ def inspect_3mf(filepath: str) -> InspectResult:
         _inspect_textures(root, result)
 
         # ---- Objects -------------------------------------------------------
-        for obj_node in root.iterfind(
-            "./3mf:resources/3mf:object", MODEL_NAMESPACES
-        ):
+        for obj_node in root.iterfind("./3mf:resources/3mf:object", MODEL_NAMESPACES):
             obj_id = obj_node.attrib.get("id", "")
             obj_name = obj_node.attrib.get("name", "")
             obj_type = obj_node.attrib.get("type", "model")
@@ -574,9 +578,7 @@ def inspect_3mf(filepath: str) -> InspectResult:
     if config_path in result.archive_files:
         try:
             with archive.open(config_path) as f:
-                config_root = xml.etree.ElementTree.fromstring(
-                    f.read().decode("UTF-8")
-                )
+                config_root = xml.etree.ElementTree.fromstring(f.read().decode("UTF-8"))
             for obj_elem in config_root.findall(".//object"):
                 for part_elem in obj_elem.findall("part"):
                     part_id = part_elem.get("id", "")
@@ -586,15 +588,15 @@ def inspect_3mf(filepath: str) -> InspectResult:
                         if meta.get("key") == "name":
                             part_name = meta.get("value", "")
                             break
-                    result.part_subtypes.append({
-                        "part_id": part_id,
-                        "subtype": subtype,
-                        "name": part_name,
-                    })
+                    result.part_subtypes.append(
+                        {
+                            "part_id": part_id,
+                            "subtype": subtype,
+                            "name": part_name,
+                        }
+                    )
         except Exception as e:
-            result.warnings.append(
-                f"Could not parse model_settings.config: {e}"
-            )
+            result.warnings.append(f"Could not parse model_settings.config: {e}")
 
     archive.close()
     return result
@@ -603,6 +605,7 @@ def inspect_3mf(filepath: str) -> InspectResult:
 # ═══════════════════════════════════════════════════════════════════════════
 # import_3mf
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def import_3mf(
     filepath: str,
@@ -734,7 +737,8 @@ def import_3mf(
             bpy.context.scene.collection.children.link(col)
         # Find the layer collection wrapper for this collection.
         layer_col = _find_layer_collection(
-            bpy.context.view_layer.layer_collection, col,
+            bpy.context.view_layer.layer_collection,
+            col,
         )
         if layer_col is not None:
             bpy.context.view_layer.active_layer_collection = layer_col
@@ -823,6 +827,7 @@ def import_3mf(
         # Read modifier part subtypes from Orca/BambuStudio model_settings.
         if ctx.vendor_format == "orca":
             from .import_3mf.slicer.colors import read_orca_part_subtypes
+
             read_orca_part_subtypes(ctx, filepath)
 
         # Metadata.
@@ -835,7 +840,10 @@ def import_3mf(
             datatype = metadata_node.attrib.get("type", "")
             value = metadata_node.text
             scene_metadata[name] = MetadataEntry(
-                name=name, preserve=preserve, datatype=datatype, value=value,
+                name=name,
+                preserve=preserve,
+                datatype=datatype,
+                value=value,
             )
 
         if on_progress:
@@ -906,6 +914,7 @@ def import_3mf(
 # ═══════════════════════════════════════════════════════════════════════════
 # export_3mf
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def export_3mf(
     filepath: str,
@@ -1026,12 +1035,19 @@ def export_3mf(
     _pw = None
     if show_progress_window:
         from .progress import ProgressWindow, PHASES, should_show_progress
+
         _filename = os.path.basename(filepath)
-        if should_show_progress("export", tri_count=999_999, has_paint=True,
-                                thumbnail_render=False):
+        if should_show_progress(
+            "export", tri_count=999_999, has_paint=True, thumbnail_render=False
+        ):
             _pw = ProgressWindow()
-            _pw.start(bpy.context, "export", _filename,
-                      phases=PHASES["export"], can_cancel=False)
+            _pw.start(
+                bpy.context,
+                "export",
+                _filename,
+                phases=PHASES["export"],
+                can_cancel=False,
+            )
         # Wrap on_progress so both the caller's callback and the window update
         _caller_on_progress = on_progress
 
@@ -1039,6 +1055,7 @@ def export_3mf(
             if _pw is not None:
                 # Map the coarse on_progress int% into ProgressWindow.update()
                 import math
+
                 _phases = PHASES["export"]
                 _n = len(_phases)
                 _phase_idx = min(int(pct / 100 * _n), _n - 1)
@@ -1149,9 +1166,7 @@ def export_3mf(
         if non_manifold:
             msg = f"Non-manifold geometry detected in: {non_manifold[0]}"
             warn(msg)
-            result.warnings.append(
-                "Exported geometry contains non-manifold issues."
-            )
+            result.warnings.append("Exported geometry contains non-manifold issues.")
             if on_warning:
                 on_warning(msg)
 
@@ -1176,58 +1191,58 @@ def export_3mf(
                 has_materials = True
                 break
     elif mesh_objects:
-        has_materials = any(
-            len(obj.material_slots) >= 1 for obj in mesh_objects
-        )
+        has_materials = any(len(obj.material_slots) >= 1 for obj in mesh_objects)
 
     # Dispatch to exporter.
     try:  # noqa: SIM105  (must keep _pw.finish() in finally)
-      try:
-        if use_orca_format == "PAINT":
-            if mmu_slicer_format == "ORCA":
-                exporter = OrcaExporter(ctx)
-            else:
-                if ctx.project_template_path or ctx.object_settings:
-                    warn(
-                        "project_template and object_settings are Orca-specific "
-                        "features and will be ignored for PrusaSlicer export"
-                    )
-                exporter = PrusaExporter(ctx)
-        elif use_orca_format == "STANDARD":
-            # Explicit standard mode — always spec-compliant
-            debug("API: Standard mode requested, using StandardExporter")
-            exporter = StandardExporter(ctx)
-        else:
-            # AUTO mode
-            if ctx.project_template_path or ctx.object_settings:
-                exporter = OrcaExporter(ctx)
-            else:
-                # Check for MMU paint textures
-                has_paint = any(
-                    obj.data.get("3mf_is_paint_texture")
-                    for obj in mesh_objects
-                    if obj.type == "MESH" and obj.data is not None
-                )
-                if has_paint:
-                    debug("API AUTO: paint textures detected — promoting to PAINT mode")
-                    ctx.options.use_orca_format = "PAINT"
-                    if mmu_slicer_format == "ORCA":
-                        exporter = OrcaExporter(ctx)
-                    else:
-                        exporter = PrusaExporter(ctx)
-                elif has_materials:
-                    debug("API AUTO: materials detected, using OrcaExporter")
+        try:
+            if use_orca_format == "PAINT":
+                if mmu_slicer_format == "ORCA":
                     exporter = OrcaExporter(ctx)
                 else:
-                    exporter = StandardExporter(ctx)
+                    if ctx.project_template_path or ctx.object_settings:
+                        warn(
+                            "project_template and object_settings are Orca-specific "
+                            "features and will be ignored for PrusaSlicer export"
+                        )
+                    exporter = PrusaExporter(ctx)
+            elif use_orca_format == "STANDARD":
+                # Explicit standard mode — always spec-compliant
+                debug("API: Standard mode requested, using StandardExporter")
+                exporter = StandardExporter(ctx)
+            else:
+                # AUTO mode
+                if ctx.project_template_path or ctx.object_settings:
+                    exporter = OrcaExporter(ctx)
+                else:
+                    # Check for MMU paint textures
+                    has_paint = any(
+                        obj.data.get("3mf_is_paint_texture")
+                        for obj in mesh_objects
+                        if obj.type == "MESH" and obj.data is not None
+                    )
+                    if has_paint:
+                        debug(
+                            "API AUTO: paint textures detected — promoting to PAINT mode"
+                        )
+                        ctx.options.use_orca_format = "PAINT"
+                        if mmu_slicer_format == "ORCA":
+                            exporter = OrcaExporter(ctx)
+                        else:
+                            exporter = PrusaExporter(ctx)
+                    elif has_materials:
+                        debug("API AUTO: materials detected, using OrcaExporter")
+                        exporter = OrcaExporter(ctx)
+                    else:
+                        exporter = StandardExporter(ctx)
 
-        status_set = exporter.execute(context, archive, blender_objects, scale)
-        result.status = next(iter(status_set)) if status_set else "FINISHED"
-      except Exception as e:
-        error(f"Export failed: {e}")
-        result.status = "CANCELLED"
-        result.warnings.append(str(e))
-        return result
+            status_set = exporter.execute(context, archive, blender_objects, scale)
+            result.status = next(iter(status_set)) if status_set else "FINISHED"
+        except Exception as e:
+            error(f"Export failed: {e}")
+            result.status = "CANCELLED"
+            result.warnings.append(str(e))
+            return result
     finally:
         if _pw is not None:
             _pw.finish()
@@ -1245,6 +1260,7 @@ def export_3mf(
 # ═══════════════════════════════════════════════════════════════════════════
 # batch_import / batch_export
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def batch_import(
     filepaths: Sequence[str],
@@ -1381,6 +1397,7 @@ def batch_export(
 # Internal helpers
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _find_layer_collection(
     layer_collection,
     target_collection,
@@ -1435,11 +1452,13 @@ def _inspect_materials(root, result: InspectResult) -> None:
     ):
         mat_id = bm_node.attrib.get("id", "")
         bases = bm_node.findall("m:base", mat_ns)
-        result.materials.append({
-            "id": mat_id,
-            "type": "basematerials",
-            "count": len(bases),
-        })
+        result.materials.append(
+            {
+                "id": mat_id,
+                "type": "basematerials",
+                "count": len(bases),
+            }
+        )
 
     # colorgroups
     for cg_node in root.iterfind(
@@ -1447,11 +1466,13 @@ def _inspect_materials(root, result: InspectResult) -> None:
     ):
         cg_id = cg_node.attrib.get("id", "")
         colors = cg_node.findall("m:color", mat_ns)
-        result.materials.append({
-            "id": cg_id,
-            "type": "colorgroup",
-            "count": len(colors),
-        })
+        result.materials.append(
+            {
+                "id": cg_id,
+                "type": "colorgroup",
+                "count": len(colors),
+            }
+        )
 
     # texture2dgroups
     for tg_node in root.iterfind(
@@ -1459,11 +1480,13 @@ def _inspect_materials(root, result: InspectResult) -> None:
     ):
         tg_id = tg_node.attrib.get("id", "")
         coords = tg_node.findall("m:tex2coord", mat_ns)
-        result.materials.append({
-            "id": tg_id,
-            "type": "texture2dgroup",
-            "count": len(coords),
-        })
+        result.materials.append(
+            {
+                "id": tg_id,
+                "type": "texture2dgroup",
+                "count": len(coords),
+            }
+        )
 
 
 def _inspect_textures(root, result: InspectResult) -> None:
@@ -1473,11 +1496,13 @@ def _inspect_textures(root, result: InspectResult) -> None:
         "./3mf:resources/m:texture2d", {**MODEL_NAMESPACES, **mat_ns}
     ):
         tex_id = tex_node.attrib.get("id", "")
-        result.textures.append({
-            "id": tex_id,
-            "path": tex_node.attrib.get("path", ""),
-            "contenttype": tex_node.attrib.get("contenttype", ""),
-        })
+        result.textures.append(
+            {
+                "id": tex_id,
+                "path": tex_node.attrib.get("path", ""),
+                "contenttype": tex_node.attrib.get("contenttype", ""),
+            }
+        )
 
 
 def _apply_scene_unit_api(
@@ -1487,9 +1512,11 @@ def _apply_scene_unit_api(
 ) -> None:
     """Apply the scene_unit setting to context.scene.unit_settings."""
     from .import_3mf.operator import _THREEMF_TO_BLENDER_UNIT, _BLENDER_UNIT_SYSTEM
+
     if scene_unit == "KEEP":
         return
     from .common.constants import MODEL_DEFAULT_UNIT
+
     if scene_unit == "FILE":
         threemf_unit = root.attrib.get("unit", MODEL_DEFAULT_UNIT)
         target = _THREEMF_TO_BLENDER_UNIT.get(threemf_unit, "MILLIMETERS")
@@ -1554,11 +1581,23 @@ def _activate_extensions_api(
 #   from io_mesh_3mf.api import segmentation
 #   tree = segmentation.decode_segmentation_string("A3F0")
 
-from .common import colors         # hex_to_rgb, rgb_to_hex, srgb_to_linear, ...  # noqa: E402
-from .common import types          # ResourceObject, Component, ResourceMaterial, ... # noqa: E402
-from .common import segmentation   # SegmentationDecoder, SegmentationEncoder, ... # noqa: E402
-from .common import units          # blender_to_metre, threemf_to_metre, import_unit_scale, ... # noqa: E402
-from .common import extensions     # ExtensionManager, Extension, MATERIALS_EXTENSION, ... # noqa: E402
-from .common import xml as xml_tools  # parse_transformation, format_transformation, ... # noqa: E402
-from .common import metadata       # Metadata, MetadataEntry # noqa: E402
-from .export_3mf import components  # detect_linked_duplicates, ComponentGroup, ... # noqa: E402
+from .common import colors  # hex_to_rgb, rgb_to_hex, srgb_to_linear, ...  # noqa: E402
+from .common import (
+    types,
+)  # ResourceObject, Component, ResourceMaterial, ... # noqa: E402
+from .common import (
+    segmentation,
+)  # SegmentationDecoder, SegmentationEncoder, ... # noqa: E402
+from .common import (
+    units,
+)  # blender_to_metre, threemf_to_metre, import_unit_scale, ... # noqa: E402
+from .common import (
+    extensions,
+)  # ExtensionManager, Extension, MATERIALS_EXTENSION, ... # noqa: E402
+from .common import (
+    xml as xml_tools,
+)  # parse_transformation, format_transformation, ... # noqa: E402
+from .common import metadata  # Metadata, MetadataEntry # noqa: E402
+from .export_3mf import (
+    components,
+)  # detect_linked_duplicates, ComponentGroup, ... # noqa: E402
