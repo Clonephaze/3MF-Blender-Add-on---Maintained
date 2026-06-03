@@ -1,3 +1,12 @@
+2.7.2 — Export Crash Fix
+====
+
+Bug Fixes
+----
+* **Export crashes with `TypeError` in Auto and Standard modes (Issue #33)** — `_progress_update()` on `ExportContext` did not accept the `phase` keyword argument that `StandardExporter` and `OrcaExporter` were passing to it. Added `phase` as an optional parameter; when supplied it is used directly as the phase index for the progress window rather than being auto-derived from the value. Paint Segmentation mode was unaffected because `PrusaExporter` does not pass `phase`.
+
+----
+
 2.7.1 — Progress Window Fixes
 ====
 

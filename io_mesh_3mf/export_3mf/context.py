@@ -140,7 +140,7 @@ class ExportContext:
             if hasattr(window_manager, "status_text_set"):
                 window_manager.status_text_set(message)
 
-    def _progress_update(self, value: int, message: Optional[str] = None) -> None:
+    def _progress_update(self, value: int, message: Optional[str] = None, phase: Optional[int] = None) -> None:
         """Update progress bar (monotonically increasing)."""
         context = self._progress_context
         if not context:
@@ -157,15 +157,18 @@ class ExportContext:
         # Export phases (weights): Preparing=5, Geometry=40, Materials=20,
         #   Segmentation=25, Thumbnail=5, Packaging=5
         if self.progress is not None:
-            # Approximate phase boundaries by cumulative weight
-            _PHASE_BREAKS = [5, 45, 65, 90, 95, 100]  # cumulative %
-            phase_idx = 0
-            for i, threshold in enumerate(_PHASE_BREAKS):
-                if new_value < threshold:
-                    phase_idx = i
-                    break
+            if phase is not None:
+                phase_idx = phase
             else:
-                phase_idx = len(_PHASE_BREAKS) - 1
+                # Approximate phase boundaries by cumulative weight
+                _PHASE_BREAKS = [5, 45, 65, 90, 95, 100]  # cumulative %
+                phase_idx = 0
+                for i, threshold in enumerate(_PHASE_BREAKS):
+                    if new_value < threshold:
+                        phase_idx = i
+                        break
+                else:
+                    phase_idx = len(_PHASE_BREAKS) - 1
             self.progress.update(new_value / 100.0, phase_idx, message or "")
 
     def _progress_end(self) -> None:
