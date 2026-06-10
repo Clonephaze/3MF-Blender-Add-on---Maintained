@@ -545,7 +545,14 @@ def _kmeans_pp_init(data, k, rng):
     for i in range(1, k):
         d = np.sum((data - centers[i - 1]) ** 2, axis=1)
         dist_sq = np.minimum(dist_sq, d)
-        prob = dist_sq / dist_sq.sum()
+        total = dist_sq.sum()
+        if total == 0.0:
+            # Every sample point coincides with an already-chosen center —
+            # no more distinct colors exist.  Truncate and let the caller's
+            # empty-cluster discard step handle the reduced center count.
+            centers = centers[:i]
+            break
+        prob = dist_sq / total
         centers[i] = data[rng.choice(n, p=prob)]
 
     return centers

@@ -40,7 +40,7 @@ from .geometry import check_non_manifold_geometry
 from .orca import OrcaExporter
 from .prusa import PrusaExporter
 from .standard import StandardExporter
-from ..progress import ProgressWindow, PHASES, should_show_progress
+from ..progress import ProgressReporter, PHASES, get_progress_mode
 
 # The top-level package name — works in both dev (io_mesh_3mf.export_3mf)
 # and installed-extension namespace (bl_ext.user_default.io_mesh_3mf.export_3mf).
@@ -647,21 +647,22 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         )
         _thumbnail_render = self.thumbnail_mode == "AUTO"
 
-        if should_show_progress(
+        _mode = get_progress_mode(
             "export",
             tri_count=_tri_count,
             has_paint=_has_paint,
             thumbnail_render=_thumbnail_render,
-        ):
-            pw = ProgressWindow()
-            pw.start(
+        )
+        if _mode != "NONE":
+            _pw = ProgressReporter(_mode)
+            _pw.start(
                 context,
                 "export",
                 _filename,
                 phases=PHASES["export"],
                 can_cancel=False,
             )
-            ctx.progress = pw
+            ctx.progress = _pw
 
         ctx._progress_begin(context, "Exporting 3MF...")
 

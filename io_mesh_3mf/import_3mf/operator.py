@@ -32,7 +32,7 @@ import bpy.types
 import bpy_extras.io_utils
 
 from ..common import debug, warn, error
-from ..progress import ProgressWindow, PHASES, should_show_progress
+from ..progress import ProgressReporter, PHASES, get_progress_mode
 from ..common.constants import (
     RELS_MIMETYPE,
     MODEL_MIMETYPE,
@@ -342,16 +342,17 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             _os.path.getsize(p) for p in paths if _os.path.isfile(p)
         )
         filename = _os.path.basename(paths[0]) if paths else "model.3mf"
-        if should_show_progress("import", file_size_bytes=total_bytes):
-            pw = ProgressWindow()
-            pw.start(
+        _mode = get_progress_mode("import", file_size_bytes=total_bytes)
+        if _mode != "NONE":
+            _pw = ProgressReporter(_mode)
+            _pw.start(
                 context,
                 "import",
                 filename,
                 phases=PHASES["import"],
                 can_cancel=False,
             )
-            self._progress_window = pw
+            self._progress_window = _pw
 
     def _progress_update(self, value: int, message: Optional[str] = None) -> None:
         ctx_bl = getattr(self, "_progress_context", None)

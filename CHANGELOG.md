@@ -1,3 +1,25 @@
+2.7.3 — Three-Tier Progress System & Detect Colors Crash Fix
+====
+
+Features
+----
+* **Three-tier progress system** — Progress indicators are now chosen automatically based on operation size:
+  - **NONE** — small/fast operations get no indicator (no overhead).
+  - **VIEWPORT** — medium operations show a lightweight in-viewport progress card drawn directly in the 3D view via Blender's GPU/BLF APIs — no subprocess, no browser.
+  - **BROWSER** — large or cancellable operations (heavy painted exports, Cycles bakes) open the existing floating browser card.
+  Thresholds are tunable constants in `progress.py` (`EXPORT_VIEWPORT_TRI_MIN`, `EXPORT_BROWSER_TRI_MIN`, `BAKE_CYCLES_BROWSER_FACE_MIN`, etc.). The browser card no longer appears for routine small exports or thumbnail-only renders.
+* **Viewport progress bar** — A compact branded card (operation badge, progress bar, phase name, elapsed timer) is rendered directly into the active 3D viewport via a `SpaceView3D` POST_PIXEL draw handler. Draws in the bottom-left corner, clear of headers and toolbars.
+* **Stale window cleanup** — On each new operation start, any leftover progress subprocess and its browser window from a previous (possibly crashed) operation are killed before launching a new one. Both the subprocess PID and the browser process PID are now tracked in the port file.
+* **Independent browser process per card** — The browser is launched with `--user-data-dir` pointing to a dedicated per-session profile directory, giving each card its own killable OS process handle rather than a tab in an existing browser window.
+* **Auto-closing browser card** — After 20 consecutive poll failures (~10 s with no live server), the browser card closes itself automatically.
+* **Smooth elapsed timer** — The browser card timer now runs on a pure 100 ms `setInterval` wall-clock independent of Blender's poll responses. During blocking operations (Cycles bake, segmentation encode) the timer continues ticking rather than freezing or jumping.
+
+Bug Fixes
+----
+* **"Detect Colors" crashes with `ValueError: Probabilities contain NaN` (Issue #34)** — When a texture contains large uniform regions, all spatially-balanced sample points can land in the same color, causing `dist_sq.sum()` to be zero in the k-means++ initializer and producing NaN probabilities. The initializer now detects a zero-sum distance array and exits early with the centers found so far, since all remaining sample points already coincide with an existing center and no further distinct colors exist. The empty-cluster discard step after `_kmeans` handles the reduced center count transparently.
+
+----
+
 2.7.2 — Export Crash Fix
 ====
 

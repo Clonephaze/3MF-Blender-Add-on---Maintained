@@ -30,7 +30,7 @@ from ..common.extensions import ExtensionManager
 from ..common.logging import debug, warn, error
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from ..progress import ProgressWindow
+    from ..progress import ProgressReporter
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ class ExportContext:
     _progress_value: int = 0
     _progress_range: Optional[Tuple[int, int]] = None
     # Browser progress window (None when disabled / below threshold)
-    progress: Optional["ProgressWindow"] = None
+    progress: Optional["ProgressReporter"] = None
 
     # --- Helpers ------------------------------------------------------------
 

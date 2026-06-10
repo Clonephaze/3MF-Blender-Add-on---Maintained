@@ -51,6 +51,7 @@ _HTML = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>3MF Progress</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230c0c10'/%3E%3Ccircle cx='8' cy='8' r='5.5' stroke='%233b7ef6' stroke-width='1.5' fill='none'/%3E%3Cpath d='M8 4.5v3.75L10.5 10' stroke='%233b7ef6' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -439,10 +440,10 @@ _HTML = """<!DOCTYPE html>
 
   // ── SVG icon paths per operation type ──
   const OP_ICONS = {
-    export: '<path d="M5 1v6M2.5 4.5L5 7l2.5-2.5M1 8v1.5A.5.5 0 001.5 10h7a.5.5 0 00.5-.5V8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>', # noqa: E501
-    import: '<path d="M5 9V3M2.5 5.5L5 3l2.5 2.5M1 8v1.5A.5.5 0 001.5 10h7a.5.5 0 00.5-.5V8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>', # noqa: E501
-    bake_cycles: '<circle cx="5" cy="5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M5 1v1M5 8v1M1 5h1M8 5h1M2.05 2.05l.71.71M7.24 7.24l.71.71M7.24 2.76l-.71.71M2.76 7.24l-.71.71" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>', # noqa: E501
-    bake_vc:     '<path d="M2 7.5C2 5.567 3.343 4 5 4s3 1.567 3 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="5" cy="3" r="1.2" stroke="currentColor" stroke-width="1.2"/><path d="M1 9h8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>', # noqa: E501
+    export: '<path d="M5 1v6M2.5 4.5L5 7l2.5-2.5M1 8v1.5A.5.5 0 001.5 10h7a.5.5 0 00.5-.5V8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+    import: '<path d="M5 9V3M2.5 5.5L5 3l2.5 2.5M1 8v1.5A.5.5 0 001.5 10h7a.5.5 0 00.5-.5V8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+    bake_cycles: '<circle cx="5" cy="5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M5 1v1M5 8v1M1 5h1M8 5h1M2.05 2.05l.71.71M7.24 7.24l.71.71M7.24 2.76l-.71.71M2.76 7.24l-.71.71" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+    bake_vc:     '<path d="M2 7.5C2 5.567 3.343 4 5 4s3 1.567 3 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="5" cy="3" r="1.2" stroke="currentColor" stroke-width="1.2"/><path d="M1 9h8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
   };
 
   const OP_LABELS = {
@@ -468,21 +469,21 @@ _HTML = """<!DOCTYPE html>
   const elDone     = document.getElementById('done-flash');
 
   // ── State ──
-  let lastPhases   = [];
-  let initialized  = false;
-  let cancelSent   = false;
-  let done         = false;
-  let elapsedStart = Date.now();
+  let lastPhases       = [];
+  let initialized      = false;
+  let cancelSent       = false;
+  let done             = false;
+  let elapsedStart     = Date.now();
+  let consecutiveFails = 0;  // auto-close if server becomes unreachable
 
-  // ── Independent elapsed timer (1 s tick) ──
-  let elapsedServer = 0;
+  // ── Independent elapsed timer — ticks every 100 ms from wall clock ──
+  // Driven purely by Date.now() so it never freezes during blocking Blender
+  // calls (e.g. bpy.ops.object.bake).  elapsedStart is calibrated once on
+  // first server response using the server's elapsed value.
   setInterval(function () {
     if (done) return;
-    const local = (Date.now() - elapsedStart) / 1000;
-    // Use server elapsed when available (more accurate), local as fallback
-    const val = elapsedServer > 0 ? elapsedServer + 0.25 : local;
-    elElapsed.textContent = formatElapsed(val);
-  }, 250);
+    elElapsed.textContent = formatElapsed((Date.now() - elapsedStart) / 1000);
+  }, 100);
 
   function formatElapsed(s) {
     if (s < 60) return s.toFixed(1) + 's';
@@ -585,10 +586,6 @@ _HTML = """<!DOCTYPE html>
     // Message
     elMessage.textContent = d.message || d.phase || '';
 
-    // Elapsed from server
-    elapsedServer = d.elapsed || 0;
-    elElapsed.textContent = formatElapsed(elapsedServer);
-
     // Completion
     if (!d.active) {
       done = true;
@@ -609,10 +606,16 @@ _HTML = """<!DOCTYPE html>
     fetch(BASE + '/state')
       .then(function (r) { return r.json(); })
       .then(function (d) {
+        consecutiveFails = 0;
         applyState(d);
         if (!done) setTimeout(poll, 250);
       })
       .catch(function () {
+        consecutiveFails++;
+        // If the server has been unreachable for ~10 s, the Blender-side
+        // subprocess was likely killed (e.g. new operation started).
+        // Close the stale window rather than leaving it open forever.
+        if (consecutiveFails >= 20) { window.close(); return; }
         if (!done) setTimeout(poll, 500);
       });
   }
@@ -808,22 +811,33 @@ def _run(json_path_str: str) -> None:
     # Fallback: webbrowser.open() — opens a new tab in whatever the user has
     # set as their default browser.  Either way this subprocess handles it
     # entirely; Blender's main thread does NOT need to call url_open.
+    #
+    # CRITICAL: we launch with a dedicated --user-data-dir so Chromium spawns
+    # a *fresh, independent* browser process instead of handing the URL off to
+    # an already-running Chrome/Edge instance.  That guarantees ``browser_proc``
+    # is the real window process whose PID we can record and kill later —
+    # otherwise stale progress windows can never be closed programmatically.
+    browser_pid = None
+    profile_dir = json_path.parent / "3mf_progress_profile"
     chromium = _find_chromium()
     if chromium:
         try:
-            subprocess.Popen(
+            browser_proc = subprocess.Popen(
                 [
                     chromium,
                     f"--app={url}",
                     "--window-size=440,175",
+                    f"--user-data-dir={profile_dir}",
                     "--disable-extensions",
                     "--no-first-run",
                     "--no-default-browser-check",
                     "--disable-background-networking",
+                    "--disable-sync",
                 ],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
+            browser_pid = browser_proc.pid
         except Exception:
             import webbrowser
             webbrowser.open(url)
@@ -834,8 +848,16 @@ def _run(json_path_str: str) -> None:
     # Signal Blender that the server is ready.  browser_opened is always True
     # from Blender's perspective — the subprocess has already handled opening
     # the browser, so bpy.ops.wm.url_open must NOT be called.
+    # Include both PIDs so Blender can kill the lingering server *and* browser
+    # window when starting a new operation (prevents stale windows from
+    # surviving after a failed or superseded run).
     port_path.write_text(
-        json.dumps({"port": port, "browser_opened": True}),
+        json.dumps({
+            "port": port,
+            "browser_opened": True,
+            "pid": os.getpid(),
+            "browser_pid": browser_pid,
+        }),
         encoding="utf-8",
     )
 
@@ -845,13 +867,37 @@ def _run(json_path_str: str) -> None:
         try:
             state = json.loads(json_path.read_text(encoding="utf-8"))
             if not state.get("active", True):
-                # Give the browser time to receive the final 100% state
-                time.sleep(1.0)
+                # Give the browser time to receive the final 100% state and
+                # run its own window.close() after the "Done" flash.
+                time.sleep(1.5)
                 break
         except Exception:
             pass
 
     server.shutdown()
+
+    # Best-effort: ensure the browser window is gone even if its JS failed to
+    # self-close (e.g. it was opened as a plain tab via the webbrowser
+    # fallback, or window.close() was blocked).  Killing our own dedicated
+    # browser process only affects this card, never the user's main browser.
+    if browser_pid:
+        try:
+            _kill_pid(browser_pid)
+        except Exception:
+            pass
+
+
+def _kill_pid(pid: int) -> None:
+    """Terminate a process by PID, cross-platform, best-effort."""
+    if sys.platform == "win32":
+        import ctypes
+        handle = ctypes.windll.kernel32.OpenProcess(1, False, pid)  # PROCESS_TERMINATE
+        if handle:
+            ctypes.windll.kernel32.TerminateProcess(handle, 0)
+            ctypes.windll.kernel32.CloseHandle(handle)
+    else:
+        import signal as _signal
+        os.kill(pid, _signal.SIGTERM)
 
 
 if __name__ == "__main__":
