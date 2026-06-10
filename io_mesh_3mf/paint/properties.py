@@ -33,6 +33,7 @@ def _uv_layer_search_items(self, context, edit_text):
         return []
     return [layer.name for layer in obj.data.uv_layers]
 
+
 from .helpers import _on_active_filament_changed, _on_active_mix_filament_changed
 
 

@@ -117,7 +117,9 @@ def _kill_pid(pid: int) -> None:
 # proportionally in the stepper but do not affect the percent value Blender
 # passes to update().
 
+
 PHASES: dict[str, List[Tuple[str, int]]] = {
+
     "export": [
         ("Preparing", 5),
         ("Geometry", 40),
@@ -146,6 +148,7 @@ PHASES: dict[str, List[Tuple[str, int]]] = {
         ("Finalizing", 10),
     ],
 }
+
 
 # ---------------------------------------------------------------------------
 # Preference helpers
@@ -264,7 +267,7 @@ def get_progress_mode(op_type: str, **hints) -> str:
         has_paint = hints.get("has_paint", False)
         thumbnail = hints.get("thumbnail_render", False)
         # BROWSER: only large painted exports (slow segmentation encoding)
-        if has_paint and tris >= EXPORT_BROWSER_TRI_MIN: 
+        if has_paint and tris >= EXPORT_BROWSER_TRI_MIN:
             return "BROWSER"
         # VIEWPORT: medium mesh, any paint, or thumbnail with a non-trivial mesh
         if (
@@ -560,10 +563,10 @@ def _draw_viewport_progress() -> None:
     except Exception:
         return
 
-    percent   = float(state.get("percent", 0.0))
-    phase     = str(state.get("phase", ""))
-    message   = str(state.get("message", ""))
-    elapsed   = float(state.get("elapsed", 0.0))
+    percent = float(state.get("percent", 0.0))
+    phase = str(state.get("phase", ""))
+    message = str(state.get("message", ""))
+    elapsed = float(state.get("elapsed", 0.0))
     operation = str(state.get("operation", ""))
 
     # ── Drawing helpers (same pattern as modal_base.py) ───────────────────────
@@ -576,10 +579,10 @@ def _draw_viewport_progress() -> None:
         cx_, cy_ = x + w / 2, y + h / 2
         verts = [(cx_, cy_)]
         corners = [
-            (x + r,     y + r,     _math.pi,       1.5 * _math.pi),
-            (x + w - r, y + r,     1.5 * _math.pi, 2.0 * _math.pi),
-            (x + w - r, y + h - r, 0.0,             0.5 * _math.pi),
-            (x + r,     y + h - r, 0.5 * _math.pi, _math.pi),
+            (x + r, y + r, _math.pi, 1.5 * _math.pi),
+            (x + w - r, y + r, 1.5 * _math.pi, 2.0 * _math.pi),
+            (x + w - r, y + h - r, 0.0, 0.5 * _math.pi),
+            (x + r, y + h - r, 0.5 * _math.pi, _math.pi),
         ]
         for ox, oy, a0, a1 in corners:
             for i in range(segs + 1):
@@ -605,17 +608,17 @@ def _draw_viewport_progress() -> None:
         b.draw(shader)
 
     # ── Layout ────────────────────────────────────────────────────────────────
-    MARGIN       = 30
-    CARD_W       = 300
-    PAD          = 12
-    ROW_GAP      = 6
-    BADGE_PAD_X  = 6
-    BADGE_PAD_Y  = 3
-    BAR_H        = 8
-    CORNER_R     = 6
-    TITLE_SIZE   = 12
-    STEP_SIZE    = 10
-    BADGE_SIZE   = 10
+    MARGIN = 30
+    CARD_W = 300
+    PAD = 12
+    ROW_GAP = 6
+    BADGE_PAD_X = 6
+    BADGE_PAD_Y = 3
+    BAR_H = 8
+    CORNER_R = 6
+    TITLE_SIZE = 12
+    STEP_SIZE = 10
+    BADGE_SIZE = 10
 
     blf.size(_FONT, TITLE_SIZE)
     _, title_h = blf.dimensions(_FONT, "Ag")

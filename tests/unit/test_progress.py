@@ -46,7 +46,7 @@ from io_mesh_3mf.progress import (
 class ProgressThresholdTestCase(unittest.TestCase):
     def setUp(self):
         self._p_pref = patch.object(prog_mod, "_get_progress_pref", return_value=True)
-        self._p_bg   = patch.object(prog_mod, "_is_background",      return_value=False)
+        self._p_bg = patch.object(prog_mod, "_is_background", return_value=False)
         self._p_pref.start()
         self._p_bg.start()
 
@@ -83,7 +83,9 @@ class TestGetProgressModeExport(ProgressThresholdTestCase):
         self.assertEqual(get_progress_mode("export", tri_count=t, has_paint=False, thumbnail_render=True), "VIEWPORT")
 
     def test_thumbnail_never_triggers_browser(self):
-        mode = get_progress_mode("export", tri_count=EXPORT_BROWSER_TRI_MIN * 10, has_paint=False, thumbnail_render=True)
+        mode = get_progress_mode(
+            "export", tri_count=EXPORT_BROWSER_TRI_MIN * 10, has_paint=False, thumbnail_render=True
+        )
         self.assertEqual(mode, "VIEWPORT")
 
     def test_pref_disabled_returns_none(self):

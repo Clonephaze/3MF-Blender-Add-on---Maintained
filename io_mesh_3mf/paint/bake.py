@@ -175,6 +175,8 @@ def _ensure_uv_unwrap(obj, context):
 
     bpy.ops.object.mode_set(mode=prev_mode)
     return prev_active_name
+
+
 def _get_texture_size(mesh, override_size=0):
     """Determine texture size based on triangle count or user override."""
     if override_size > 0:

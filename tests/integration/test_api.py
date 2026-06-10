@@ -616,6 +616,9 @@ class TestProgressAPI(Blender3mfTestCase):
         import json
         from io_mesh_3mf.progress import STATE_PATH
 
+        # Write a known-inactive baseline so previous tests can't pollute this one.
+        STATE_PATH.write_text(json.dumps({"active": False}), encoding="utf-8")
+
         bpy.ops.mesh.primitive_cube_add()
         export_3mf(str(self.temp_file), progress_mode="NONE")
 
