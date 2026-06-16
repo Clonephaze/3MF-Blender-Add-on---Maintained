@@ -940,6 +940,7 @@ def export_3mf(
     on_progress: Optional[ProgressCallback] = None,
     on_warning: Optional[WarningCallback] = None,
     show_progress_window: bool = False,
+    progress_mode: str = "NONE",
 ) -> ExportResult:
     """Export Blender objects to a 3MF file.
 
@@ -1012,12 +1013,18 @@ def export_3mf(
 
     :param on_progress: Optional ``(percentage: int, message: str)`` callback.
     :param on_warning: Optional ``(message: str)`` callback for warnings.
-    :param show_progress_window: When *True*, open the 3MF browser progress
-        card (same one shown by the Blender file-dialog operator).  Respects
-        the ``Show Progress Window`` addon preference.  Useful when calling
-        from another addon that wants the card without going through the
-        operator (e.g. ``export_3mf(path, ..., show_progress_window=True)``).
-        The *on_progress* callback still fires in addition if provided.
+    :param show_progress_window: *Deprecated* — equivalent to
+        ``progress_mode="AUTO"``.  Kept for backwards-compatibility.
+    :param progress_mode: Controls which progress indicator to show.
+
+        - ``"NONE"`` (default) — no indicator (API callers are headless by
+          default; opt in explicitly).
+        - ``"AUTO"`` — let the threshold system pick ``VIEWPORT`` or
+          ``BROWSER`` based on operation size, same as the Blender operator.
+        - ``"VIEWPORT"`` — always show the in-viewport bar.
+        - ``"BROWSER"``  — always open the floating browser card.
+
+        The *on_progress* callback fires regardless of this setting.
     :return: :class:`ExportResult` with status, written count, and filepath.
     """
     from .export_3mf.context import ExportContext, ExportOptions
@@ -1031,35 +1038,39 @@ def export_3mf(
     filepath = os.path.abspath(filepath)
     result = ExportResult(filepath=filepath)
 
-    # ── Optional browser progress card ───────────────────────────────────────
+    # ── Resolve progress mode ─────────────────────────────────────────────────
+    # progress_mode takes precedence; show_progress_window=True is legacy AUTO.
+    _raw_mode = (
+        progress_mode
+        if progress_mode != "NONE"
+        else ("AUTO" if show_progress_window else "NONE")
+    )
+
     _pw = None
-    if show_progress_window:
-        from .progress import ProgressWindow, PHASES, should_show_progress
+    if _raw_mode != "NONE":
+        from .progress import ProgressReporter, PHASES, get_progress_mode as _gpm
 
         _filename = os.path.basename(filepath)
-        if should_show_progress(
+        _resolved_mode = _gpm(
             "export", tri_count=999_999, has_paint=True, thumbnail_render=False
-        ):
-            _pw = ProgressWindow()
-            _pw.start(
-                bpy.context,
-                "export",
-                _filename,
-                phases=PHASES["export"],
-                can_cancel=False,
-            )
-        # Wrap on_progress so both the caller's callback and the window update
+        ) if _raw_mode == "AUTO" else _raw_mode
+
+        _pw = ProgressReporter(_resolved_mode)
+        _pw.start(
+            bpy.context,
+            "export",
+            _filename,
+            phases=PHASES["export"],
+            can_cancel=False,
+        )
+        # Wrap on_progress so both the caller's callback and the reporter update.
         _caller_on_progress = on_progress
 
         def on_progress(pct: int, msg: str) -> None:  # type: ignore[misc]
-            if _pw is not None:
-                # Map the coarse on_progress int% into ProgressWindow.update()
-                import math
-
-                _phases = PHASES["export"]
-                _n = len(_phases)
-                _phase_idx = min(int(pct / 100 * _n), _n - 1)
-                _pw.update(pct / 100, _phase_idx, msg)
+            _phases = PHASES["export"]
+            _n = len(_phases)
+            _phase_idx = min(int(pct / 100 * _n), _n - 1)
+            _pw.update(pct / 100, _phase_idx, msg)
             if _caller_on_progress is not None:
                 _caller_on_progress(pct, msg)
 

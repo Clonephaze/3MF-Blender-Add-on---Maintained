@@ -412,5 +412,223 @@ class TestBuildingBlocks(unittest.TestCase):
         self.assertTrue(hasattr(units, "threemf_to_metre"))
 
 
+# ============================================================================
+# Progress system — API surface
+# ============================================================================
+
+class TestProgressAPI(Blender3mfTestCase):
+    """Public progress API available to other addons and scripts.
+
+    Tests the four documented use-cases:
+      1. Force nothing  — ProgressReporter("NONE")
+      2. Force a window — ProgressReporter("VIEWPORT") / ("BROWSER")
+      3. Drive own UI   — get_active_progress() / STATE_PATH polling
+      4. Peek before work — get_progress_mode() / should_show_progress()
+    """
+
+    # ── Imports ──────────────────────────────────────────────────────────────
+
+    def test_imports_from_progress_module(self):
+        """All documented symbols import without error."""
+        from io_mesh_3mf.progress import (
+            get_progress_mode,
+            should_show_progress,
+            get_active_progress,
+            ProgressReporter,
+            ViewportProgressBar,
+            ProgressWindow,
+            PHASES,
+            STATE_PATH,
+            EXPORT_VIEWPORT_TRI_MIN,
+            EXPORT_BROWSER_TRI_MIN,
+            IMPORT_VIEWPORT_BYTES_MIN,
+            IMPORT_BROWSER_BYTES_MIN,
+            BAKE_CYCLES_VIEWPORT_FACE_MIN,
+            BAKE_CYCLES_BROWSER_FACE_MIN,
+            BAKE_VC_VIEWPORT_FACE_MIN,
+            BAKE_VC_BROWSER_FACE_MIN,
+        )
+
+    # ── Use-case 1: force nothing ────────────────────────────────────────────
+
+    def test_none_reporter_start_update_finish_no_raise(self):
+        """ProgressReporter('NONE') is safe to call through its full lifecycle."""
+        from io_mesh_3mf.progress import ProgressReporter, PHASES
+        pr = ProgressReporter("NONE")
+        pr.start(bpy.context, "export", "test.3mf", phases=PHASES["export"])
+        pr.update(0.5, 1, "Halfway")
+        pr.finish()
+
+    def test_none_reporter_cancel_always_false(self):
+        from io_mesh_3mf.progress import ProgressReporter
+        pr = ProgressReporter("NONE")
+        self.assertFalse(pr.is_cancel_requested())
+
+    def test_none_reporter_active_false(self):
+        from io_mesh_3mf.progress import ProgressReporter
+        pr = ProgressReporter("NONE")
+        self.assertFalse(pr.active)
+
+    def test_none_reporter_context_manager(self):
+        from io_mesh_3mf.progress import ProgressReporter
+        with ProgressReporter("NONE") as pr:
+            self.assertEqual(pr.mode, "NONE")
+        # finish() called on exit — should not raise
+
+    # ── Use-case 2: force a specific window ──────────────────────────────────
+
+    def test_viewport_reporter_starts_and_finishes(self):
+        """ProgressReporter('VIEWPORT') activates the viewport bar and cleans up."""
+        from io_mesh_3mf.progress import ProgressReporter, PHASES, _VIEWPORT_STATE
+        import io_mesh_3mf.progress as prog_mod
+
+        pr = ProgressReporter("VIEWPORT")
+        pr.start(bpy.context, "export", "cube.3mf", phases=PHASES["export"])
+        self.assertTrue(prog_mod._VIEWPORT_STATE.get("active"))
+        self.assertEqual(prog_mod._VIEWPORT_STATE["operation"], "export")
+
+        pr.update(0.3, 1, "Geometry")
+        self.assertAlmostEqual(prog_mod._VIEWPORT_STATE["percent"], 0.3)
+
+        pr.finish()
+        self.assertFalse(prog_mod._VIEWPORT_STATE.get("active", True))
+
+    def test_viewport_reporter_mode_property(self):
+        from io_mesh_3mf.progress import ProgressReporter
+        pr = ProgressReporter("VIEWPORT")
+        self.assertEqual(pr.mode, "VIEWPORT")
+
+    def test_browser_reporter_mode_property(self):
+        """ProgressReporter('BROWSER') creates a ProgressWindow without launching it."""
+        from io_mesh_3mf.progress import ProgressReporter, ProgressWindow
+        pr = ProgressReporter("BROWSER")
+        self.assertEqual(pr.mode, "BROWSER")
+        self.assertIsInstance(pr._impl, ProgressWindow)
+
+    # ── Use-case 3: drive own UI via get_active_progress() ───────────────────
+
+    def test_get_active_progress_returns_none_when_idle(self):
+        """When no operation is running, get_active_progress() returns None."""
+        from io_mesh_3mf.progress import get_active_progress, ProgressReporter
+
+        # Ensure no stale state
+        pr = ProgressReporter("NONE")
+        pr.finish()
+
+        # get_active_progress reads STATE_PATH — if it exists but active=False, returns None
+        result = get_active_progress()
+        # May be None (file absent) or None (active=False). Either is correct.
+        self.assertIsNone(result)
+
+    def test_get_active_progress_live_during_viewport_operation(self):
+        """get_active_progress() returns a live state dict while a VP bar is active."""
+        from io_mesh_3mf.progress import get_active_progress, ProgressReporter, PHASES
+
+        pr = ProgressReporter("VIEWPORT")
+        pr.start(bpy.context, "export", "live.3mf", phases=PHASES["export"])
+        try:
+            pr.update(0.25, 1, "Writing geometry")
+            state = get_active_progress()
+            self.assertIsNotNone(state)
+            self.assertTrue(state["active"])
+            self.assertEqual(state["operation"], "export")
+            self.assertEqual(state["filename"], "live.3mf")
+            self.assertAlmostEqual(state["percent"], 0.25, places=2)
+        finally:
+            pr.finish()
+
+    def test_state_path_is_a_path_object(self):
+        """STATE_PATH is a pathlib.Path that external pollers can use."""
+        import pathlib
+        from io_mesh_3mf.progress import STATE_PATH
+        self.assertIsInstance(STATE_PATH, pathlib.Path)
+
+    def test_state_path_written_during_operation(self):
+        """STATE_PATH file exists and contains valid JSON while a reporter is active."""
+        import json
+        from io_mesh_3mf.progress import ProgressReporter, PHASES, STATE_PATH
+
+        pr = ProgressReporter("VIEWPORT")
+        pr.start(bpy.context, "import", "mesh.3mf", phases=PHASES["import"])
+        try:
+            pr.update(0.6, 2, "Building scene")
+            self.assertTrue(STATE_PATH.exists())
+            data = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+            self.assertTrue(data.get("active"))
+            self.assertAlmostEqual(data["percent"], 0.6, places=2)
+        finally:
+            pr.finish()
+
+    # ── Use-case 4: peek before committing to work ───────────────────────────
+
+    def test_get_progress_mode_returns_valid_string(self):
+        """get_progress_mode() always returns one of the three valid strings."""
+        from io_mesh_3mf.progress import get_progress_mode
+        for mode in (
+            get_progress_mode("export", tri_count=0),
+            get_progress_mode("export", tri_count=1_000_000, has_paint=True),
+            get_progress_mode("import", file_size_bytes=5_000_000),
+            get_progress_mode("bake_cycles", face_count=100_000),
+        ):
+            self.assertIn(mode, ("NONE", "VIEWPORT", "BROWSER"))
+
+    def test_should_show_progress_is_boolean(self):
+        """should_show_progress() returns a plain bool."""
+        from io_mesh_3mf.progress import should_show_progress
+        result = should_show_progress("export", tri_count=50_000, has_paint=False)
+        self.assertIsInstance(result, bool)
+
+    def test_should_show_progress_false_for_tiny_op(self):
+        from io_mesh_3mf.progress import should_show_progress
+        # Zero tris, no paint → NONE → False
+        self.assertFalse(should_show_progress("export", tri_count=0, has_paint=False))
+
+    def test_get_progress_mode_background_always_none(self):
+        """In background mode get_progress_mode() always returns NONE."""
+        from io_mesh_3mf.progress import get_progress_mode
+        # bpy.app.background is True during --background runs
+        if bpy.app.background:
+            mode = get_progress_mode("export", tri_count=1_000_000, has_paint=True)
+            self.assertEqual(mode, "NONE")
+        else:
+            self.skipTest("Not running in background mode")
+
+    # ── on_progress callback fires independently of progress window ──────────
+
+    def test_on_progress_fires_with_none_progress_mode(self):
+        """export_3mf on_progress callback works even when progress_mode='NONE'."""
+        bpy.ops.mesh.primitive_cube_add()
+        calls = []
+        result = export_3mf(
+            str(self.temp_file),
+            progress_mode="NONE",
+            on_progress=lambda pct, msg: calls.append(pct),
+        )
+        if result.status == "FINISHED":
+            self.assertGreater(len(calls), 0)
+            # All percentages should be in 0–100 range
+            for pct in calls:
+                self.assertGreaterEqual(pct, 0)
+                self.assertLessEqual(pct, 100)
+
+    def test_export_progress_mode_none_no_state_file_written(self):
+        """progress_mode='NONE' should not leave an active=True state file."""
+        import json
+        from io_mesh_3mf.progress import STATE_PATH
+
+        # Write a known-inactive baseline so previous tests can't pollute this one.
+        STATE_PATH.write_text(json.dumps({"active": False}), encoding="utf-8")
+
+        bpy.ops.mesh.primitive_cube_add()
+        export_3mf(str(self.temp_file), progress_mode="NONE")
+
+        if STATE_PATH.exists():
+            data = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+            self.assertFalse(
+                data.get("active", False),
+                "STATE_PATH should not be active after a NONE-mode export",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -545,7 +545,14 @@ def _kmeans_pp_init(data, k, rng):
     for i in range(1, k):
         d = np.sum((data - centers[i - 1]) ** 2, axis=1)
         dist_sq = np.minimum(dist_sq, d)
-        prob = dist_sq / dist_sq.sum()
+        total = dist_sq.sum()
+        if total == 0.0:
+            # Every sample point coincides with an already-chosen center —
+            # no more distinct colors exist.  Truncate and let the caller's
+            # empty-cluster discard step handle the reduced center count.
+            centers = centers[:i]
+            break
+        prob = dist_sq / total
         centers[i] = data[rng.choice(n, p=prob)]
 
     return centers
@@ -559,6 +566,11 @@ def _kmeans(data, k, max_iter=_MAX_ITER, seed=42):
     """
     rng = np.random.default_rng(seed)
     centers = _kmeans_pp_init(data, k, rng)
+    # _kmeans_pp_init may return fewer than k centers when the sample is
+    # degenerate (all points coincide with an existing center).  Use the
+    # actual count throughout so that labels, counts, and centers stay
+    # consistent.
+    k_actual = len(centers)
 
     labels = np.zeros(len(data), dtype=np.int32)
     for iteration in range(max_iter):
@@ -574,12 +586,12 @@ def _kmeans(data, k, max_iter=_MAX_ITER, seed=42):
         labels = new_labels
 
         # Update step: new centers = mean of assigned points
-        for c in range(k):
+        for c in range(k_actual):
             mask = labels == c
             if np.any(mask):
                 centers[c] = data[mask].mean(axis=0)
 
-    counts = np.bincount(labels, minlength=k)
+    counts = np.bincount(labels, minlength=k_actual)
     return centers, labels, counts
 
 
@@ -669,10 +681,18 @@ def _extract_texture_colors(image, num_colors):
 
     srgb = _linear_to_srgb_array(rgb_linear)
 
-    # Discard near-white pixels -- typically bare UV background
+    # Discard near-white pixels that are almost certainly bare UV background
+    # (the default white Blender renders on unassigned UV space).  Only drop
+    # them when they are a small minority of the image — if white covers more
+    # than 5 % of the opaque pixels it is likely intentional content and must
+    # be kept.
     near_white = np.all(srgb > 0.94, axis=1)
-    debug(f"[Detect]   Near-white pixels discarded: {np.sum(near_white)}")
-    srgb = srgb[~near_white]
+    near_white_frac = np.sum(near_white) / max(len(srgb), 1)
+    if near_white_frac < 0.05:
+        debug(f"[Detect]   Near-white pixels discarded: {np.sum(near_white)} ({near_white_frac:.1%} — background)")
+        srgb = srgb[~near_white]
+    else:
+        debug(f"[Detect]   Near-white pixels kept: {np.sum(near_white)} ({near_white_frac:.1%} — treated as content)")
     debug(f"[Detect]   Remaining pixels: {len(srgb)}")
     if len(srgb) == 0:
         return []
