@@ -111,7 +111,7 @@ from .common.units import (
 #: - MAJOR: Breaking changes to existing functions/signatures
 #: - MINOR: New features, backward-compatible
 #: - PATCH: Bug fixes only
-API_VERSION = (1, 3, 1)
+API_VERSION = (1, 3, 2)
 
 #: Human-readable version string
 API_VERSION_STRING = ".".join(str(v) for v in API_VERSION)
@@ -140,7 +140,6 @@ API_CAPABILITIES = frozenset(
         "subdivision_depth",  # Paint segmentation subdivision depth control
         "flatten_hierarchy",  # Option to flatten parented meshes into top-level build items (export)
         "modifier_parts",  # Orca/BambuStudio modifier part subtypes (import, export, inspect)
-        "progress_window",  # show_progress_window param on export_3mf() opens the browser card
     }
 )
 
@@ -1013,16 +1012,12 @@ def export_3mf(
 
     :param on_progress: Optional ``(percentage: int, message: str)`` callback.
     :param on_warning: Optional ``(message: str)`` callback for warnings.
-    :param show_progress_window: *Deprecated* — equivalent to
-        ``progress_mode="AUTO"``.  Kept for backwards-compatibility.
-    :param progress_mode: Controls which progress indicator to show.
+    :param show_progress_window: Deprecated, has no effect.
+    :param progress_mode: Controls whether to show the in-viewport progress bar.
 
-        - ``"NONE"`` (default) — no indicator (API callers are headless by
-          default; opt in explicitly).
-        - ``"AUTO"`` — let the threshold system pick ``VIEWPORT`` or
-          ``BROWSER`` based on operation size, same as the Blender operator.
-        - ``"VIEWPORT"`` — always show the in-viewport bar.
-        - ``"BROWSER"``  — always open the floating browser card.
+        - ``"NONE"`` (default) — no indicator.
+        - ``"AUTO"`` | ``"VIEWPORT"`` — show the in-viewport bar based on
+          operation size.
 
         The *on_progress* callback fires regardless of this setting.
     :return: :class:`ExportResult` with status, written count, and filepath.

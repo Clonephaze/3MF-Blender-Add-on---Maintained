@@ -325,7 +325,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
     def _progress_begin(self, context: bpy.types.Context, message: str) -> None:
         self._progress_context = context
         self._progress_value = 0
-        self._progress_window: Optional[ProgressWindow] = None
+        self._progress_window: Optional[ProgressReporter] = None
         wm = getattr(context, "window_manager", None)
         if wm:
             if hasattr(wm, "progress_begin"):

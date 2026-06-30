@@ -421,7 +421,7 @@ class TestProgressAPI(Blender3mfTestCase):
 
     Tests the four documented use-cases:
       1. Force nothing  — ProgressReporter("NONE")
-      2. Force a window — ProgressReporter("VIEWPORT") / ("BROWSER")
+      2. Force a window — ProgressReporter("VIEWPORT") / ("BROWSER" falls back to VIEWPORT)
       3. Drive own UI   — get_active_progress() / STATE_PATH polling
       4. Peek before work — get_progress_mode() / should_show_progress()
     """
@@ -436,17 +436,12 @@ class TestProgressAPI(Blender3mfTestCase):
             get_active_progress,
             ProgressReporter,
             ViewportProgressBar,
-            ProgressWindow,
             PHASES,
             STATE_PATH,
             EXPORT_VIEWPORT_TRI_MIN,
-            EXPORT_BROWSER_TRI_MIN,
             IMPORT_VIEWPORT_BYTES_MIN,
-            IMPORT_BROWSER_BYTES_MIN,
             BAKE_CYCLES_VIEWPORT_FACE_MIN,
-            BAKE_CYCLES_BROWSER_FACE_MIN,
             BAKE_VC_VIEWPORT_FACE_MIN,
-            BAKE_VC_BROWSER_FACE_MIN,
         )
 
     # ── Use-case 1: force nothing ────────────────────────────────────────────
@@ -498,12 +493,12 @@ class TestProgressAPI(Blender3mfTestCase):
         pr = ProgressReporter("VIEWPORT")
         self.assertEqual(pr.mode, "VIEWPORT")
 
-    def test_browser_reporter_mode_property(self):
-        """ProgressReporter('BROWSER') creates a ProgressWindow without launching it."""
-        from io_mesh_3mf.progress import ProgressReporter, ProgressWindow
+    def test_browser_reporter_falls_back_to_viewport(self):
+        """ProgressReporter('BROWSER') falls back to ViewportProgressBar (no subprocess)."""
+        from io_mesh_3mf.progress import ProgressReporter, ViewportProgressBar
         pr = ProgressReporter("BROWSER")
-        self.assertEqual(pr.mode, "BROWSER")
-        self.assertIsInstance(pr._impl, ProgressWindow)
+        self.assertEqual(pr.mode, "VIEWPORT")
+        self.assertIsInstance(pr._impl, ViewportProgressBar)
 
     # ── Use-case 3: drive own UI via get_active_progress() ───────────────────
 
@@ -570,7 +565,7 @@ class TestProgressAPI(Blender3mfTestCase):
             get_progress_mode("import", file_size_bytes=5_000_000),
             get_progress_mode("bake_cycles", face_count=100_000),
         ):
-            self.assertIn(mode, ("NONE", "VIEWPORT", "BROWSER"))
+            self.assertIn(mode, ("NONE", "VIEWPORT"))
 
     def test_should_show_progress_is_boolean(self):
         """should_show_progress() returns a plain bool."""

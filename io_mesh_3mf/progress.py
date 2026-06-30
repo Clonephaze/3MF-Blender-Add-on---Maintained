@@ -22,35 +22,16 @@ Modes
     everything runs in the main thread.  Used for medium-duration ops
     (e.g. mid-size exports, moderate imports, smaller bakes).
 
-``"BROWSER"``
-    A floating browser card (Edge/Chrome --app mode) opens in a separate
-    process for long-running, potentially cancellable operations such as
-    Cycles bakes or very large paint segmentation exports.
-
-    Blender main thread:
-      ProgressWindow.start()
-        ├─ writes $TEMP/3mf_progress.json   (initial state)
-        ├─ spawns progress_win.py           (subprocess)
-        └─ polls $TEMP/3mf_progress_port.json then opens browser
-
-    Subprocess (progress_win.py):
-      ├─ starts HTTPServer on 127.0.0.1:<random port>  (daemon thread)
-      ├─ writes $TEMP/3mf_progress_port.json
-      └─ waits until JSON active=False, then shuts down
-
-    Browser:
-      ├─ GET /       → full HTML page
-      ├─ GET /state  → JSON state (polled every 250ms)
-      └─ POST /cancel → writes $TEMP/3mf_progress.cancel
-
-Both VIEWPORT and BROWSER write to $TEMP/3mf_progress.json so that
-``get_active_progress()`` works identically for external addon observers.
+``"VIEWPORT"``
+    A compact branded card is drawn in the bottom-left corner of the active
+    3D viewport using Blender's GPU/blf APIs.  No subprocess overhead —
+    everything runs in the main thread.
 
 Thresholds are controlled by the module-level constants
-(``EXPORT_VIEWPORT_TRI_MIN``, ``IMPORT_BROWSER_BYTES_MIN``, etc.) — edit
-them directly to tune sensitivity without touching any logic.
+(``EXPORT_VIEWPORT_TRI_MIN``, etc.) — edit them directly to tune
+sensitivity without touching any logic.
 
-Usage — preferred (let the system pick the mode)::
+Usage::
 
     from io_mesh_3mf.progress import get_progress_mode, ProgressReporter, PHASES
 
@@ -58,24 +39,12 @@ Usage — preferred (let the system pick the mode)::
     with ProgressReporter(mode) as pr:
         pr.start(context, "export", "model.3mf", phases=PHASES["export"])
         pr.update(0.4, 1, "Writing geometry...")
-
-Usage — force a specific mode::
-
-    with ProgressReporter("BROWSER") as pr:
-        pr.start(context, "bake_cycles", mesh.name,
-                 phases=PHASES["bake_cycles"], can_cancel=True,
-                 filament_colors=["#FF0000", "#00FF00"])
-        ...
-        if pr.is_cancel_requested():
-            return {"CANCELLED"}
 """
 
 from __future__ import annotations
 
 import json
 import pathlib
-import subprocess
-import sys
 import tempfile
 import time
 from typing import List, Optional, Tuple
@@ -88,26 +57,6 @@ from .common.logging import warn
 # that ``get_active_progress()`` and external addon observers work uniformly.
 _STATE_JSON: pathlib.Path = pathlib.Path(tempfile.gettempdir()) / "3mf_progress.json"
 
-
-def _kill_pid(pid: int) -> None:
-    """Terminate a process by PID, cross-platform, best-effort.
-
-    Used to clean up an orphaned progress subprocess or browser window left
-    over from a previous (failed or superseded) operation.  Never raises.
-    """
-    try:
-        if sys.platform == "win32":
-            import ctypes
-            handle = ctypes.windll.kernel32.OpenProcess(1, False, pid)  # PROCESS_TERMINATE
-            if handle:
-                ctypes.windll.kernel32.TerminateProcess(handle, 0)
-                ctypes.windll.kernel32.CloseHandle(handle)
-        else:
-            import os as _os
-            import signal as _signal
-            _os.kill(pid, _signal.SIGTERM)
-    except Exception:
-        pass  # already dead or insufficient permissions — fine
 
 # ---------------------------------------------------------------------------
 # Phase definitions
@@ -155,24 +104,6 @@ PHASES: dict[str, List[Tuple[str, int]]] = {
 # ---------------------------------------------------------------------------
 
 
-def _get_addon_package() -> str:
-    """Return the top-level addon package name."""
-    pkg = __package__ or ""
-    return pkg.rsplit(".", 1)[0] if "." in pkg else pkg
-
-
-def _get_progress_pref() -> bool:
-    """Return the show_progress_window preference value, defaulting to True."""
-    try:
-        pkg = _get_addon_package()
-        addon = bpy.context.preferences.addons.get(pkg)
-        if addon is not None:
-            return bool(addon.preferences.show_progress_window)
-    except Exception:
-        pass
-    return True
-
-
 def _is_background() -> bool:
     """Return True when Blender is running headless (--background).
 
@@ -194,29 +125,17 @@ def _is_background() -> bool:
 EXPORT_VIEWPORT_TRI_MIN: int = 5_000
 """Minimum triangle count to show the viewport bar for exports without paint."""
 
-EXPORT_BROWSER_TRI_MIN: int = 200_000
-"""Triangle count above which a painted export is promoted to the browser card."""
-
 # ── Import ────────────────────────────────────────────────────────────────────
 IMPORT_VIEWPORT_BYTES_MIN: int = 500_000
 """Minimum archive size (bytes) to show the viewport bar on import."""
-
-IMPORT_BROWSER_BYTES_MIN: int = 1_000_000
-"""Archive size (bytes) above which an import is promoted to the browser card."""
 
 # ── Bake — Cycles render path ─────────────────────────────────────────────
 BAKE_CYCLES_VIEWPORT_FACE_MIN: int = 1_000
 """Minimum face count to show the viewport bar for a Cycles bake."""
 
-BAKE_CYCLES_BROWSER_FACE_MIN: int = 50_000
-"""Face count above which a Cycles bake is promoted to the browser card."""
-
 # ── Bake — vertex-color fast path ─────────────────────────────────────────────
 BAKE_VC_VIEWPORT_FACE_MIN: int = 2_000
 """Minimum face count to show the viewport bar for a vertex-color bake."""
-
-BAKE_VC_BROWSER_FACE_MIN: int = 100_000
-"""Face count above which a vertex-color bake is promoted to the browser card."""
 
 
 # ---------------------------------------------------------------------------
@@ -227,8 +146,8 @@ BAKE_VC_BROWSER_FACE_MIN: int = 100_000
 def get_progress_mode(op_type: str, **hints) -> str:
     """Return the appropriate progress mode for an operation.
 
-    Evaluates the thresholds above and the ``show_progress_window`` preference
-    to decide which — if any — progress indicator to display.
+    Evaluates the thresholds above to decide which — if any — progress
+    indicator to display.
 
     :param op_type: One of ``"export"``, ``"import"``,
         ``"bake_cycles"``, ``"bake_vc"``, ``"batch"``.
@@ -243,10 +162,7 @@ def get_progress_mode(op_type: str, **hints) -> str:
     :returns:
         - ``"NONE"``     — too quick; no indicator shown.
         - ``"VIEWPORT"`` — lightweight in-viewport progress bar.
-        - ``"BROWSER"``  — full floating browser card (long / cancellable).
     """
-    if not _get_progress_pref():
-        return "NONE"
     if _is_background():
         return "NONE"
 
@@ -254,22 +170,18 @@ def get_progress_mode(op_type: str, **hints) -> str:
         faces = hints.get("face_count", 0)
         if faces < BAKE_CYCLES_VIEWPORT_FACE_MIN:
             return "NONE"
-        return "BROWSER" if faces >= BAKE_CYCLES_BROWSER_FACE_MIN else "VIEWPORT"
+        return "VIEWPORT"
 
     if op_type == "bake_vc":
         faces = hints.get("face_count", 0)
         if faces < BAKE_VC_VIEWPORT_FACE_MIN:
             return "NONE"
-        return "BROWSER" if faces >= BAKE_VC_BROWSER_FACE_MIN else "VIEWPORT"
+        return "VIEWPORT"
 
     if op_type == "export":
         tris = hints.get("tri_count", 0)
         has_paint = hints.get("has_paint", False)
         thumbnail = hints.get("thumbnail_render", False)
-        # BROWSER: only large painted exports (slow segmentation encoding)
-        if has_paint and tris >= EXPORT_BROWSER_TRI_MIN:
-            return "BROWSER"
-        # VIEWPORT: medium mesh, any paint, or thumbnail with a non-trivial mesh
         if (
             tris >= EXPORT_VIEWPORT_TRI_MIN
             or has_paint
@@ -282,7 +194,7 @@ def get_progress_mode(op_type: str, **hints) -> str:
         size = hints.get("file_size_bytes", 0)
         if size < IMPORT_VIEWPORT_BYTES_MIN:
             return "NONE"
-        return "BROWSER" if size >= IMPORT_BROWSER_BYTES_MIN else "VIEWPORT"
+        return "VIEWPORT"
 
     if op_type == "batch":
         return "VIEWPORT"
@@ -298,228 +210,6 @@ def should_show_progress(op_type: str, **hints) -> bool:
     that only need a boolean gate.
     """
     return get_progress_mode(op_type, **hints) != "NONE"
-
-
-# ---------------------------------------------------------------------------
-# ProgressWindow
-# ---------------------------------------------------------------------------
-
-
-class ProgressWindow:
-    """Manages a floating browser progress card for a long-running operation.
-
-    Thread safety: all methods must be called from Blender's main thread.
-    The HTTP server runs in a completely separate subprocess — Blender only
-    writes JSON files and never blocks on network I/O.
-    """
-
-    _json_path: pathlib.Path = pathlib.Path(tempfile.gettempdir()) / "3mf_progress.json"
-    _cancel_path: pathlib.Path = (
-        pathlib.Path(tempfile.gettempdir()) / "3mf_progress.cancel"
-    )
-    _port_path: pathlib.Path = (
-        pathlib.Path(tempfile.gettempdir()) / "3mf_progress_port.json"
-    )
-
-    def __init__(self) -> None:
-        self._proc: Optional[subprocess.Popen] = None
-        self._active: bool = False
-        self._start_time: float = 0.0
-        self._phases: List[str] = []
-
-    # ------------------------------------------------------------------
-    # Context manager
-    # ------------------------------------------------------------------
-
-    def __enter__(self) -> "ProgressWindow":
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.finish()
-        return False  # never suppress exceptions
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
-    def start(
-        self,
-        context,
-        operation: str,
-        filename: str,
-        phases: List[Tuple[str, int]],
-        can_cancel: bool = False,
-        filament_colors: Optional[List[str]] = None,
-    ) -> None:
-        """Spawn the progress window subprocess and open the browser.
-
-        :param context: Blender context (must be called from the main thread).
-        :param operation: Operation type string — one of ``PHASES`` keys.
-        :param filename: Short display name (e.g. ``"model.3mf"``).
-        :param phases: List of ``(name, weight)`` tuples — use ``PHASES[op]``.
-        :param can_cancel: When ``True``, a Cancel button appears in the card.
-        :param filament_colors: Optional list of ``"#RRGGBB"`` strings shown as
-            filament swatches (bake operations).
-        """
-        # Kill any stale progress_win.py subprocess AND its browser window from
-        # a previous run.  The port file records both PIDs so we can terminate
-        # them before spinning up a new card — otherwise an orphaned window from
-        # a failed/superseded operation lingers forever showing stale state.
-        if self._port_path.exists():
-            try:
-                port_data = json.loads(self._port_path.read_text(encoding="utf-8"))
-                for _key in ("browser_pid", "pid"):
-                    _old = port_data.get(_key)
-                    if _old:
-                        _kill_pid(int(_old))
-            except Exception:
-                pass
-
-        # Clear stale IPC files from a previous run.
-        for p in (self._cancel_path, self._port_path):
-            try:
-                p.unlink()
-            except FileNotFoundError:
-                pass
-
-        self._start_time = time.time()
-        self._active = True
-        self._phases = [name for name, _weight in phases]
-
-        initial_state = {
-            "active": True,
-            "operation": operation,
-            "filename": filename,
-            "percent": 0.0,
-            "phase": self._phases[0] if self._phases else "",
-            "phases": self._phases,
-            "phase_index": 0,
-            "message": "",
-            "elapsed": 0.0,
-            "can_cancel": can_cancel,
-            "filament_colors": filament_colors or [],
-        }
-        self._write_state(initial_state)
-
-        script = pathlib.Path(__file__).parent / "progress_win.py"
-        creationflags = 0x08000000 if sys.platform == "win32" else 0
-        try:
-            self._proc = subprocess.Popen(
-                [sys.executable, str(script), str(self._json_path)],
-                creationflags=creationflags,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        except Exception as e:
-            warn(f"ProgressWindow: could not spawn subprocess: {e}")
-            self._active = False
-            return
-
-        # Wait up to 2 s for the subprocess HTTP server to be ready, then
-        # open the browser from Blender's main thread via bpy.ops.wm.url_open.
-        # (Opening from inside the subprocess fails silently on macOS — see
-        #  the architecture note in the module docstring.)
-        deadline = time.time() + 2.0
-        opened = False
-        while time.time() < deadline:
-            if self._port_path.exists():
-                try:
-                    port_data = json.loads(self._port_path.read_text(encoding="utf-8"))
-                    port = int(port_data["port"])
-                    # If the subprocess already launched a Chromium --app window,
-                    # don't open a second full browser tab.
-                    if not port_data.get("browser_opened", False):
-                        bpy.ops.wm.url_open(url=f"http://127.0.0.1:{port}/")
-                    opened = True
-                    break
-                except Exception:
-                    pass
-            time.sleep(0.05)
-
-        if not opened:
-            warn("ProgressWindow: timed out waiting for server — window may not appear")
-
-    def update(
-        self,
-        percent: float,
-        phase_index: int,
-        message: str = "",
-    ) -> None:
-        """Write updated progress state.
-
-        :param percent: Overall progress fraction 0.0–1.0.
-        :param phase_index: Index into ``phases`` list; drives the stepper highlight.
-        :param message: Short status line (e.g. ``"Object 5 of 12"``).
-        """
-        if not self._active:
-            return
-        try:
-            existing = json.loads(self._json_path.read_text(encoding="utf-8"))
-            phase_name = (
-                self._phases[phase_index]
-                if 0 <= phase_index < len(self._phases)
-                else ""
-            )
-            existing.update(
-                {
-                    "percent": float(max(0.0, min(1.0, percent))),
-                    "phase": phase_name,
-                    "phase_index": int(phase_index),
-                    "message": str(message),
-                    "elapsed": time.time() - self._start_time,
-                }
-            )
-            self._write_state(existing)
-        except Exception:
-            pass
-
-    def finish(self) -> None:
-        """Signal completion and detach the subprocess.
-
-        Writes ``active: False`` to the JSON so the browser card and subprocess
-        can exit, then immediately returns — does NOT block waiting for the
-        subprocess to die.  If a new operation starts before the subprocess
-        exits naturally, :meth:`start` will kill it via the stored PID.
-
-        Safe to call multiple times; subsequent calls are no-ops.
-        """
-        if not self._active:
-            return
-        self._active = False
-
-        try:
-            existing = json.loads(self._json_path.read_text(encoding="utf-8"))
-            existing.update(
-                {
-                    "active": False,
-                    "percent": 1.0,
-                    "elapsed": time.time() - self._start_time,
-                }
-            )
-            self._write_state(existing)
-        except Exception:
-            self._write_state({"active": False, "percent": 1.0})
-
-        # Don't block — the subprocess polls every 0.25 s and exits within
-        # ~1.5 s on its own.  Blender's main thread returns immediately.
-        # The browser receives active=False on its next poll and closes after
-        # a 900 ms flash.  If another operation starts before the subprocess
-        # exits, ProgressWindow.start() will terminate it by PID.
-        self._proc = None
-
-    def is_cancel_requested(self) -> bool:
-        """Return ``True`` if the Cancel button was clicked in the progress card."""
-        return self._cancel_path.exists()
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-
-    def _write_state(self, data: dict) -> None:
-        try:
-            self._json_path.write_text(json.dumps(data), encoding="utf-8")
-        except Exception:
-            pass
 
 
 # ---------------------------------------------------------------------------
@@ -858,7 +548,7 @@ class ViewportProgressBar:
 
 class ProgressReporter:
     """Unified progress facade — delegates to ``ViewportProgressBar``,
-    ``ProgressWindow``, or a no-op stub depending on *mode*.
+    ``ViewportProgressBar``, or a no-op stub depending on *mode*.
 
     Call sites never need to branch on the mode; ``update()``, ``finish()``,
     and ``is_cancel_requested()`` are always safe to call regardless of which
@@ -877,11 +567,11 @@ class ProgressReporter:
     """
 
     def __init__(self, mode: str) -> None:
-        self._mode = mode
-        if mode == "VIEWPORT":
+        # "BROWSER" is kept as an accepted value for backwards-compatibility
+        # but falls back to the viewport bar (no subprocess / no browser).
+        self._mode = "VIEWPORT" if mode == "BROWSER" else mode
+        if self._mode == "VIEWPORT":
             self._impl: Optional[object] = ViewportProgressBar()
-        elif mode == "BROWSER":
-            self._impl = ProgressWindow()
         else:
             self._impl = None  # "NONE" — all methods are no-ops
 
@@ -952,7 +642,7 @@ class ProgressReporter:
 #:             elapsed = state["elapsed"]       # seconds since start
 #:     except (FileNotFoundError, ValueError):
 #:         pass  # no operation in progress
-STATE_PATH: pathlib.Path = ProgressWindow._json_path
+STATE_PATH: pathlib.Path = _STATE_JSON
 
 
 def get_active_progress() -> Optional[dict]:

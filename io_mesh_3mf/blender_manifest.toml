@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "ThreeMF_io"
-version = "2.7.3"
+version = "2.7.4"
 name = "3MF Import/Export"
 tagline = "Import and export 3D Manufacturing Format (3MF) files"
 maintainer = "Clonephaze"
@@ -16,3 +16,11 @@ copyright = ["2025 Clonephaze", "2020 Ghostkeeper"]
 
 [permissions]
 files = "For import and export of 3MF files"
+
+[build]
+paths_exclude_pattern = [
+  "__pycache__/",
+  ".git",
+  "*.zip",
+  "threemf_discovery.py",
+]

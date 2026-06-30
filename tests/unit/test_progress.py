@@ -28,26 +28,20 @@ from io_mesh_3mf.progress import (
     get_progress_mode,
     should_show_progress,
     EXPORT_VIEWPORT_TRI_MIN,
-    EXPORT_BROWSER_TRI_MIN,
     IMPORT_VIEWPORT_BYTES_MIN,
-    IMPORT_BROWSER_BYTES_MIN,
     BAKE_CYCLES_VIEWPORT_FACE_MIN,
-    BAKE_CYCLES_BROWSER_FACE_MIN,
     BAKE_VC_VIEWPORT_FACE_MIN,
-    BAKE_VC_BROWSER_FACE_MIN,
 )
 
 
 # ---------------------------------------------------------------------------
-# Base class: patches _get_progress_pref->True and _is_background->False so
-# threshold tests work inside --background mode.
+# Base class: patches _is_background->False so threshold tests work inside
+# --background mode.
 # ---------------------------------------------------------------------------
 
 class ProgressThresholdTestCase(unittest.TestCase):
     def setUp(self):
-        self._p_pref = patch.object(prog_mod, "_get_progress_pref", return_value=True)
         self._p_bg = patch.object(prog_mod, "_is_background", return_value=False)
-        self._p_pref.start()
         self._p_bg.start()
 
     def tearDown(self):
@@ -69,11 +63,11 @@ class TestGetProgressModeExport(ProgressThresholdTestCase):
     def test_small_painted_mesh_returns_viewport(self):
         self.assertEqual(get_progress_mode("export", tri_count=10, has_paint=True), "VIEWPORT")
 
-    def test_large_painted_mesh_returns_browser(self):
-        self.assertEqual(get_progress_mode("export", tri_count=EXPORT_BROWSER_TRI_MIN, has_paint=True), "BROWSER")
+    def test_large_painted_mesh_returns_viewport(self):
+        self.assertEqual(get_progress_mode("export", tri_count=5_000_000, has_paint=True), "VIEWPORT")
 
-    def test_large_unpainted_mesh_returns_viewport_not_browser(self):
-        self.assertEqual(get_progress_mode("export", tri_count=EXPORT_BROWSER_TRI_MIN + 1, has_paint=False), "VIEWPORT")
+    def test_large_unpainted_mesh_returns_viewport(self):
+        self.assertEqual(get_progress_mode("export", tri_count=5_000_001, has_paint=False), "VIEWPORT")
 
     def test_thumbnail_only_small_mesh_returns_none(self):
         self.assertEqual(get_progress_mode("export", tri_count=100, has_paint=False, thumbnail_render=True), "NONE")
@@ -84,18 +78,13 @@ class TestGetProgressModeExport(ProgressThresholdTestCase):
 
     def test_thumbnail_never_triggers_browser(self):
         mode = get_progress_mode(
-            "export", tri_count=EXPORT_BROWSER_TRI_MIN * 10, has_paint=False, thumbnail_render=True
+            "export", tri_count=5_000_000, has_paint=False, thumbnail_render=True
         )
         self.assertEqual(mode, "VIEWPORT")
 
-    def test_pref_disabled_returns_none(self):
-        with patch.object(prog_mod, "_get_progress_pref", return_value=False):
-            mode = get_progress_mode("export", tri_count=EXPORT_BROWSER_TRI_MIN, has_paint=True)
-        self.assertEqual(mode, "NONE")
-
     def test_background_returns_none(self):
         with patch.object(prog_mod, "_is_background", return_value=True):
-            mode = get_progress_mode("export", tri_count=EXPORT_BROWSER_TRI_MIN, has_paint=True)
+            mode = get_progress_mode("export", tri_count=5_000_000, has_paint=True)
         self.assertEqual(mode, "NONE")
 
 
@@ -111,11 +100,11 @@ class TestGetProgressModeImport(ProgressThresholdTestCase):
     def test_medium_file_returns_viewport(self):
         self.assertEqual(get_progress_mode("import", file_size_bytes=IMPORT_VIEWPORT_BYTES_MIN), "VIEWPORT")
 
-    def test_large_file_returns_browser(self):
-        self.assertEqual(get_progress_mode("import", file_size_bytes=IMPORT_BROWSER_BYTES_MIN), "BROWSER")
+    def test_large_file_returns_viewport(self):
+        self.assertEqual(get_progress_mode("import", file_size_bytes=5_000_000), "VIEWPORT")
 
-    def test_just_below_browser_returns_viewport(self):
-        self.assertEqual(get_progress_mode("import", file_size_bytes=IMPORT_BROWSER_BYTES_MIN - 1), "VIEWPORT")
+    def test_just_above_min_returns_viewport(self):
+        self.assertEqual(get_progress_mode("import", file_size_bytes=IMPORT_VIEWPORT_BYTES_MIN + 1), "VIEWPORT")
 
 
 # ============================================================================
@@ -130,8 +119,8 @@ class TestGetProgressModeBakeCycles(ProgressThresholdTestCase):
     def test_medium_returns_viewport(self):
         self.assertEqual(get_progress_mode("bake_cycles", face_count=BAKE_CYCLES_VIEWPORT_FACE_MIN), "VIEWPORT")
 
-    def test_large_returns_browser(self):
-        self.assertEqual(get_progress_mode("bake_cycles", face_count=BAKE_CYCLES_BROWSER_FACE_MIN), "BROWSER")
+    def test_large_returns_viewport(self):
+        self.assertEqual(get_progress_mode("bake_cycles", face_count=1_000_000), "VIEWPORT")
 
 
 # ============================================================================
@@ -146,8 +135,8 @@ class TestGetProgressModeBakeVC(ProgressThresholdTestCase):
     def test_medium_returns_viewport(self):
         self.assertEqual(get_progress_mode("bake_vc", face_count=BAKE_VC_VIEWPORT_FACE_MIN), "VIEWPORT")
 
-    def test_large_returns_browser(self):
-        self.assertEqual(get_progress_mode("bake_vc", face_count=BAKE_VC_BROWSER_FACE_MIN), "BROWSER")
+    def test_large_returns_viewport(self):
+        self.assertEqual(get_progress_mode("bake_vc", face_count=1_000_000), "VIEWPORT")
 
 
 # ============================================================================
@@ -175,8 +164,8 @@ class TestShouldShowProgress(ProgressThresholdTestCase):
     def test_returns_true_for_viewport_mode(self):
         self.assertTrue(should_show_progress("export", tri_count=EXPORT_VIEWPORT_TRI_MIN, has_paint=False))
 
-    def test_returns_true_for_browser_mode(self):
-        self.assertTrue(should_show_progress("export", tri_count=EXPORT_BROWSER_TRI_MIN, has_paint=True))
+    def test_returns_true_for_large_painted_mesh(self):
+        self.assertTrue(should_show_progress("export", tri_count=5_000_000, has_paint=True))
 
 
 # ============================================================================
@@ -195,11 +184,10 @@ class TestProgressReporterModeSelection(unittest.TestCase):
         self.assertIsInstance(pr._impl, ViewportProgressBar)
         self.assertEqual(pr.mode, "VIEWPORT")
 
-    def test_browser_creates_progress_window(self):
-        from io_mesh_3mf.progress import ProgressWindow
+    def test_browser_falls_back_to_viewport_bar(self):
         pr = ProgressReporter("BROWSER")
-        self.assertIsInstance(pr._impl, ProgressWindow)
-        self.assertEqual(pr.mode, "BROWSER")
+        self.assertIsInstance(pr._impl, ViewportProgressBar)
+        self.assertEqual(pr.mode, "VIEWPORT")
 
 
 # ============================================================================
