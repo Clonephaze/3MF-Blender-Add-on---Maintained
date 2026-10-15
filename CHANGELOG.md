@@ -1,3 +1,13 @@
+Unreleased
+====
+
+Bug Fixes
+----
+* **Exports show 100000% scale in Orca/Bambu (Issue #38)** — Standard and Orca/Bambu exports applied unit conversion as an instance scale transform. Scale is now baked into vertices, including shared mesh definitions, while transforms preserve real object rotation and scale and use millimeter translations. Physical size, centering, and bed placement are unchanged. Changing the scene Length display unit alone does not change Unit Scale, which determines the conversion.
+* **Coordinate precision** — Standard and Orca vertex precision still means significant digits (`%g`), not fixed decimal places, now applied to millimeter coordinates (for example, 0.0123456 m becomes 12.3456 mm at precision 6). Rounding happens after unit conversion. Prusa export and import scaling are unchanged.
+
+----
+
 2.7.3 — Three-Tier Progress System & Detect Colors Crash Fix
 ====
 
