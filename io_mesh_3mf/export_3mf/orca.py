@@ -384,7 +384,7 @@ class OrcaExporter(BaseExporter):
                 od["transformation"][2][3] += cz
             debug(f"Applied centering offset ({cx:.2f}, {cy:.2f}, {cz:.2f}) mm")
 
-        # Apply bed center offset to transformations (built-in template only)
+        # Apply bed placement offset (printable_area + best_object_pos)
         bed_offset_x, bed_offset_y = self._get_bed_center_offset()
 
         if groups:
@@ -976,7 +976,7 @@ class OrcaExporter(BaseExporter):
 
         try:
             # Write project_settings.config from template with updated colors
-            project_settings = self.generate_project_settings()
+            project_settings = self._get_project_settings()
             with archive.open("Metadata/project_settings.config", "w") as f:
                 f.write(json.dumps(project_settings, indent=4).encode("utf-8"))
             debug("Wrote project_settings.config")
@@ -995,32 +995,40 @@ class OrcaExporter(BaseExporter):
             ctx.safe_report({"ERROR"}, f"Failed to write Orca metadata: {e}")
             raise
 
-    # Built-in template bed center (Bambu Lab A1: 256x256 mm, origin bottom-left)
-    _BED_CENTER_X = 128.0
-    _BED_CENTER_Y = 128.0
-
     def _get_bed_center_offset(self) -> tuple:
-        """Return bed center offset for the built-in project template.
+        """Return the XY point (mm) where the centered export should be placed.
 
-        The built-in template (Bambu Lab A1) uses a bottom-left origin.
-        Custom templates and stashed configs get no offset — the caller
-        handles positioning.
-
-        :return: ``(offset_x, offset_y)`` in millimeters.
+        Derived from the effective ``project_settings.config`` that will be
+        written: ``printable_area`` bounding box plus the ``best_object_pos``
+        fraction (default 0.5,0.5).  Explicit ``project_template`` callers
+        keep the old behaviour (no offset; the caller positions objects).
+        Falls back to ``(0, 0)`` with a warning if the bed is unknown.
         """
         if self.ctx.project_template_path:
             return (0.0, 0.0)
-        if get_stashed_config("Metadata/project_settings.config") is not None:
+        settings = self._get_project_settings()
+        try:
+            pts = [tuple(float(v) for v in p.split("x")) for p in settings["printable_area"]]
+            if len(pts) < 3:
+                raise ValueError("printable_area needs at least 3 points")
+            xs = [p[0] for p in pts]
+            ys = [p[1] for p in pts]
+        except (KeyError, TypeError, ValueError, AttributeError) as e:
+            warn(f"Cannot determine bed from printable_area ({e}); not offsetting objects.")
             return (0.0, 0.0)
-        if (
-            self.ctx.options.slicer_profile != "NONE"
-            and get_profile_config(
-                self.ctx.options.slicer_profile,
-                "Metadata/project_settings.config",
-            ) is not None
-        ):
-            return (0.0, 0.0)
-        return (self._BED_CENTER_X, self._BED_CENTER_Y)
+        try:
+            fx, fy = (float(v) for v in str(settings.get("best_object_pos", "0.5,0.5")).split(","))
+        except ValueError:
+            fx, fy = 0.5, 0.5
+        target = (min(xs) + fx * (max(xs) - min(xs)), min(ys) + fy * (max(ys) - min(ys)))
+        debug(f"Bed placement target {target} (best_object_pos={fx},{fy})")
+        return target
+
+    def _get_project_settings(self) -> dict:
+        """Generate project_settings once so placement and the written file agree."""
+        if getattr(self, "_project_settings", None) is None:
+            self._project_settings = self.generate_project_settings()
+        return self._project_settings
 
     def _get_dominant_color(self, blender_object: bpy.types.Object) -> Optional[str]:
         """Return the hex colour string of the most-common face material on *blender_object*.
