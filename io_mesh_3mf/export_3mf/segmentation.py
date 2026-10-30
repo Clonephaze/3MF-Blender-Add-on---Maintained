@@ -41,8 +41,10 @@ def clear_export_state_cache() -> None:
     """Discard cached state maps from the previous export run."""
     _state_map_cache.clear()
 
+
 # Maximum iterations for adaptive mesh pre-subdivision
 _MAX_SUBDIV_ITERATIONS = 6
+
 
 # Target pixels per segmentation leaf node (lower = finer detail, more triangles)
 _PIXELS_PER_LEAF = 4
@@ -81,7 +83,7 @@ def subdivide_mesh_for_segmentation(
         return False
 
     # Pixel-area budget per triangle: 4^depth leaves × pixels_per_leaf.
-    max_pixel_area = (4 ** max_depth) * _PIXELS_PER_LEAF
+    max_pixel_area = (4**max_depth) * _PIXELS_PER_LEAF
 
     bm = bmesh.new()
     bm.from_mesh(mesh)
@@ -215,9 +217,12 @@ def _analyze_and_encode_direct(
     state_map: np.ndarray,
     width: int,
     height: int,
-    u0: float, v0: float,
-    u1: float, v1: float,
-    u2: float, v2: float,
+    u0: float,
+    v0: float,
+    u1: float,
+    v1: float,
+    u2: float,
+    v2: float,
     max_depth: int,
     nibbles: list,
 ) -> int:
@@ -281,10 +286,18 @@ def _analyze_and_encode_direct(
     nibbles.append(0b0011)  # split_sides=3, special_side=0
 
     # Children in same order as SegmentationEncoder: c3 (center), c2, c1, c0.
-    rs3 = _analyze_and_encode_direct(state_map, width, height, m01u, m01v, m12u, m12v, m20u, m20v, nd, nibbles)
-    rs2 = _analyze_and_encode_direct(state_map, width, height, m12u, m12v, u2, v2, m20u, m20v, nd, nibbles)
-    rs1 = _analyze_and_encode_direct(state_map, width, height, m01u, m01v, u1, v1, m12u, m12v, nd, nibbles)
-    rs0 = _analyze_and_encode_direct(state_map, width, height, u0, v0, m01u, m01v, m20u, m20v, nd, nibbles)
+    rs3 = _analyze_and_encode_direct(
+        state_map, width, height, m01u, m01v, m12u, m12v, m20u, m20v, nd, nibbles
+    )
+    rs2 = _analyze_and_encode_direct(
+        state_map, width, height, m12u, m12v, u2, v2, m20u, m20v, nd, nibbles
+    )
+    rs1 = _analyze_and_encode_direct(
+        state_map, width, height, m01u, m01v, u1, v1, m12u, m12v, nd, nibbles
+    )
+    rs0 = _analyze_and_encode_direct(
+        state_map, width, height, u0, v0, m01u, m01v, m20u, m20v, nd, nibbles
+    )
 
     if rs0 >= 0 and rs0 == rs1 == rs2 == rs3:
         del nibbles[save_pos:]
@@ -295,8 +308,12 @@ def _analyze_and_encode_direct(
 
 
 def texture_to_segmentation(
-    obj, image, extruder_colors: Dict[int, List[float]], default_extruder: int = 1,
-    progress_callback=None, max_depth: int = MAX_SUBDIVISION_DEPTH,
+    obj,
+    image,
+    extruder_colors: Dict[int, List[float]],
+    default_extruder: int = 1,
+    progress_callback=None,
+    max_depth: int = MAX_SUBDIVISION_DEPTH,
     mesh=None,
 ) -> Dict[int, str]:
     """
@@ -328,7 +345,13 @@ def texture_to_segmentation(
     debug(f"  Default extruder: {default_extruder}")
 
     # Re-use the state map when multiple objects share the same texture (e.g. puzzle pieces).
-    cache_key = (image.name, width, height, frozenset(color_to_extruder.items()), default_extruder)
+    cache_key = (
+        image.name,
+        width,
+        height,
+        frozenset(color_to_extruder.items()),
+        default_extruder,
+    )
     if cache_key in _state_map_cache:
         debug(f"  State map cache hit for '{image.name}' — skipping pixel read + build")
         state_map = _state_map_cache[cache_key]
@@ -365,9 +388,7 @@ def texture_to_segmentation(
 
     mesh.calc_loop_triangles()
     total_faces = len(mesh.loop_triangles)
-    debug(
-        f"  Processing {total_faces} triangles (max_depth={max_depth})..."
-    )
+    debug(f"  Processing {total_faces} triangles (max_depth={max_depth})...")
 
     # Bulk-extract loop indices and UV data once — avoids per-element Python/C crossings.
     tri_loops_flat = np.empty(total_faces * 3, dtype=np.int32)
@@ -384,28 +405,36 @@ def texture_to_segmentation(
     _uv1s = all_uvs[tri_loops[:, 1]]
     _uv2s = all_uvs[tri_loops[:, 2]]
     _ps = np.maximum(
-        (np.maximum(np.maximum(_uv0s[:, 0], _uv1s[:, 0]), _uv2s[:, 0]) -
-         np.minimum(np.minimum(_uv0s[:, 0], _uv1s[:, 0]), _uv2s[:, 0])) * (width - 1),
-        (np.maximum(np.maximum(_uv0s[:, 1], _uv1s[:, 1]), _uv2s[:, 1]) -
-         np.minimum(np.minimum(_uv0s[:, 1], _uv1s[:, 1]), _uv2s[:, 1])) * (height - 1),
+        (
+            np.maximum(np.maximum(_uv0s[:, 0], _uv1s[:, 0]), _uv2s[:, 0])
+            - np.minimum(np.minimum(_uv0s[:, 0], _uv1s[:, 0]), _uv2s[:, 0])
+        )
+        * (width - 1),
+        (
+            np.maximum(np.maximum(_uv0s[:, 1], _uv1s[:, 1]), _uv2s[:, 1])
+            - np.minimum(np.minimum(_uv0s[:, 1], _uv1s[:, 1]), _uv2s[:, 1])
+        )
+        * (height - 1),
     )
     tri_depths = np.where(
         _ps < 1.0,
         1,
-        np.clip(np.floor(np.log2(np.maximum(_ps, 1.0))).astype(np.int32) + 1, 1, max_depth),
+        np.clip(
+            np.floor(np.log2(np.maximum(_ps, 1.0))).astype(np.int32) + 1, 1, max_depth
+        ),
     ).tolist()
 
     for tri_idx in range(total_faces):
         # Progress callback every 500 triangles
         if progress_callback and tri_idx > 0 and tri_idx % 500 == 0:
-            progress_callback(tri_idx, total_faces, f"Segmentation: {tri_idx}/{total_faces}")
+            progress_callback(
+                tri_idx, total_faces, f"Segmentation: {tri_idx}/{total_faces}"
+            )
         if tri_idx > 0 and tri_idx % 2000 == 0:
             elapsed = time.perf_counter() - t_state
             rate = tri_idx / elapsed if elapsed > 0 else 0
             remaining = (total_faces - tri_idx) / rate if rate > 0 else 0
-            debug(
-                f"    {tri_idx}/{total_faces} ({rate:.0f}/s, ~{remaining:.0f}s left)"
-            )
+            debug(f"    {tri_idx}/{total_faces} ({rate:.0f}/s, ~{remaining:.0f}s left)")
 
         li = tri_loops[tri_idx]
         uv0 = all_uvs[li[0]]
@@ -414,10 +443,15 @@ def texture_to_segmentation(
 
         nibbles: list = []
         _leaf = _analyze_and_encode_direct(
-            state_map, width, height,
-            float(uv0[0]), float(uv0[1]),
-            float(uv1[0]), float(uv1[1]),
-            float(uv2[0]), float(uv2[1]),
+            state_map,
+            width,
+            height,
+            float(uv0[0]),
+            float(uv0[1]),
+            float(uv1[0]),
+            float(uv1[1]),
+            float(uv2[0]),
+            float(uv2[1]),
             tri_depths[tri_idx],
             nibbles,
         )
