@@ -9,13 +9,32 @@ import unittest
 import xml.etree.ElementTree as ET
 
 import bpy
+from mathutils import Matrix
 
 from io_mesh_3mf.common.units import (
     blender_to_metre,
     threemf_to_metre,
     import_unit_scale,
     export_unit_scale,
+    scale_transform_translation,
 )
+
+
+class TestScaleTransformTranslation(unittest.TestCase):
+    def test_preserves_linear_part_and_source_matrix(self):
+        original = Matrix.Translation((0.01, -0.02, 0.03)) @ Matrix.Scale(2, 4)
+        before = original.copy()
+        result = scale_transform_translation(original, 1000)
+        self.assertEqual(original, before)
+        for row in range(3):
+            for col in range(3):
+                self.assertEqual(result[row][col], original[row][col])
+        for actual, expected in zip(result.translation, (10, -20, 30)):
+            self.assertAlmostEqual(actual, expected, places=5)
+
+    def test_identity_conversion(self):
+        original = Matrix.Translation((1, 2, 3))
+        self.assertEqual(scale_transform_translation(original, 1), original)
 
 
 class TestBlenderToMetre(unittest.TestCase):

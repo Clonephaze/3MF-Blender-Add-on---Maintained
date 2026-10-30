@@ -829,8 +829,8 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
         exporter = StandardExporter(ctx)
         exporter.write_objects(root, resources_element, blender_objects, global_scale)
 
-    def write_object_resource(self, resources_element, blender_object):
+    def write_object_resource(self, resources_element, blender_object, global_scale: float = 1.0):
         """Write a single object resource. Backward-compatible wrapper."""
         ctx = self._build_context()
         exporter = StandardExporter(ctx)
-        return exporter.write_object_resource(resources_element, blender_object)
+        return exporter.write_object_resource(resources_element, blender_object, global_scale)

@@ -36,6 +36,7 @@ from ..common.extensions import TRIANGLE_SETS_EXTENSION, MATERIALS_EXTENSION
 from ..common.logging import debug, timing_debug, warn
 from ..common.metadata import Metadata
 from ..common.xml import format_transformation
+from ..common.units import scale_transform_translation
 
 from .archive import write_core_properties
 from .components import collect_mesh_objects, detect_linked_duplicates, should_use_components
@@ -567,8 +568,10 @@ class StandardExporter(BaseExporter):
         as component instances for smaller file sizes.
         """
         ctx = self.ctx
-        transformation = mathutils.Matrix.Scale(global_scale, 4)
-        transformation = self._compute_centering_offset(blender_objects, transformation) @ transformation
+        # Bake units into all mesh resources, including shared component definitions.
+        transformation = self._compute_centering_offset(
+            blender_objects, mathutils.Matrix.Scale(global_scale, 4)
+        )
 
         # Detect linked duplicates if component optimization is enabled
         component_groups = {}
@@ -593,7 +596,7 @@ class StandardExporter(BaseExporter):
                 for mesh_data, group in component_groups.items():
                     representative_obj = group.objects[0]
                     component_id = self._write_component_definition(
-                        resources_element, representative_obj
+                        resources_element, representative_obj, global_scale
                     )
                     group.component_id = component_id
                     debug(
@@ -655,13 +658,15 @@ class StandardExporter(BaseExporter):
                     )
                 for child_obj in child_meshes:
                     child_id, _ = self.write_object_resource(
-                        resources_element, child_obj
+                        resources_element, child_obj, global_scale
                     )
                     if child_id is None:
                         continue
                     self._write_build_item(
                         build_element, child_id,
-                        transformation @ child_obj.matrix_world,
+                        transformation @ scale_transform_translation(
+                            child_obj.matrix_world, global_scale
+                        ),
                         child_obj,
                     )
                 continue
@@ -679,7 +684,7 @@ class StandardExporter(BaseExporter):
                 )
             else:
                 objectid, mesh_transformation = self.write_object_resource(
-                    resources_element, blender_object
+                    resources_element, blender_object, global_scale
                 )
 
             if objectid is None:
@@ -687,7 +692,9 @@ class StandardExporter(BaseExporter):
 
             self._write_build_item(
                 build_element, objectid,
-                transformation @ blender_object.matrix_world,
+                transformation @ scale_transform_translation(
+                    blender_object.matrix_world, global_scale
+                ),
                 blender_object,
             )
 
@@ -735,6 +742,7 @@ class StandardExporter(BaseExporter):
         self,
         resources_element: xml.etree.ElementTree.Element,
         blender_object: bpy.types.Object,
+        global_scale: float = 1.0,
     ) -> Tuple[int, mathutils.Matrix]:
         """
         Write a single Blender object and all of its children to the resources of a 3MF document.
@@ -779,12 +787,15 @@ class StandardExporter(BaseExporter):
                 )
                 for child in exportable_children:
                     child_id, child_transformation = self.write_object_resource(
-                        resources_element, child
+                        resources_element, child, global_scale
                     )
                     if child_id is None:
                         continue
                     child_transformation = (
                         mesh_transformation.inverted_safe() @ child_transformation
+                    )
+                    child_transformation = scale_transform_translation(
+                        child_transformation, global_scale
                     )
                     component_element = xml.etree.ElementTree.SubElement(
                         components_element, f"{{{MODEL_NAMESPACE}}}component"
@@ -958,6 +969,7 @@ class StandardExporter(BaseExporter):
                 mesh.vertices,
                 ctx.options.use_orca_format,
                 ctx.options.coordinate_precision,
+                global_scale,
             )
             timing_debug(f"write_vertices wall '{object_name}'", (time.perf_counter() - _t_verts) * 1000)
 
@@ -1161,6 +1173,7 @@ class StandardExporter(BaseExporter):
         self,
         resources_element: xml.etree.ElementTree.Element,
         blender_object: bpy.types.Object,
+        global_scale: float = 1.0,
     ) -> int:
         """
         Write a component definition — a reusable mesh resource.
@@ -1260,6 +1273,7 @@ class StandardExporter(BaseExporter):
                 mesh.vertices,
                 ctx.options.use_orca_format,
                 ctx.options.coordinate_precision,
+                global_scale,
             )
 
             write_triangles(

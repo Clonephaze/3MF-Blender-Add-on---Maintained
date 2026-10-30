@@ -48,6 +48,7 @@ from ..common.constants import (
 from ..common.extensions import PRODUCTION_EXTENSION, ORCA_EXTENSION
 from ..common.logging import debug, timing_debug, warn, error
 from ..common.xml import format_transformation
+from ..common.units import scale_transform_translation
 
 from .geometry import _raw_geometry_cache
 from .materials import (
@@ -308,13 +309,14 @@ class OrcaExporter(BaseExporter):
             safe_name = re.sub(r"[^\w\-.]", "_", blender_object.name)
             object_path = f"/3D/Objects/{safe_name}_{object_counter}.model"
 
-            # Get transformation
-            transformation = blender_object.matrix_world.copy()
-            transformation = mathutils.Matrix.Scale(global_scale, 4) @ transformation
+            # Unit conversion is baked into vertices; only translation changes units.
+            transformation = scale_transform_translation(
+                blender_object.matrix_world, global_scale
+            )
 
             # Write the individual object model file
             self.write_object_model(
-                archive, blender_object, object_path, mesh_id, mesh_uuid,
+                archive, blender_object, object_path, mesh_id, mesh_uuid, global_scale,
                 idx, total_mesh_objects,
             )
 
@@ -428,10 +430,11 @@ class OrcaExporter(BaseExporter):
         object_path: str,
         mesh_id: int,
         mesh_uuid: str,
+        global_scale: float,
         obj_index: int = 0,
         total_objects: int = 1,
     ) -> None:
-        """Write an individual object model file for Orca Slicer."""
+        """Write an Orca object model with local vertices converted to millimeters."""
         ctx = self.ctx
 
         root = xml.etree.ElementTree.Element(
@@ -522,6 +525,7 @@ class OrcaExporter(BaseExporter):
         co_flat = np.empty(n_verts * 3, dtype=np.float64)
         mesh.vertices.foreach_get("co", co_flat)
         co = co_flat.reshape(n_verts, 3)
+        co *= global_scale
         _t_vert1 = time.perf_counter()
         timing_debug(f"orca write_vertices foreach_get ({n_verts} verts)", (_t_vert1 - _t_vert0) * 1000)
         fmt = f"%.{decimals}g"

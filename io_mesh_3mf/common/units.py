@@ -16,6 +16,7 @@ Unit conversions between Blender's units and 3MF's units.
 from typing import Dict
 
 import bpy.types  # For type hints in unit_scale functions
+import mathutils
 
 from .constants import MODEL_DEFAULT_UNIT
 
@@ -24,6 +25,7 @@ __all__ = [
     "threemf_to_metre",
     "import_unit_scale",
     "export_unit_scale",
+    "scale_transform_translation",
 ]
 
 blender_to_metre: Dict[str, float] = {
@@ -55,6 +57,15 @@ threemf_to_metre: Dict[str, float] = {
     "foot": 0.3048,
     "meter": 1,
 }
+
+
+def scale_transform_translation(
+    transformation: mathutils.Matrix, scale: float
+) -> mathutils.Matrix:
+    """Convert a transform's translation units without changing rotation or scale."""
+    result = transformation.copy()
+    result.translation *= scale
+    return result
 
 
 def import_unit_scale(
