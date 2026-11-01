@@ -76,6 +76,11 @@ Pull requests are welcome.
 
 This project has **unit tests** and **integration tests**. All tests run in **real Blender headless mode** — no mocking. They require Blender's Python interpreter.
 
+GitHub Actions runs the code-style check and both test suites on every push and pull request.
+The test matrix uses Ubuntu 24.04 with the latest patch releases of Blender 4.5 LTS, Blender 5.2 LTS,
+and the latest stable Blender release. Blender downloads are cached by exact version; the latest
+stable release may coincide with one of the LTS entries.
+
 #### Run all tests (recommended before submitting PR)
 
 Windows (PowerShell):
@@ -85,6 +90,8 @@ python tests/run_all_tests.py
 ```
 
 This spawns separate Blender processes for unit and integration tests, reporting pass/fail for both suites.
+To use a particular Blender installation, pass `--blender <path>` or set the `BLENDER_EXE`
+environment variable.
 
 #### Unit tests only
 
@@ -108,7 +115,8 @@ Located in `tests/integration/`
 
 Test resources (sample files) are in `tests/resources/` and `tests/resources/3mf_consortium/`
 
-**Note:** All tests require Blender's Python — don't use system Python or virtualenvs. You need Blender installed and available on your PATH.
+**Note:** The individual test suites require Blender's Python. The master runner uses system Python
+to launch Blender, which must be on your PATH unless `--blender` or `BLENDER_EXE` is set.
 
 ### Code style and architecture
 

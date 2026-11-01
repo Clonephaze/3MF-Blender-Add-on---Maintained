@@ -9,18 +9,19 @@
 # You should have received a copy of the GNU General Public License along with this program. If not, see
 # <https://www.gnu.org/licenses/>.
 
-# GitHub workflow that performs code style checks on every change and pull request.
-# Note: Unit and integration tests require Blender and must be run locally before commits.
-# Run all tests locally with: python tests/run_all_tests.py
-name: Code Style
+# GitHub workflow that checks code style and runs tests in real Blender.
+name: Tests
 
 on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   lint: # Performs code style checks.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,3 +35,104 @@ jobs:
         # E402: module-level import not at top (common in Blender addons)
         # W503: line break before binary operator (conflicts with PEP8 recommendation)
         run: python3 -m pycodestyle --ignore=E402,W503 --max-line-length=120 io_mesh_3mf/ tests/
+
+  test:
+    name: Blender ${{ matrix.label }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: '4.5'
+            label: '4.5 LTS'
+          - target: '5.2'
+            label: '5.2 LTS'
+          - target: latest
+            label: Latest stable
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve Blender version
+        id: resolve
+        env:
+          BLENDER_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+
+          if [ "$BLENDER_TARGET" = latest ]; then
+            if ! release_index="$(curl -fsSL --retry 3 https://download.blender.org/release/)"; then
+              echo "::error::Could not fetch the Blender release index"
+              exit 1
+            fi
+            if ! branch="$(printf '%s\n' "$release_index" | grep -oP 'Blender\K\d+\.\d+(?=/)' | sort -V | tail -1)" \
+              || [ -z "$branch" ]; then
+              echo "::error::Could not resolve the latest Blender release branch"
+              exit 1
+            fi
+          else
+            branch="$BLENDER_TARGET"
+          fi
+
+          if ! release_index="$(curl -fsSL --retry 3 "https://download.blender.org/release/Blender${branch}/")"; then
+            echo "::error::Could not fetch the Blender ${branch} release index"
+            exit 1
+          fi
+          branch_pattern="${branch//./\\.}"
+          if ! version="$(printf '%s\n' "$release_index" \
+            | grep -oP "blender-\K${branch_pattern}\.\d+(?=-linux-x64\.tar\.xz)" | sort -V | tail -1)" \
+            || [ -z "$version" ]; then
+            echo "::error::Could not resolve Blender ${BLENDER_TARGET} for Linux x64"
+            exit 1
+          fi
+
+          echo "Resolved Blender ${version} (branch ${branch})"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Blender
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: blender-${{ steps.resolve.outputs.version }}
+          key: blender-${{ steps.resolve.outputs.version }}-linux-x64
+
+      - name: Download Blender
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          BLENDER_VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          branch="${BLENDER_VERSION%.*}"
+          url="https://download.blender.org/release/Blender${branch}/blender-${BLENDER_VERSION}-linux-x64.tar.xz"
+          echo "Downloading ${url}"
+          curl -fsSL --retry 3 "$url" -o blender.tar.xz
+          tar -xf blender.tar.xz
+          mv "blender-${BLENDER_VERSION}-linux-x64" "blender-${BLENDER_VERSION}"
+          rm blender.tar.xz
+
+      - name: Install runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libxi6 libxxf86vm1 libxfixes3 libxrender1 \
+            libxkbcommon0 libsm6 libgl1 libegl1
+
+      - name: Unit tests
+        id: unit
+        env:
+          BLENDER_VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          "./blender-${BLENDER_VERSION}/blender" \
+            --background --factory-startup --python-exit-code 1 -noaudio -q \
+            --python tests/run_unit_tests.py
+
+      - name: Integration tests
+        if: ${{ !cancelled() && (success() || steps.unit.outcome == 'failure') }}
+        env:
+          BLENDER_VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          "./blender-${BLENDER_VERSION}/blender" \
+            --background --factory-startup --python-exit-code 1 -noaudio -q \
+            --python tests/run_tests.py
