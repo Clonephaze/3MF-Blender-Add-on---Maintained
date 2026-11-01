@@ -71,6 +71,9 @@ class APICapabilitiesTests(unittest.TestCase):
             "use_components",
             "auto_smooth",
             "subdivision_depth",
+            "assemblies",
+            "multi_plate",
+            "plate_per_material",
         }
         self.assertTrue(params.issubset(API_CAPABILITIES))
 

@@ -165,6 +165,27 @@ class SetObjectOriginTests(Blender3mfTestCase):
         local_min_z = min(v.co.z for v in obj.data.vertices)
         self.assertAlmostEqual(local_min_z, 0.0, places=1)
 
+    def test_center_preserves_world_geometry_and_other_selected_objects(self):
+        bpy.ops.mesh.primitive_cube_add(size=2.0)
+        other = bpy.context.object
+        bpy.ops.mesh.primitive_cube_add(size=2.0, location=(3.0, 4.0, 5.0))
+        obj = bpy.context.object
+        obj.rotation_euler = (0.2, 0.3, 0.7)
+        obj.scale = (1.2, 0.7, 1.5)
+        for vertex in obj.data.vertices:
+            vertex.co += mathutils.Vector((4.0, -2.0, 3.0))
+        other.select_set(True)
+        bpy.context.view_layer.update()
+        before = {
+            current.name: [current.matrix_world @ v.co for v in current.data.vertices]
+            for current in (obj, other)
+        }
+        set_object_origin(obj, "CENTER")
+        bpy.context.view_layer.update()
+        for current in (obj, other):
+            for old, vertex in zip(before[current.name], current.data.vertices):
+                self.assertLess((old - current.matrix_world @ vertex.co).length, 0.00001)
+
 
 # ============================================================================
 #  Import options via operator (end-to-end)

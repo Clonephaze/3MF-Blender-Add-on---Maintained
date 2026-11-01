@@ -24,9 +24,13 @@ from typing import List, Optional, TYPE_CHECKING
 
 import bpy
 import mathutils
+import numpy as np
 
 from ..common import debug, warn, MODEL_NAMESPACES
+from ..common.constants import MODEL_DEFAULT_UNIT
 from ..common.metadata import Metadata, MetadataEntry
+from ..common.plates import ASSEMBLE_DELTA_PROPERTY, PLATE_NAME_PROPERTY, PLATE_PROPERTY
+from ..common.units import threemf_to_metre
 from ..common.xml import parse_transformation, read_metadata as _read_metadata
 from ..common.types import ResourceObject
 from ..common.colors import apply_subtype_material
@@ -73,6 +77,7 @@ def build_items(
 
     import time as _time
     _t0 = _time.perf_counter()
+    instance_counts = {}
 
     for idx, build_item in enumerate(build_items_list):
         if progress_callback and total_items > 0:
@@ -85,6 +90,20 @@ def build_items(
         except KeyError:
             warn("Encountered build item without object ID.")
             continue
+
+        try:
+            plate_object_id = str(int(objectid))
+        except ValueError:
+            plate_object_id = objectid
+        instance_id = instance_counts.get(plate_object_id, 0)
+        instance_counts[plate_object_id] = instance_id + 1
+        plate = ctx.plate_assignments.get((plate_object_id, instance_id))
+        if plate is None and ctx.has_plate_metadata:
+            ctx.safe_report(
+                {"WARNING"},
+                f"No plate entry for object {objectid} instance {instance_id}; "
+                "keeping its original position.",
+            )
 
         metadata = Metadata()
         for metadata_node in build_item.iterfind("./3mf:metadatagroup", MODEL_NAMESPACES):
@@ -99,9 +118,31 @@ def build_items(
 
         transform = mathutils.Matrix.Scale(scale_unit, 4)
         transform @= parse_transformation(build_item.attrib.get("transform", ""))
+        if plate is not None and plate.grid_offset_mm is not None:
+            file_unit = root.attrib.get("unit", MODEL_DEFAULT_UNIT)
+            mm_to_blender = scale_unit * threemf_to_metre["millimeter"] / threemf_to_metre[file_unit]
+            transform[0][3] -= plate.grid_offset_mm[0] * mm_to_blender
+            transform[1][3] -= plate.grid_offset_mm[1] * mm_to_blender
 
         _t_obj = _time.perf_counter()
+        first_new_object = len(ctx.imported_objects)
         build_object(ctx, resource_object, transform, metadata, [objectid])
+        if plate is not None:
+            new_objects = ctx.imported_objects[first_new_object:]
+            # A lone plate 1 is the default layout: tagging it with 3mf_plate
+            # would make re-export treat the object as an explicit plate request.
+            # Its name alone is kept; Orca export reads a bare name as plate 1.
+            tag_plate = ctx.plate_count > 1 or plate.number != 1
+            for obj in new_objects:
+                if tag_plate:
+                    obj[PLATE_PROPERTY] = plate.number
+                if plate.name:
+                    obj[PLATE_NAME_PROPERTY] = plate.name
+            if plate.assemble_transform and new_objects:
+                _store_assemble_transform(
+                    ctx, resource_object, transform, plate.assemble_transform,
+                    scale_unit, new_objects,
+                )
         _obj_elapsed = _time.perf_counter() - _t_obj
         tris = len(resource_object.triangles) if resource_object.triangles else 0
         debug(
@@ -109,6 +150,76 @@ def build_items(
         )
 
     debug(f"[TIMING]   build_items total: {_time.perf_counter() - _t0:.3f}s")
+
+
+def _single_volume(ctx: "ImportContext", resource_object: ResourceObject):
+    """Resolve a single component chain to its mesh and component transform."""
+    transform = mathutils.Matrix.Identity(4)
+    seen = set()
+    current = resource_object
+    while not current.triangles:
+        if len(current.components) != 1:
+            return None
+        component = current.components[0]
+        if component.resource_object in seen:
+            return None
+        seen.add(component.resource_object)
+        current = ctx.resource_objects.get(component.resource_object)
+        if current is None:
+            return None
+        transform @= component.transformation
+    if current.components or not current.vertices:
+        return None
+    return current, transform
+
+
+def _store_assemble_transform(
+    ctx: "ImportContext",
+    resource_object: ResourceObject,
+    build_transform: mathutils.Matrix,
+    assemble_transform: str,
+    scale_unit: float,
+    objects: List[bpy.types.Object],
+) -> None:
+    """Preserve the assembled frame independently of the plate-local frame."""
+    assembly = mathutils.Matrix.Scale(scale_unit, 4) @ parse_transformation(assemble_transform)
+    volume = _single_volume(ctx, resource_object)
+    if volume is not None and len(objects) == 1 and objects[0].type == "MESH":
+        mesh_resource, component_transform = volume
+        vertices = np.asarray(mesh_resource.vertices, dtype=np.float64)
+        center = mathutils.Vector(((vertices.min(axis=0) + vertices.max(axis=0)) / 2.0).tolist())
+        component_transform.translation = (0.0, 0.0, 0.0)
+        target = assembly @ component_transform @ mathutils.Matrix.Translation(-center)
+        obj = objects[0]
+        if ctx.options.origin_to_geometry != "KEEP":
+            coords = np.empty(len(obj.data.vertices) * 3, dtype=np.float64)
+            obj.data.vertices.foreach_get("co", coords)
+            coords = coords.reshape((-1, 3))
+            imported_center = mathutils.Vector(
+                ((coords.min(axis=0) + coords.max(axis=0)) / 2.0).tolist()
+            )
+            target @= mathutils.Matrix.Translation(center - imported_center)
+        reference = obj.matrix_world
+    else:
+        if ctx.options.import_location != "KEEP" and any(obj.type != "EMPTY" for obj in objects):
+            ctx.safe_report(
+                {"WARNING"},
+                "Cannot preserve the assembled frame for separately placed assembly parts.",
+            )
+            return
+        target = assembly
+        reference = build_transform
+
+    try:
+        delta = target @ reference.inverted()
+    except ValueError:
+        ctx.safe_report({"WARNING"}, "Cannot preserve an assembled frame with zero scale.")
+        return
+    identity = mathutils.Matrix.Identity(4)
+    if any(abs(delta[row][col] - identity[row][col]) > 1e-7 for row in range(4) for col in range(4)):
+        values = [float(delta[row][col]) for row in range(4) for col in range(4)]
+        for obj in objects:
+            obj[ASSEMBLE_DELTA_PROPERTY] = values
 
 
 # ---------------------------------------------------------------------------
@@ -140,19 +251,30 @@ def build_object(
     :return: The created Blender Object, or ``None``.
     """
     # --- Component instance detection ---
-    is_component_instance = (
-        not resource_object.triangles
-        and resource_object.components
-        and len(resource_object.components) == 1
+    component = (
+        resource_object.components[0]
+        if not resource_object.triangles and len(resource_object.components) == 1
+        else None
+    )
+    component_resource = (
+        ctx.resource_objects.get(component.resource_object) if component is not None else None
+    )
+    is_component_instance = bool(
+        component_resource is not None
+        and component_resource.triangles
+        and not component_resource.components
     )
 
+    origin_shift = (0.0, 0.0, 0.0)
     if is_component_instance:
-        mesh = _build_component_instance(
+        instance = _build_component_instance(
             ctx, resource_object, transformation, metadata,
             objectid_stack_trace, parent,
         )
-        if mesh is None:
+        if instance is None:
             return None
+        mesh, origin_shift = instance
+        transformation = transformation @ component.transformation
     else:
         mesh = _build_mesh(ctx, resource_object, objectid_stack_trace)
 
@@ -163,7 +285,11 @@ def build_object(
         # 2. name attribute from 3MF <object> element
         # 3. Fallback: "3MF Object"
         wrapper_id = objectid_stack_trace[0] if objectid_stack_trace else None
-        current_id = objectid_stack_trace[-1] if objectid_stack_trace else None
+        current_id = (
+            component.resource_object
+            if is_component_instance and component is not None
+            else objectid_stack_trace[-1] if objectid_stack_trace else None
+        )
         name_key = (wrapper_id, current_id) if wrapper_id and current_id else None
         object_name = "3MF Object"
         if name_key and name_key in ctx.part_names:
@@ -179,12 +305,13 @@ def build_object(
         bpy.context.view_layer.objects.active = blender_object
         blender_object.select_set(True)
 
-        # Origin placement (before transformation)
-        set_object_origin(blender_object, ctx.options.origin_to_geometry)
+        if not is_component_instance:
+            origin_shift = set_object_origin(blender_object, ctx.options.origin_to_geometry)
+        transformation = transformation @ mathutils.Matrix.Translation(origin_shift)
 
         # Adjust transformation for import_location
         transformation = apply_import_location(
-            transformation, ctx.options.import_location
+            transformation, "KEEP" if is_temp_component_def else ctx.options.import_location
         )
 
         blender_object.matrix_world = transformation
@@ -203,7 +330,8 @@ def build_object(
         if subtype_key and subtype_key in ctx.part_subtypes:
             part_subtype = ctx.part_subtypes[subtype_key]
             blender_object["3mf_part_subtype"] = part_subtype
-            apply_subtype_material(blender_object, part_subtype)
+            if ctx.options.import_materials != "NONE":
+                apply_subtype_material(blender_object, part_subtype)
 
         # Apply per-part filament color (Orca/FullSpectrum per-part extruder mode).
         # Only applied when no materials were created by the 3MF spec or paint pipeline
@@ -317,16 +445,16 @@ def _build_component_instance(
     metadata: Metadata,
     objectid_stack_trace: List[str],
     parent,
-) -> Optional[bpy.types.Mesh]:
+) -> Optional[tuple[bpy.types.Mesh, tuple[float, float, float]]]:
     """Handle component-instance pattern: reuse or build + cache mesh."""
     component = resource_object.components[0]
     component_id = component.resource_object
 
     if component_id in ctx.component_instance_cache:
-        cached_mesh, instance_count = ctx.component_instance_cache[component_id]
-        ctx.component_instance_cache[component_id] = (cached_mesh, instance_count + 1)
+        cached_mesh, instance_count, origin_shift = ctx.component_instance_cache[component_id]
+        ctx.component_instance_cache[component_id] = (cached_mesh, instance_count + 1, origin_shift)
         debug(f"Creating linked duplicate {instance_count + 1} for component {component_id}")
-        return cached_mesh
+        return cached_mesh, origin_shift
 
     # First instance — build the component and cache its mesh
     try:
@@ -347,10 +475,12 @@ def _build_component_instance(
 
     if temp_obj and temp_obj.data:
         mesh = temp_obj.data
-        ctx.component_instance_cache[component_id] = (mesh, 1)
+        shift = temp_obj.matrix_world.translation
+        origin_shift = (float(shift.x), float(shift.y), float(shift.z))
+        ctx.component_instance_cache[component_id] = (mesh, 1, origin_shift)
         debug(f"Cached component {component_id} mesh for linked duplicates")
         bpy.data.objects.remove(temp_obj, do_unlink=True)
-        return mesh
+        return mesh, origin_shift
 
     warn(f"Failed to build component {component_id}")
     return None

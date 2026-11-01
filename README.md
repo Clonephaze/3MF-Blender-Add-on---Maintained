@@ -110,6 +110,7 @@ The importer can also preserve:
 - Scene/object metadata
 - Triangle sets
 - Embedded slicer config files for later round-trip export
+- Orca/Bambu plate assignments, plate names, and assembled positions
 
 ### Exporting
 
@@ -134,6 +135,28 @@ The external guide pages walk through both workflows in detail:
 
 - [Standard export guide](https://clonecore.net/docs/3mf-guide/exporting-standard)
 - [Multi-color export guide](https://clonecore.net/docs/3mf-guide/exporting-multicolor)
+
+### Assemblies and Multi-Plate Projects
+
+In the **3MF → Assemblies** sidebar, select meshes and choose **Create
+Assembly** to group them under an Empty without moving them. Use the adjacent
+clear button to remove selected meshes from their assembly. **Assign Plate**
+and **Clear Plate** manage Orca/Bambu plate assignments for objects or
+assemblies.
+
+**Plate per Material** is off by default. When enabled for Orca/Bambu export,
+objects sharing a material use the same plate; the optional **Split
+Assemblies by Material** setting separates mixed assemblies while preserving
+their assembled positions. Explicit plate assignments take precedence.
+Grouping uses each object's dominant material or default paint extruder; it
+does not split different colors within a single mesh. Arrange overlapping
+parts in the slicer.
+
+Import restores saved plate names and assignments for multi-plate projects
+and removes the slicer's plate-grid offsets when bed dimensions are available.
+With **Selection Only**, select an assembly's Empty to export it as an
+assembly; selecting only its parts exports them as separate objects. See the
+[API reference](API.md) for custom properties, limits, and round-trip details.
 
 ### Metadata, Part Types, and Triangle Sets
 

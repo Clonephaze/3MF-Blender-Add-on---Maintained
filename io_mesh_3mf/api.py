@@ -110,7 +110,7 @@ from .common.units import (
 #: - MAJOR: Breaking changes to existing functions/signatures
 #: - MINOR: New features, backward-compatible
 #: - PATCH: Bug fixes only
-API_VERSION = (1, 3, 3)
+API_VERSION = (1, 4, 0)
 
 #: Human-readable version string
 API_VERSION_STRING = ".".join(str(v) for v in API_VERSION)
@@ -140,6 +140,9 @@ API_CAPABILITIES = frozenset(
         "flatten_hierarchy",  # Option to flatten parented meshes into top-level build items (export)
         "modifier_parts",  # Orca/BambuStudio modifier part subtypes (import, export, inspect)
         "slicer_profile",  # Named slicer profile selection (export)
+        "assemblies",  # Empty- and property-based Orca/Bambu assemblies
+        "multi_plate",  # Orca/Bambu plate assignments and import round trips
+        "plate_per_material",  # Automatic material-based plate assignment
     }
 )
 
@@ -699,17 +702,17 @@ def import_3mf(
     )
     ctx = ImportContext(options=options, operator=None)
 
-    # Wire up warning callback (intercept ctx.safe_report for WARNING level).
-    if on_warning is not None:
-        _original_safe_report = ctx.safe_report
+    # Collect warnings even when no callback was supplied.
+    _original_safe_report = ctx.safe_report
 
-        def _intercepted_safe_report(level, message):
-            _original_safe_report(level, message)
-            if "WARNING" in level:
+    def _intercepted_safe_report(level, message):
+        _original_safe_report(level, message)
+        if "WARNING" in level:
+            warnings_list.append(message)
+            if on_warning is not None:
                 on_warning(message)
-                warnings_list.append(message)
 
-        ctx.safe_report = _intercepted_safe_report  # type: ignore[assignment]
+    ctx.safe_report = _intercepted_safe_report  # type: ignore[assignment]
 
     scene_metadata = Metadata()
     scene_metadata.retrieve(bpy.context.scene)
@@ -768,6 +771,8 @@ def import_3mf(
 
     # Stash slicer config files for round-trip export.
     archive_mod.stash_slicer_configs(ctx, filepath)
+    from .import_3mf.slicer.plates import read_orca_plates
+    read_orca_plates(ctx, filepath)
 
     if on_progress:
         on_progress(15, "Parsing model files…")
@@ -784,9 +789,16 @@ def import_3mf(
             continue
         root = document.getroot()
 
+        build_node = root.find("./3mf:build", MODEL_NAMESPACES)
+        if build_node is None or next(
+            build_node.iterfind("./3mf:item", MODEL_NAMESPACES), None
+        ) is None:
+            continue
+
         # Vendor detection.
+        detected_vendor = detect_vendor(root)
         if ctx.options.import_materials != "NONE":
-            ctx.vendor_format = detect_vendor(root)
+            ctx.vendor_format = detected_vendor
         else:
             ctx.vendor_format = None
 
@@ -812,6 +824,10 @@ def import_3mf(
         ctx.part_metadata = {}
         ctx.wrapper_metadata = {}
         ctx.part_names = {}
+        ctx.part_extruders = {}
+        ctx.pending_solid_paint_parts = []
+        ctx.component_instance_cache.clear()
+        ctx.loaded_external_paths.clear()
 
         if on_progress:
             on_progress(20, "Reading filament colours…")
@@ -820,7 +836,7 @@ def import_3mf(
         read_all_slicer_colors(ctx, filepath)
 
         # Read modifier part subtypes from Orca/BambuStudio model_settings.
-        if ctx.vendor_format == "orca":
+        if detected_vendor == "orca" or ctx.plate_assignments:
             from .import_3mf.slicer.colors import read_orca_part_subtypes
 
             read_orca_part_subtypes(ctx, filepath)
@@ -931,6 +947,8 @@ def export_3mf(
     thumbnail_mode: str = "AUTO",
     thumbnail_resolution: int = 256,
     thumbnail_image: str = "",
+    plate_per_material: bool = False,
+    split_assemblies_by_material: bool = True,
     project_template: str | None = None,
     object_settings: dict | None = None,
     on_progress: ProgressCallback | None = None,
@@ -963,7 +981,10 @@ def export_3mf(
         spec-compliant StandardExporter with proper component instancing.
         ``PAINT`` forces segmentation export.  When *project_template* or
         *object_settings* is provided, the Orca exporter is used
-        automatically even in ``AUTO`` mode.
+        automatically even in ``AUTO`` mode. Plate assignments,
+        *plate_per_material*, and ``3mf_assembly`` property groups also
+        select Orca in ``AUTO``; explicit Standard and Prusa exports warn
+        when those settings are ignored.
     :param use_components: Use component instances for linked duplicates.
     :param flatten_hierarchy: When *True*, child meshes parented to an Empty
         are written directly as top-level build items with their combined
@@ -984,6 +1005,14 @@ def export_3mf(
     :param thumbnail_resolution: Width and height in pixels for AUTO mode
         (default 256).
     :param thumbnail_image: Absolute path to an image file for CUSTOM mode.
+    :param plate_per_material: Orca/Bambu only.  Put each material on its own
+        plate (Orca's auto-arrange with "allow multiple materials on a single
+        plate" off).  Objects or assemblies with a ``3mf_plate`` custom
+        property keep that plate.  Default ``False``.
+    :param split_assemblies_by_material: With *plate_per_material*, split an
+        assembly that has several materials into one sub-assembly per
+        material (assembled positions are preserved).  When ``False`` a mixed
+        assembly stays whole on its own plate.  Default ``True``.
     :param project_template: Absolute path to a JSON file to use as the Orca
         ``project_settings.config`` instead of the built-in template.  The
         addon loads this file, patches ``filament_colour`` and resizes
@@ -1027,6 +1056,12 @@ def export_3mf(
     from .export_3mf.components import collect_mesh_objects
     from .export_3mf.context import ExportContext, ExportOptions
     from .export_3mf.geometry import check_non_manifold_geometry
+    from .export_3mf.operator import (
+        _assembly_export_requested,
+        _plate_export_requested,
+        _warn_ignored_assembly_properties,
+        _warn_ignored_plate_options,
+    )
     from .export_3mf.orca import OrcaExporter
     from .export_3mf.prusa import PrusaExporter
     from .export_3mf.standard import StandardExporter
@@ -1092,6 +1127,8 @@ def export_3mf(
         thumbnail_mode=thumbnail_mode,
         thumbnail_resolution=thumbnail_resolution,
         thumbnail_image=thumbnail_image,
+        plate_per_material=plate_per_material,
+        split_assemblies_by_material=split_assemblies_by_material,
     )
     ctx = ExportContext(
         options=options,
@@ -1117,17 +1154,17 @@ def export_3mf(
                 str(k): str(v) for k, v in settings_dict.items()
             }
 
-    # Wire up warning callback.
-    if on_warning is not None:
-        _original_safe_report = ctx.safe_report
+    # Collect warnings even when no callback was supplied.
+    _original_safe_report = ctx.safe_report
 
-        def _intercepted_safe_report(level, message):
-            _original_safe_report(level, message)
-            if "WARNING" in level:
+    def _intercepted_safe_report(level, message):
+        _original_safe_report(level, message)
+        if "WARNING" in level:
+            result.warnings.append(message)
+            if on_warning is not None:
                 on_warning(message)
-                result.warnings.append(message)
 
-        ctx.safe_report = _intercepted_safe_report  # type: ignore[assignment]
+    ctx.safe_report = _intercepted_safe_report  # type: ignore[assignment]
 
     if on_progress:
         on_progress(10, "Creating archive…")
@@ -1203,6 +1240,9 @@ def export_3mf(
     elif mesh_objects:
         has_materials = any(len(obj.material_slots) >= 1 for obj in mesh_objects)
 
+    plates_requested = _plate_export_requested(ctx, blender_objects, mesh_objects)
+    assemblies_requested = _assembly_export_requested(ctx, mesh_objects)
+
     # Dispatch to exporter.
     try:  # must keep _pw.finish() in finally
         try:
@@ -1210,6 +1250,10 @@ def export_3mf(
                 if mmu_slicer_format == "ORCA":
                     exporter = OrcaExporter(ctx)
                 else:
+                    if plates_requested:
+                        _warn_ignored_plate_options(ctx, "PrusaSlicer")
+                    if assemblies_requested:
+                        _warn_ignored_assembly_properties(ctx, "PrusaSlicer")
                     if ctx.project_template_path or ctx.object_settings:
                         warn(
                             "project_template and object_settings are Orca-specific "
@@ -1218,6 +1262,10 @@ def export_3mf(
                     exporter = PrusaExporter(ctx)
             elif use_orca_format == "STANDARD":
                 # Explicit standard mode — always spec-compliant
+                if plates_requested:
+                    _warn_ignored_plate_options(ctx, "standard 3MF")
+                if assemblies_requested:
+                    _warn_ignored_assembly_properties(ctx, "standard 3MF")
                 debug("API: Standard mode requested, using StandardExporter")
                 exporter = StandardExporter(ctx)
             else:
@@ -1239,7 +1287,13 @@ def export_3mf(
                         if mmu_slicer_format == "ORCA":
                             exporter = OrcaExporter(ctx)
                         else:
+                            if plates_requested:
+                                _warn_ignored_plate_options(ctx, "PrusaSlicer")
+                            if assemblies_requested:
+                                _warn_ignored_assembly_properties(ctx, "PrusaSlicer")
                             exporter = PrusaExporter(ctx)
+                    elif plates_requested or assemblies_requested:
+                        exporter = OrcaExporter(ctx)
                     elif has_materials:
                         debug("API AUTO: materials detected, using OrcaExporter")
                         exporter = OrcaExporter(ctx)

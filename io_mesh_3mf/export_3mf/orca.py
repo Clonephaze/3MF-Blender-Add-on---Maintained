@@ -24,6 +24,7 @@ import ast
 import datetime
 import io
 import json
+import math
 import os
 import re
 import time
@@ -47,6 +48,13 @@ from ..common.constants import (
 )
 from ..common.extensions import PRODUCTION_EXTENSION, ORCA_EXTENSION
 from ..common.logging import debug, timing_debug, warn, error
+from ..common.plates import (
+    ASSEMBLE_DELTA_PROPERTY,
+    MAX_PLATES,
+    PLATE_NAME_PROPERTY,
+    PLATE_PROPERTY,
+    printable_area_size,
+)
 from ..common.xml import format_transformation
 from ..common.units import scale_transform_translation
 
@@ -58,6 +66,10 @@ from .materials import (
     material_to_hex_color,
 )
 from .components import collect_mesh_objects
+from .grouping import resolve_assembly_groups
+from .plate_layout import plate_origin
+from .material_plates import plan_material_plates
+from .plate_model import explicit_unit_plate, layout_plates, plate_property
 from .segmentation import texture_to_segmentation
 from .standard import BaseExporter, _stream_model_to_file
 from .thumbnail import write_thumbnail
@@ -265,22 +277,13 @@ class OrcaExporter(BaseExporter):
             archive.close()
             return {"CANCELLED"}
 
-        # Build mapping of mesh objects to their parent groups (Empties)
-        # Each Empty with children becomes a separate assembly in Orca
-        mesh_to_group: dict[str, bpy.types.Object] = {}
-        group_empties: list[bpy.types.Object] = []
-
-        for obj in blender_objects:
-            if obj.type == "EMPTY" and obj.children:
-                group_empties.append(obj)
-                # Map all mesh children to this group
-                for child in obj.children:
-                    if child.type == "MESH":
-                        mesh_to_group[child.name] = obj
-
-        debug(f"Detected {len(group_empties)} group(s) from parent Empties")
+        # Resolve assemblies: ``3mf_assembly`` property, else parent Empties
+        resolved = resolve_assembly_groups(blender_objects, mesh_objects)
+        mesh_to_group = resolved.mesh_to_key
+        debug(f"Detected {len(resolved.groups)} group(s) (Empties + properties)")
 
         # Write individual object model files
+        self._mesh_centers = {}
         object_data = []
 
         total_mesh_objects = len(mesh_objects)
@@ -321,8 +324,7 @@ class OrcaExporter(BaseExporter):
             )
 
             # Track which group this mesh belongs to (if any)
-            parent_group = mesh_to_group.get(blender_object.name)
-            group_name = str(parent_group.name) if parent_group else None
+            group_name = mesh_to_group.get(blender_object.name)  # None if ungrouped
 
             object_data.append(
                 {
@@ -333,7 +335,9 @@ class OrcaExporter(BaseExporter):
                     "mesh_uuid": mesh_uuid,
                     "component_uuid": component_uuid,
                     "transformation": transformation,
+                    "assemble_delta": self._read_assemble_delta(blender_object),
                     "name": blender_object.name,
+                    "mesh_center": self._mesh_centers.get(blender_object.name, (0.0, 0.0, 0.0)),
                     "group_name": group_name,  # None if ungrouped
                 }
             )
@@ -344,10 +348,8 @@ class OrcaExporter(BaseExporter):
         groups: list[dict] = []
         next_wrapper_id = len(object_data) * 2 + 1
 
-        for group_empty in group_empties:
-            group_name = str(group_empty.name)
-            # Get the members of this group
-            group_members = [od for od in object_data if od["group_name"] == group_name]
+        for spec in resolved.groups:
+            group_members = [od for od in object_data if od["group_name"] == spec.key]
 
             if not group_members:
                 continue
@@ -355,9 +357,10 @@ class OrcaExporter(BaseExporter):
             groups.append({
                 "wrapper_id": next_wrapper_id,
                 "uuid": str(uuid.uuid4()),
-                "name": group_name,
+                "name": spec.name,
                 "members": group_members,
-                "empty": group_empty,
+                "empty": spec.empty,
+                "assemble_delta": self._group_assemble_delta(spec.empty, group_members),
             })
             next_wrapper_id += 1
 
@@ -373,6 +376,7 @@ class OrcaExporter(BaseExporter):
             for obj in mesh_objects
             for corner in obj.bound_box
         ]
+        cx = cy = cz = 0.0
         if all_corners:
             xs = [v.x for v in all_corners]
             ys = [v.y for v in all_corners]
@@ -403,6 +407,29 @@ class OrcaExporter(BaseExporter):
                 f"Applied bed center offset ({bed_offset_x}, {bed_offset_y}) mm "
                 f"to {len(ungrouped)} ungrouped objects"
             )
+
+        center = mathutils.Matrix.Translation((cx, cy, cz))
+        bed = mathutils.Matrix.Translation((bed_offset_x, bed_offset_y, 0.0))
+        for grp in groups:
+            if grp["assemble_delta"] is not None:
+                delta = scale_transform_translation(grp["assemble_delta"], global_scale)
+                grp["assemble_frame"] = bed @ center @ delta @ center.inverted()
+        for od in ungrouped:
+            if od["assemble_delta"] is not None:
+                delta = scale_transform_translation(od["assemble_delta"], global_scale)
+                od["assemble_frame"] = bed @ center @ delta @ center.inverted() @ bed.inverted()
+
+        # Plate per Material: split mixed assemblies into per-material
+        # sub-assemblies (their assembled positions are unchanged).
+        if ctx.options.plate_per_material:
+            groups, next_wrapper_id = self._split_groups_by_material(
+                groups, ungrouped, mesh_objects, next_wrapper_id
+            )
+
+        # Plate assignment (``3mf_plate`` property) and per-plate placement
+        self._assign_plates(
+            mesh_objects, groups, ungrouped, scale_mat, (cx, cy, cz),
+        )
 
         # Write main 3dmodel.model with wrapper objects and build items
         ctx._progress_update(90, "Writing main model...")
@@ -526,6 +553,12 @@ class OrcaExporter(BaseExporter):
         mesh.vertices.foreach_get("co", co_flat)
         co = co_flat.reshape(n_verts, 3)
         co *= global_scale
+        # Orca centres every loaded mesh on its bounding box; remember where that is
+        # so the assemble transform can compensate (see _assemble_translation).
+        if n_verts:
+            self._mesh_centers[blender_object.name] = tuple(
+                float(v) for v in (co.min(axis=0) + co.max(axis=0)) / 2.0
+            )
         _t_vert1 = time.perf_counter()
         timing_debug(f"orca write_vertices foreach_get ({n_verts} verts)", (_t_vert1 - _t_vert0) * 1000)
         fmt = f"%.{decimals}g"
@@ -883,11 +916,12 @@ class OrcaExporter(BaseExporter):
         # Build items for groups
         for grp in groups:
             bed_x, bed_y = grp.get("bed_offset", (0.0, 0.0))
+            plate_x, plate_y, plate_z = grp.get("plate_offset", (0.0, 0.0, 0.0))
             group_transform = (
                 f"1.000000000 0.000000000 0.000000000 "
                 f"0.000000000 1.000000000 0.000000000 "
                 f"0.000000000 0.000000000 1.000000000 "
-                f"{bed_x:.9f} {bed_y:.9f} 0.000000000"
+                f"{bed_x + plate_x:.9f} {bed_y + plate_y:.9f} {plate_z:.9f}"
             )
             item_uuid = f"0000000{item_idx + 2}-b1ec-4553-aec9-835e5b724bb4"
             xml.etree.ElementTree.SubElement(
@@ -905,7 +939,15 @@ class OrcaExporter(BaseExporter):
         # Build items for ungrouped objects
         for obj in ungrouped:
             item_uuid = f"0000000{item_idx + 2}-b1ec-4553-aec9-835e5b724bb4"
-            transform_str = format_transformation(obj["transformation"])
+            build_matrix = obj["transformation"]
+            plate_offset = obj.get("plate_offset")
+            if plate_offset:
+                # Plate placement moves the build item only; the assemble
+                # section keeps the original (assembled) position.
+                build_matrix = build_matrix.copy()
+                for axis in range(3):
+                    build_matrix[axis][3] += plate_offset[axis]
+            transform_str = format_transformation(build_matrix)
 
             xml.etree.ElementTree.SubElement(
                 build,
@@ -999,16 +1041,17 @@ class OrcaExporter(BaseExporter):
             ctx.safe_report({"ERROR"}, f"Failed to write Orca metadata: {e}")
             raise
 
-    def _get_bed_center_offset(self) -> tuple:
+    def _get_bed_center_offset(self, *, force_for_plates: bool = False) -> tuple:
         """Return the XY point (mm) where the centered export should be placed.
 
         Derived from the effective ``project_settings.config`` that will be
         written: ``printable_area`` bounding box plus the ``best_object_pos``
         fraction (default 0.5,0.5).  Explicit ``project_template`` callers
-        keep the old behaviour (no offset; the caller positions objects).
-        Falls back to ``(0, 0)`` with a warning if the bed is unknown.
+        keep the old single-plate behaviour (no offset; the caller positions
+        objects), unless multi-plate placement explicitly requests the bed
+        centre. Falls back to ``(0, 0)`` with a warning if the bed is unknown.
         """
-        if self.ctx.project_template_path:
+        if self.ctx.project_template_path and not force_for_plates:
             return (0.0, 0.0)
         settings = self._get_project_settings()
         try:
@@ -1028,13 +1071,316 @@ class OrcaExporter(BaseExporter):
         debug(f"Bed placement target {target} (best_object_pos={fx},{fy})")
         return target
 
+    def _material_key(self, blender_object) -> tuple:
+        """``(key, label)`` identifying the filament/material of an object.
+
+        A custom material group takes precedence over the dominant colour or
+        the stored extruder for FullSpectrum parts.
+        """
+        group = blender_object.get("3mf_material_group")
+        if isinstance(group, str) and group.strip():
+            label = group.strip()
+            return (("group", label), label)
+        if group is not None:
+            self.ctx.safe_report(
+                {"WARNING"},
+                f"Invalid 3mf_material_group on '{blender_object.name}'; using its material.",
+            )
+        mesh_data = blender_object.data if blender_object else None
+        if mesh_data and mesh_data.get("3mf_paint_default_extruder"):
+            number = int(mesh_data["3mf_paint_default_extruder"])
+            return (f"extruder:{number}", f"Filament {number}")
+        hex_color, name = self._get_dominant_material_info(blender_object)
+        if not hex_color:
+            return (None, None)
+        return (hex_color, name or hex_color)
+
+    def _read_assemble_delta(self, obj) -> Optional[mathutils.Matrix]:
+        values = obj.get(ASSEMBLE_DELTA_PROPERTY)
+        if values is None:
+            return None
+        try:
+            values = [float(value) for value in values]
+            if (
+                len(values) != 16 or not all(math.isfinite(value) for value in values)
+                or any(abs(values[12 + i] - expected) > 1e-6
+                       for i, expected in enumerate((0.0, 0.0, 0.0, 1.0)))
+            ):
+                raise ValueError("expected a finite affine 4x4 matrix")
+            return mathutils.Matrix([values[index:index + 4] for index in range(0, 16, 4)])
+        except (TypeError, ValueError, OverflowError) as exc:
+            self.ctx.safe_report(
+                {"WARNING"},
+                f"Invalid {ASSEMBLE_DELTA_PROPERTY} on '{obj.name}': {exc}; "
+                "using its current position.",
+            )
+            return None
+
+    def _group_assemble_delta(self, empty, members) -> Optional[mathutils.Matrix]:
+        if empty is not None:
+            delta = self._read_assemble_delta(empty)
+            if delta is not None:
+                return delta
+
+        identity = mathutils.Matrix.Identity(4)
+        deltas = [member["assemble_delta"] for member in members]
+        reference = deltas[0] if deltas and deltas[0] is not None else identity
+        for delta in deltas[1:]:
+            candidate = delta if delta is not None else identity
+            if any(
+                abs(reference[row][col] - candidate[row][col]) > 1e-6
+                for row in range(4) for col in range(4)
+            ):
+                self.ctx.safe_report(
+                    {"WARNING"},
+                    "Assembly members have different saved assembled frames; "
+                    "using their current positions.",
+                )
+                return None
+        return reference if any(delta is not None for delta in deltas) else None
+
+    def _split_groups_by_material(self, groups, ungrouped, mesh_objects, next_wrapper_id):
+        """Tag every unit with its material and split mixed assemblies.
+
+        Each assembly with several materials becomes one sub-assembly per
+        material (when ``split_assemblies_by_material`` is on); members keep
+        their transforms, so assembled positions are preserved.  With the
+        option off, a mixed assembly stays whole and gets its own plate.
+        """
+        obj_by_name = {o.name: o for o in mesh_objects}
+        info = {name: self._material_key(obj) for name, obj in obj_by_name.items()}
+        split = self.ctx.options.split_assemblies_by_material
+
+        result = []
+        for grp in groups:
+            by_key = {}
+            for member in grp["members"]:
+                key, label = info.get(member["name"], (None, None))
+                by_key.setdefault(key, (label, []))[1].append(member)
+
+            if len(by_key) <= 1:
+                key, (label, _) = next(iter(by_key.items()))
+                grp["material_key"], grp["material_label"] = key, label
+                result.append(grp)
+            elif not split:
+                grp["material_key"] = ("mixed", grp["wrapper_id"])
+                grp["material_label"] = grp["name"]
+                result.append(grp)
+            else:
+                for index, (key, (label, members)) in enumerate(by_key.items()):
+                    sub = dict(grp)
+                    if index > 0:
+                        sub["wrapper_id"] = next_wrapper_id
+                        sub["uuid"] = str(uuid.uuid4())
+                        next_wrapper_id += 1
+                    sub["name"] = f"{grp['name']} ({label or 'No material'})"
+                    sub["members"] = members
+                    sub["material_key"], sub["material_label"] = key, label
+                    sub["material_split"] = True
+                    result.append(sub)
+                debug(f"Split assembly '{grp['name']}' into {len(by_key)} material group(s)")
+
+        for od in ungrouped:
+            od["material_key"], od["material_label"] = info.get(od["name"], (None, None))
+        return result, next_wrapper_id
+
+    @staticmethod
+    def _assemble_translation(matrix, mesh_center, base=(0.0, 0.0, 0.0)):
+        """Assembled position of a single-volume object, as Orca computes it.
+
+        On load Orca moves each mesh's origin to its bounding-box centre and, for
+        single-volume objects, folds that shift into the instance (build) offset.
+        It does not do the same for the assemble transform, so the exporter has to:
+        ``translation = base + matrix.translation + matrix.linear @ mesh_center``.
+        """
+        shifted = matrix.to_3x3() @ mathutils.Vector(mesh_center)
+        translation = matrix.translation
+        return (
+            base[0] + translation.x + shifted.x,
+            base[1] + translation.y + shifted.y,
+            base[2] + translation.z + shifted.z,
+        )
+
+    def _get_bed_size(self) -> tuple:
+        """Return the bed ``(width, depth)`` in mm from ``printable_area``.
+
+        Falls back to 256 x 256 (Bambu default) with a warning if unknown.
+        """
+        settings = self._get_project_settings()
+        try:
+            return printable_area_size(settings["printable_area"])
+        except (KeyError, ValueError) as e:
+            self.ctx.safe_report(
+                {"WARNING"},
+                f"Cannot determine bed size ({e}); assuming 256 x 256 mm for plate spacing.",
+            )
+            return (256.0, 256.0)
+
+    def _assign_plates(self, mesh_objects, groups, ungrouped, scale_mat, centering) -> None:
+        """Resolve each unit's plate (``3mf_plate``) and compute plate placement.
+
+        Sets ``plate`` on every unit.  When more than one plate is used, also
+        sets ``plate_offset`` (dx, dy, dz): recentre the plate's units on the
+        bed, floor them, then move to the plate's grid position.  Orca decides
+        plate membership from position, so this offset is required.  With a
+        single plate nothing is changed, so default output is unchanged.
+        """
+        obj_by_name = {o.name: o for o in mesh_objects}
+        units = []  # (unit dict, Blender member objects)
+        for grp in groups:
+            members = [obj_by_name[m["name"]] for m in grp["members"] if m["name"] in obj_by_name]
+            units.append((grp, grp.get("empty"), members))
+        for od in ungrouped:
+            member = obj_by_name.get(od["name"])
+            units.append((od, None, [member] if member is not None else []))
+
+        self._plate_names = {}
+        requests = []
+        seen_sources = set()
+        for unit, empty, members in units:
+            for source in ([empty] if empty is not None else []) + members:
+                if source.name in seen_sources:
+                    continue
+                seen_sources.add(source.name)
+                value = source.get(PLATE_PROPERTY)
+                if value is None:
+                    continue
+                normalized = plate_property(source)
+                if normalized is None:
+                    self.ctx.safe_report(
+                        {"WARNING"},
+                        f"Invalid {PLATE_PROPERTY} on '{source.name}'; ignoring the assignment.",
+                    )
+                elif value > MAX_PLATES:
+                    self.ctx.safe_report(
+                        {"WARNING"},
+                        f"{PLATE_PROPERTY} on '{source.name}' exceeds {MAX_PLATES}; "
+                        f"using plate {MAX_PLATES}.",
+                    )
+            number, conflict = explicit_unit_plate(empty, members)
+            if conflict:
+                self.ctx.safe_report(
+                    {"WARNING"},
+                    f"Objects in assembly '{unit.get('name', '?')}' request different "
+                    f"plates; using plate {number}.",
+                )
+            elif empty is not None and plate_property(empty) is not None and any(
+                plate_property(member) not in (None, number) for member in members
+            ):
+                self.ctx.safe_report(
+                    {"WARNING"},
+                    f"Assembly '{unit.get('name', '?')}' overrides conflicting member "
+                    f"plate assignments with plate {number}.",
+                )
+            requests.append(number)
+
+        if self.ctx.options.plate_per_material:
+            explicit_keys = {
+                unit.get("material_key")
+                for (unit, _, _), request in zip(units, requests) if request is not None
+            }
+            auto_keys = {
+                unit.get("material_key")
+                for (unit, _, _), request in zip(units, requests)
+                if request is None and unit.get("material_key") not in explicit_keys
+            }
+            reserved = {number for number in requests if number is not None}
+            if len(auto_keys) > MAX_PLATES - len(reserved):
+                self.ctx.safe_report(
+                    {"WARNING"},
+                    f"More material groups than available plates (maximum {MAX_PLATES}); "
+                    f"remaining groups share plate {MAX_PLATES}.",
+                )
+            plates, self._plate_names = plan_material_plates(
+                [(u.get("material_key"), u.get("material_label")) for u, _, _ in units],
+                requests,
+            )
+        else:
+            plates = [1 if r is None else r for r in requests]
+        for (unit, _, _), number in zip(units, plates):
+            unit["plate"] = number
+
+        explicit_names = {}
+        name_conflicts = set()
+        for (_, empty, members), number in zip(units, plates):
+            for source in ([empty] if empty is not None else []) + members:
+                name = source.get(PLATE_NAME_PROPERTY)
+                # A name without a plate number comes from a single-plate import.
+                named_plate = plate_property(source) if PLATE_PROPERTY in source else 1
+                if named_plate != number or not isinstance(name, str) or not name:
+                    continue
+                if number in explicit_names and explicit_names[number] != name:
+                    conflict = (number, name)
+                    if conflict not in name_conflicts:
+                        self.ctx.safe_report(
+                            {"WARNING"},
+                            f"Conflicting names for plate {number}; "
+                            f"using '{explicit_names[number]}'.",
+                        )
+                        name_conflicts.add(conflict)
+                else:
+                    explicit_names[number] = name
+        self._plate_names.update(explicit_names)
+
+        plate_numbers = sorted({unit["plate"] for unit, _, _ in units})
+        has_split_units = any(unit.get("material_split") for unit, _, _ in units)
+        if not plate_numbers or (plate_numbers == [1] and not has_split_units):
+            return
+
+        bed_w, bed_d = self._get_bed_size()
+        template_x, template_y = (
+            self._get_bed_center_offset(force_for_plates=True)
+            if self.ctx.project_template_path else (0.0, 0.0)
+        )
+        plate_count = plate_numbers[-1]
+        cx, cy, cz = centering
+
+        for number in plate_numbers:
+            members = [m for unit, _, ms in units if unit["plate"] == number for m in ms]
+            corners = [
+                scale_mat @ m.matrix_world @ mathutils.Vector(c)
+                for m in members
+                for c in m.bound_box
+            ]
+            if not corners:
+                continue
+            xs = [v.x + cx for v in corners]
+            ys = [v.y + cy for v in corners]
+            zs = [v.z + cz for v in corners]
+            if max(xs) - min(xs) > bed_w or max(ys) - min(ys) > bed_d:
+                self.ctx.safe_report(
+                    {"WARNING"},
+                    f"Objects on plate {number} are larger than the bed "
+                    f"({bed_w:g} x {bed_d:g} mm); arrange them in the slicer.",
+                )
+            origin_x, origin_y = plate_origin(number - 1, plate_count, bed_w, bed_d)
+            offset = (
+                -(min(xs) + max(xs)) / 2 + origin_x + template_x,
+                -(min(ys) + max(ys)) / 2 + origin_y + template_y,
+                -min(zs),
+            )
+            for unit, _, unit_members in units:
+                if unit["plate"] == number:
+                    if unit.get("material_split") and unit_members:
+                        unit_min_z = min(
+                            (scale_mat @ member.matrix_world @ mathutils.Vector(corner)).z + cz
+                            for member in unit_members
+                            for corner in member.bound_box
+                        )
+                        unit["plate_offset"] = (offset[0], offset[1], -unit_min_z)
+                    else:
+                        unit["plate_offset"] = offset
+        debug(f"Placed units on {len(plate_numbers)} plate(s): {plate_numbers}")
+
     def _get_project_settings(self) -> dict:
         """Generate project_settings once so placement and the written file agree."""
         if getattr(self, "_project_settings", None) is None:
             self._project_settings = self.generate_project_settings()
         return self._project_settings
 
-    def _get_dominant_color(self, blender_object: bpy.types.Object) -> Optional[str]:
+    def _get_dominant_material_info(
+        self, blender_object: bpy.types.Object
+    ) -> tuple:
         """Return the hex colour string of the most-common face material on *blender_object*.
 
         Used to determine the per-object ``extruder`` value in
@@ -1042,7 +1388,8 @@ class OrcaExporter(BaseExporter):
         when objects have only a single material (no ``paint_color``
         per-triangle overrides needed).
 
-        Returns ``None`` when no material can be determined.
+        Returns ``(hex_colour, material_name)``; both ``None`` when no material
+        can be determined.
         """
         ctx = self.ctx
 
@@ -1055,20 +1402,20 @@ class OrcaExporter(BaseExporter):
         try:
             mesh = eval_obj.to_mesh()
         except RuntimeError:
-            return None
+            return (None, None)
         if mesh is None:
-            return None
+            return (None, None)
 
         mesh.calc_loop_triangles()
         n_tris = len(mesh.loop_triangles)
         if n_tris == 0:
             eval_obj.to_mesh_clear()
-            return None
+            return (None, None)
 
         n_slots = len(eval_obj.material_slots)
         if n_slots == 0:
             eval_obj.to_mesh_clear()
-            return None
+            return (None, None)
 
         # Bulk-extract material slot indices in one C call, then use bincount to
         # find the most-used slot without a Python loop over all triangles.
@@ -1078,14 +1425,20 @@ class OrcaExporter(BaseExporter):
         dominant_slot = int(np.argmax(counts))
 
         dominant_color = None
+        dominant_name = None
         if dominant_slot < len(mesh.materials):
             mat = mesh.materials[dominant_slot]
             if mat is not None:
                 dominant_color = material_to_hex_color(mat)
+                dominant_name = mat.name
 
         eval_obj.to_mesh_clear()
 
-        return dominant_color
+        return (dominant_color, dominant_name)
+
+    def _get_dominant_color(self, blender_object: bpy.types.Object) -> Optional[str]:
+        """Hex colour of the most-common face material (``None`` if unknown)."""
+        return self._get_dominant_material_info(blender_object)[0]
 
     def generate_project_settings(self) -> dict:
         """Generate project_settings.config by loading template and updating filament colors.
@@ -1425,90 +1778,106 @@ class OrcaExporter(BaseExporter):
                 part_elem, "metadata", key="matrix", value=matrix_value
             )
 
-        # Add plate metadata with model_instance entries
-        plate_elem = xml.etree.ElementTree.SubElement(root, "plate")
-        xml.etree.ElementTree.SubElement(
-            plate_elem, "metadata", key="plater_id", value="1"
-        )
-        xml.etree.ElementTree.SubElement(
-            plate_elem, "metadata", key="plater_name", value=""
-        )
-        xml.etree.ElementTree.SubElement(
-            plate_elem, "metadata", key="locked", value="false"
-        )
-        xml.etree.ElementTree.SubElement(
-            plate_elem, "metadata", key="filament_map_mode", value="Auto For Flush"
-        )
-
-        # Model instances for groups
-        for grp in groups:
-            instance_elem = xml.etree.ElementTree.SubElement(
-                plate_elem, "model_instance"
+        # Plate entries with model_instance lists.  Default layout is a single
+        # plate holding everything; other strategies only change this list.
+        for plate in layout_plates(groups, ungrouped, getattr(self, "_plate_names", None)):
+            plate_elem = xml.etree.ElementTree.SubElement(root, "plate")
+            xml.etree.ElementTree.SubElement(
+                plate_elem, "metadata", key="plater_id", value=str(plate.plater_id)
             )
             xml.etree.ElementTree.SubElement(
-                instance_elem, "metadata", key="object_id",
-                value=str(grp["wrapper_id"]),
+                plate_elem, "metadata", key="plater_name", value=plate.name
             )
             xml.etree.ElementTree.SubElement(
-                instance_elem, "metadata", key="instance_id", value="0"
+                plate_elem, "metadata", key="locked", value="false"
             )
             xml.etree.ElementTree.SubElement(
-                instance_elem, "metadata", key="identify_id",
-                value=str(grp["wrapper_id"]),
+                plate_elem, "metadata", key="filament_map_mode", value="Auto For Flush"
             )
-
-        # Model instances for ungrouped objects
-        for od in ungrouped:
-            instance_elem = xml.etree.ElementTree.SubElement(
-                plate_elem, "model_instance"
-            )
-            xml.etree.ElementTree.SubElement(
-                instance_elem,
-                "metadata",
-                key="object_id",
-                value=str(od["wrapper_id"]),
-            )
-            xml.etree.ElementTree.SubElement(
-                instance_elem, "metadata", key="instance_id", value="0"
-            )
-            xml.etree.ElementTree.SubElement(
-                instance_elem,
-                "metadata",
-                key="identify_id",
-                value=str(od["wrapper_id"]),
-            )
+            for inst in plate.instances:
+                instance_elem = xml.etree.ElementTree.SubElement(
+                    plate_elem, "model_instance"
+                )
+                xml.etree.ElementTree.SubElement(
+                    instance_elem, "metadata", key="object_id",
+                    value=str(inst.object_id),
+                )
+                xml.etree.ElementTree.SubElement(
+                    instance_elem, "metadata", key="instance_id",
+                    value=str(inst.instance_id),
+                )
+                xml.etree.ElementTree.SubElement(
+                    instance_elem, "metadata", key="identify_id",
+                    value=str(inst.identify_id),
+                )
 
         # Add assemble section with real world transforms
         assemble_elem = xml.etree.ElementTree.SubElement(root, "assemble")
+        assemble_entries = []
+        part_centers = []
 
         # Assemble items for groups
         for grp in groups:
             bed_x, bed_y = grp.get("bed_offset", (0.0, 0.0))
-            group_transform = (
-                f"1.000000000 0.000000000 0.000000000 "
-                f"0.000000000 1.000000000 0.000000000 "
-                f"0.000000000 0.000000000 1.000000000 "
-                f"{bed_x:.9f} {bed_y:.9f} 0.000000000"
-            )
-            xml.etree.ElementTree.SubElement(
-                assemble_elem,
-                "assemble_item",
-                object_id=str(grp["wrapper_id"]),
-                instance_id="0",
-                transform=group_transform,
-                offset="0 0 0",
-            )
+            group_matrix = grp.get("assemble_frame")
+            if group_matrix is None:
+                group_matrix = mathutils.Matrix.Translation((bed_x, bed_y, 0.0))
+            else:
+                group_matrix = group_matrix.copy()
+            if len(grp["members"]) == 1:
+                # One volume: Orca folds the mesh-centring shift into the build
+                # offset only, so apply it to the assemble transform as well.
+                member = grp["members"][0]
+                group_matrix.translation = self._assemble_translation(
+                    group_matrix @ member["transformation"], member["mesh_center"]
+                )
+                part_centers.append(group_matrix.translation.copy())
+                linear = group_matrix.to_3x3() @ member["transformation"].to_3x3()
+            else:
+                for member in grp["members"]:
+                    part_centers.append(
+                        group_matrix @ member["transformation"] @ mathutils.Vector(member["mesh_center"])
+                    )
+                linear = None
+            assemble_entries.append((grp["wrapper_id"], group_matrix, linear))
 
         # Assemble items for ungrouped objects
         for od in ungrouped:
-            transform_str = format_transformation(od["transformation"])
+            assemble_matrix = od["transformation"].copy()
+            if od.get("assemble_frame") is not None:
+                assemble_matrix = od["assemble_frame"] @ assemble_matrix
+            assemble_matrix.translation = self._assemble_translation(
+                assemble_matrix, od["mesh_center"]
+            )
+            part_centers.append(assemble_matrix.translation.copy())
+            assemble_entries.append(
+                (od["wrapper_id"], assemble_matrix, assemble_matrix.to_3x3())
+            )
+
+        pivot = mathutils.Vector((
+            (min(point[axis] for point in part_centers)
+             + max(point[axis] for point in part_centers)) / 2
+            for axis in range(3)
+        ))
+        for object_id, matrix, linear in assemble_entries:
+            try:
+                if linear is None:
+                    offset = -(matrix.inverted() @ pivot)
+                else:
+                    offset = linear.inverted() @ (matrix.translation - pivot)
+            except ValueError:
+                self.ctx.safe_report(
+                    {"WARNING"},
+                    f"Cannot calculate an explode offset for object {object_id} with zero scale.",
+                )
+                offset = mathutils.Vector((0.0, 0.0, 0.0))
             xml.etree.ElementTree.SubElement(
                 assemble_elem,
                 "assemble_item",
-                object_id=str(od["wrapper_id"]),
+                object_id=str(object_id),
                 instance_id="0",
-                transform=transform_str,
-                offset="0 0 0",
+                transform=format_transformation(matrix),
+                offset=" ".join(f"{value:.9f}" for value in offset),
             )
 
         tree = xml.etree.ElementTree.ElementTree(root)

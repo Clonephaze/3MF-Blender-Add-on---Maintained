@@ -204,7 +204,8 @@ def has_threemf_capability(capability: str) -> bool:
     - ``"paint_mode"``, ``"project_template"``, ``"object_settings"``
     - ``"building_blocks"``, ``"global_scale"``, ``"compression"``
     - ``"thumbnail"``, ``"use_components"``, ``"auto_smooth"``
-    - ``"subdivision_depth"``
+    - ``"subdivision_depth"``, ``"assemblies"``, ``"multi_plate"``
+    - ``"plate_per_material"``
 
     :param capability: Capability name string.
     :return: True if the capability is supported.

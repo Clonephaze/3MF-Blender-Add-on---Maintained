@@ -867,35 +867,35 @@ def apply_uv_coordinates(
 def set_object_origin(
     blender_object: bpy.types.Object,
     origin_mode: str,
-) -> None:
+) -> mathutils.Vector:
     """Adjust the object origin placement.
 
     :param blender_object: The Blender object.
     :param origin_mode: ``"KEEP"``, ``"CENTER"``, or ``"BOTTOM"``.
+    :return: The origin shift in the mesh's original local coordinates.
     """
     if origin_mode not in ("CENTER", "BOTTOM"):
-        return
+        return mathutils.Vector((0.0, 0.0, 0.0))
 
     mesh = blender_object.data
-
-    previous_mode = bpy.context.object.mode if bpy.context.object else "OBJECT"
-    if previous_mode != "OBJECT":
-        bpy.ops.object.mode_set(mode="OBJECT")
-
-    if origin_mode == "CENTER":
-        bpy.ops.object.origin_set(type="ORIGIN_GEOMETRY", center="BOUNDS")
-    elif origin_mode == "BOTTOM":
-        bbox = blender_object.bound_box
-        min_z = min(v[2] for v in bbox)
-        center_x = (min(v[0] for v in bbox) + max(v[0] for v in bbox)) / 2
-        center_y = (min(v[1] for v in bbox) + max(v[1] for v in bbox)) / 2
-        bottom_center = mathutils.Vector((center_x, center_y, min_z))
-
-        mesh.transform(mathutils.Matrix.Translation(-bottom_center))
-        blender_object.location += bottom_center
-
-    if previous_mode != "OBJECT":
-        bpy.ops.object.mode_set(mode=previous_mode)
+    if not mesh.vertices:
+        return mathutils.Vector((0.0, 0.0, 0.0))
+    coords = np.empty(len(mesh.vertices) * 3, dtype=np.float64)
+    mesh.vertices.foreach_get("co", coords)
+    coords = coords.reshape((-1, 3))
+    low, high = coords.min(axis=0), coords.max(axis=0)
+    if mesh.users > 1:
+        mesh = mesh.copy()
+        blender_object.data = mesh
+    shift = mathutils.Vector((
+        (low[0] + high[0]) / 2,
+        (low[1] + high[1]) / 2,
+        (low[2] + high[2]) / 2 if origin_mode == "CENTER" else low[2],
+    ))
+    basis = blender_object.matrix_basis.copy()
+    mesh.transform(mathutils.Matrix.Translation(-shift))
+    blender_object.matrix_basis = basis @ mathutils.Matrix.Translation(shift)
+    return shift
 
 
 # ---------------------------------------------------------------------------

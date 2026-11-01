@@ -567,6 +567,8 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
         # Stash slicer config files for round-trip export.
         archive_mod.stash_slicer_configs(ctx, path)
+        from .slicer.plates import read_orca_plates
+        read_orca_plates(ctx, path)
 
         # Parse each model file.
         for model_file in files_by_content_type.get(MODEL_MIMETYPE, []):
@@ -606,9 +608,10 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             debug("No <build>/<item> in model — skipping (external resource file).")
             return
 
-        # Vendor detection.
+        # Plate and assembly metadata is useful even for geometry-only imports.
+        detected_vendor = detect_vendor(root)
         if ctx.options.import_materials != "NONE":
-            ctx.vendor_format = detect_vendor(root)
+            ctx.vendor_format = detected_vendor
             if ctx.vendor_format:
                 ctx.safe_report({"INFO"}, f"Detected {ctx.vendor_format.upper()} Slicer format")
                 debug(f"Will import {ctx.vendor_format} specific color data")
@@ -639,6 +642,8 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         ctx.part_names = {}
         ctx.part_extruders = {}
         ctx.pending_solid_paint_parts = []
+        ctx.component_instance_cache.clear()
+        ctx.loaded_external_paths.clear()
 
         # Read filament colours (single archive open, priority order).
         import time as _time
@@ -650,7 +655,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         # orca_fullspectrum is a superset of orca: same file layout, same
         # model_settings.config structure, so part_groups / part_extruders /
         # part_names all need to be populated for either format.
-        if ctx.vendor_format in ("orca", "orca_fullspectrum"):
+        if detected_vendor == "orca" or ctx.plate_assignments:
             _t = _time.perf_counter()
             from .slicer.colors import read_orca_part_subtypes
             read_orca_part_subtypes(ctx, path)
