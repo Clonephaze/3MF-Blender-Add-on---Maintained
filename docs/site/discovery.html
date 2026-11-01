@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Building Blocks" href="building-blocks.html"><link rel="prev" title="Core API" href="api.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
-        <title>API Discovery - 3MF Format API — v1.3.0</title>
+        <title>API Discovery - 3MF Format API — v1.4.0</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -167,7 +167,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">3MF Format API — v1.3.0</div></a>
+      <a href="index.html"><div class="brand">3MF Format API — v1.4.0</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -188,7 +188,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">3MF Format API — v1.3.0</span>
+  <span class="sidebar-brand-text">3MF Format API — v1.4.0</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -254,7 +254,7 @@ simplest and most Pythonic approach:</p>
 <h2>Discovery Functions (from <code class="docutils literal notranslate"><span class="pre">api</span></code>)<a class="headerlink" href="#discovery-functions-from-api" title="Link to this heading">¶</a></h2>
 <dl class="py function">
 <dt class="sig sig-object py" id="io_mesh_3mf.api.is_available">
-<span class="sig-name descname"><span class="pre">is_available</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/api.html#is_available"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.api.is_available" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">is_available</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><span class="pre">bool</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/api.html#is_available"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.api.is_available" title="Link to this definition">¶</a></dt>
 <dd><p>Check if the 3MF API is loaded and available.</p>
 <p>If you can import this function, the underlying code is available.
 This call ensures the module is registered in
@@ -271,7 +271,7 @@ via <code class="docutils literal notranslate"><span class="pre">unregister()</s
 <p>Example:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">io_mesh_3mf.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">is_available</span>
 <span class="k">if</span> <span class="n">is_available</span><span class="p">():</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;3MF API is ready&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"3MF API is ready"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -296,14 +296,14 @@ is disabled.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">io_mesh_3mf.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_api</span>
 <span class="n">api</span> <span class="o">=</span> <span class="n">get_api</span><span class="p">()</span>
 <span class="k">if</span> <span class="n">api</span><span class="p">:</span>
-    <span class="n">result</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">import_3mf</span><span class="p">(</span><span class="s2">&quot;/model.3mf&quot;</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">import_3mf</span><span class="p">(</span><span class="s2">"/model.3mf"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="io_mesh_3mf.api.has_capability">
-<span class="sig-name descname"><span class="pre">has_capability</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">capability</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/api.html#has_capability"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.api.has_capability" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">has_capability</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">capability</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><span class="pre">bool</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/api.html#has_capability"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.api.has_capability" title="Link to this definition">¶</a></dt>
 <dd><p>Check if a specific API capability is available.</p>
 <p>Use this for forward-compatible feature detection instead of version
 checks. New capabilities may be added in minor versions.</p>
@@ -317,7 +317,7 @@ checks. New capabilities may be added in minor versions.</p>
 </dl>
 <p>Example:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">io_mesh_3mf.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">has_capability</span>
-<span class="k">if</span> <span class="n">has_capability</span><span class="p">(</span><span class="s2">&quot;object_settings&quot;</span><span class="p">):</span>
+<span class="k">if</span> <span class="n">has_capability</span><span class="p">(</span><span class="s2">"object_settings"</span><span class="p">):</span>
     <span class="c1"># Safe to use object_settings parameter</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">export_3mf</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">object_settings</span><span class="o">=</span><span class="p">{</span><span class="o">...</span><span class="p">})</span>
 </pre></div>
@@ -326,11 +326,11 @@ checks. New capabilities may be added in minor versions.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="io_mesh_3mf.api.check_version">
-<span class="sig-name descname"><span class="pre">check_version</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">minimum</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.14)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/api.html#check_version"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.api.check_version" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">check_version</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">minimum</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><span class="pre">bool</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/api.html#check_version"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.api.check_version" title="Link to this definition">¶</a></dt>
 <dd><p>Check if the API version meets a minimum requirement.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>minimum</strong> – Tuple of (major, minor, patch) minimum version.</p>
+<dd class="field-odd"><p><strong>minimum</strong> – tuple of (major, minor, patch) minimum version.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>True if API_VERSION &gt;= minimum.</p>
@@ -362,13 +362,13 @@ regardless of addon load order.</p>
 <span class="k">def</span><span class="w"> </span><span class="nf">my_operator_execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
     <span class="n">api</span> <span class="o">=</span> <span class="n">get_threemf_api</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">api</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">report</span><span class="p">({</span><span class="s1">&#39;ERROR&#39;</span><span class="p">},</span> <span class="s2">&quot;3MF Format addon not installed/enabled&quot;</span><span class="p">)</span>
-        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;CANCELLED&#39;</span><span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">report</span><span class="p">({</span><span class="s1">'ERROR'</span><span class="p">},</span> <span class="s2">"3MF Format addon not installed/enabled"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">'CANCELLED'</span><span class="p">}</span>
 
-    <span class="n">result</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">import_3mf</span><span class="p">(</span><span class="s2">&quot;/path/to/model.3mf&quot;</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">&quot;FINISHED&quot;</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">report</span><span class="p">({</span><span class="s1">&#39;INFO&#39;</span><span class="p">},</span> <span class="sa">f</span><span class="s2">&quot;Imported </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">num_loaded</span><span class="si">}</span><span class="s2"> objects&quot;</span><span class="p">)</span>
-    <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;FINISHED&#39;</span><span class="p">}</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">import_3mf</span><span class="p">(</span><span class="s2">"/path/to/model.3mf"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">"FINISHED"</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">report</span><span class="p">({</span><span class="s1">'INFO'</span><span class="p">},</span> <span class="sa">f</span><span class="s2">"Imported </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">num_loaded</span><span class="si">}</span><span class="s2"> objects"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s1">'FINISHED'</span><span class="p">}</span>
 </pre></div>
 </div>
 <p><strong>Alternative — direct try/except</strong> (no helper needed):</p>
@@ -383,7 +383,7 @@ addon-path resolution via <code class="docutils literal notranslate"><span class
 possible (e.g. the extension repo prefix varies between installs).</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="io_mesh_3mf.threemf_discovery.get_threemf_api">
-<span class="sig-name descname"><span class="pre">get_threemf_api</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/threemf_discovery.html#get_threemf_api"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.threemf_discovery.get_threemf_api" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">get_threemf_api</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ThreeMFAPI</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/threemf_discovery.html#get_threemf_api"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.threemf_discovery.get_threemf_api" title="Link to this definition">¶</a></dt>
 <dd><p>Return the 3MF API module, or <em>None</em> if the addon isn’t available.</p>
 <p>This is the <strong>recommended single entry point</strong>.  It resolves the
 addon’s import path automatically, caches the result, and ensures
@@ -396,14 +396,14 @@ the module is registered for fast subsequent lookups.</p>
 <p>Example:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">api</span> <span class="o">=</span> <span class="n">get_threemf_api</span><span class="p">()</span>
 <span class="k">if</span> <span class="n">api</span><span class="p">:</span>
-    <span class="n">result</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">import_3mf</span><span class="p">(</span><span class="s2">&quot;/model.3mf&quot;</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">import_3mf</span><span class="p">(</span><span class="s2">"/model.3mf"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="io_mesh_3mf.threemf_discovery.is_threemf_available">
-<span class="sig-name descname"><span class="pre">is_threemf_available</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/threemf_discovery.html#is_threemf_available"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.threemf_discovery.is_threemf_available" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">is_threemf_available</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><span class="pre">bool</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/threemf_discovery.html#is_threemf_available"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.threemf_discovery.is_threemf_available" title="Link to this definition">¶</a></dt>
 <dd><p>Check whether the 3MF addon is installed and enabled.</p>
 <p>Equivalent to <code class="docutils literal notranslate"><span class="pre">get_threemf_api()</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">None</span></code> but reads better
 in boolean contexts.</p>
@@ -416,7 +416,7 @@ in boolean contexts.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="io_mesh_3mf.threemf_discovery.get_threemf_version">
-<span class="sig-name descname"><span class="pre">get_threemf_version</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.14)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/threemf_discovery.html#get_threemf_version"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.threemf_discovery.get_threemf_version" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">get_threemf_version</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/threemf_discovery.html#get_threemf_version"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.threemf_discovery.get_threemf_version" title="Link to this definition">¶</a></dt>
 <dd><p>Return the 3MF API version tuple <code class="docutils literal notranslate"><span class="pre">(major,</span> <span class="pre">minor,</span> <span class="pre">patch)</span></code>, or <em>None</em>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
@@ -427,7 +427,7 @@ in boolean contexts.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="io_mesh_3mf.threemf_discovery.check_threemf_version">
-<span class="sig-name descname"><span class="pre">check_threemf_version</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">minimum</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.14)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/threemf_discovery.html#check_threemf_version"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.threemf_discovery.check_threemf_version" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">check_threemf_version</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">minimum</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><span class="pre">bool</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/threemf_discovery.html#check_threemf_version"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.threemf_discovery.check_threemf_version" title="Link to this definition">¶</a></dt>
 <dd><p>Check if the installed 3MF API meets a minimum version requirement.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -447,7 +447,7 @@ in boolean contexts.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="io_mesh_3mf.threemf_discovery.has_threemf_capability">
-<span class="sig-name descname"><span class="pre">has_threemf_capability</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">capability</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/threemf_discovery.html#has_threemf_capability"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.threemf_discovery.has_threemf_capability" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">has_threemf_capability</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">capability</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><span class="pre">bool</span></a></span></span><a class="reference internal" href="_modules/io_mesh_3mf/threemf_discovery.html#has_threemf_capability"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#io_mesh_3mf.threemf_discovery.has_threemf_capability" title="Link to this definition">¶</a></dt>
 <dd><p>Check if a specific API capability is supported.</p>
 <p>Use this for forward-compatible feature detection instead of version
 checks.  New capabilities may be added in minor versions.</p>
@@ -459,7 +459,8 @@ checks.  New capabilities may be added in minor versions.</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">&quot;paint_mode&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;project_template&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;object_settings&quot;</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">&quot;building_blocks&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;global_scale&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;compression&quot;</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">&quot;thumbnail&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;use_components&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;auto_smooth&quot;</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">&quot;subdivision_depth&quot;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;subdivision_depth&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;assemblies&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;multi_plate&quot;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;plate_per_material&quot;</span></code></p></li>
 </ul>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -557,7 +558,7 @@ checks.  New capabilities may be added in minor versions.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=e3eff1ea"></script>
+</div><script src="_static/documentation_options.js?v=06f1c677"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
