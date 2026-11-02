@@ -473,6 +473,7 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
 # Rating nudge
 # ---------------------------------------------------------------------------
 
+
 _EXTENSIONS_URL = "https://extensions.blender.org/add-ons/threemf-io/"
 
 

@@ -43,9 +43,7 @@ from ..common.constants import MODEL_NAMESPACE
 # Entries MUST be cleared after each element is written to prevent unbounded
 # growth across multiple exports in the same Blender session.
 _raw_geometry_cache: Dict[int, Dict[str, str]] = {}
-_TEXTURE_DISPLACEMENT_ATTRIBUTES = tuple(
-    f"paint_texture_{index}" for index in range(8)
-)
+_TEXTURE_DISPLACEMENT_ATTRIBUTES = tuple(f"paint_texture_{index}" for index in range(8))
 
 
 def get_triangle_metadata(mesh_data) -> tuple[Dict[int, Dict[str, str]], Optional[int]]:
@@ -291,7 +289,7 @@ def write_triangles(
     """
     debug(
         f"[write_triangles] mode={use_orca_format}, slicer={mmu_slicer_format},",
-        f" seg_strings={len(segmentation_strings) if segmentation_strings else 0}"
+        f" seg_strings={len(segmentation_strings) if segmentation_strings else 0}",
     )
 
     # Always use plain (unqualified) attribute names in the raw XML string.
@@ -345,7 +343,9 @@ def write_triangles(
         triangles.foreach_get("polygon_index", polygon_indices)
 
     _t1 = time.perf_counter()
-    timing_debug(f"write_triangles foreach_get verts+mat ({n_tris} tris)", (_t1 - _t0) * 1000)
+    timing_debug(
+        f"write_triangles foreach_get verts+mat ({n_tris} tris)", (_t1 - _t0) * 1000
+    )
 
     # Pre-compute per-slot attribute dicts so the hot loop avoids repeated
     # material_slots[i].material.name lookups and dict rebuilds per triangle.
@@ -436,12 +436,18 @@ def write_triangles(
             seg_str = segmentation_strings.get(tri_idx)
             if seg_str:
                 seg_strings_written += 1
-                seg_part = f' {prusa_seg_attr}="{seg_str}"' if is_prusa else f' paint_color="{seg_str}"'
+                seg_part = (
+                    f' {prusa_seg_attr}="{seg_str}"'
+                    if is_prusa
+                    else f' paint_color="{seg_str}"'
+                )
                 seam = seam_strings.get(tri_idx) if seam_strings else None
                 sup = support_strings.get(tri_idx) if support_strings else None
                 seam_part = f' paint_seam="{seam}"' if seam else ""
                 sup_part = f' paint_supports="{sup}"' if sup else ""
-                append(f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}"{seg_part}{seam_part}{sup_part}{triangle_metadata}/>')
+                append(
+                    f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}"{seg_part}{seam_part}{sup_part}{triangle_metadata}/>'
+                )
                 continue
 
         # --- BASEMATERIAL mode with vertex colors ---
@@ -454,7 +460,10 @@ def write_triangles(
                     if colorgroup_id < len(ORCA_FILAMENT_CODES):
                         paint_code = ORCA_FILAMENT_CODES[colorgroup_id]
                         if paint_code:
-                            append(f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}" {prusa_seg_attr}="{paint_code}"{triangle_metadata}/>')
+                            append(
+                                f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}"'
+                                f' {prusa_seg_attr}="{paint_code}"{triangle_metadata}/>'
+                            )
                             continue
                 else:
                     paint_extra = ""
@@ -462,7 +471,10 @@ def write_triangles(
                         paint_code = ORCA_FILAMENT_CODES[colorgroup_id]
                         if paint_code:
                             paint_extra = f' paint_color="{paint_code}"'
-                    append(f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}" pid="{colorgroup_id}" p1="0"{paint_extra}{triangle_metadata}/>')
+                    append(
+                        f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}"'
+                        f' pid="{colorgroup_id}" p1="0"{paint_extra}{triangle_metadata}/>'
+                    )
                     continue
             append(f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}"{triangle_metadata}/>')
         else:
@@ -492,7 +504,9 @@ def write_triangles(
             sup = support_strings.get(tri_idx) if support_strings else None
             seam_part = f' paint_seam="{seam}"' if seam else ""
             sup_part = f' paint_supports="{sup}"' if sup else ""
-            append(f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}"{extra}{seam_part}{sup_part}{triangle_metadata}/>')
+            append(
+                f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}"{extra}{seam_part}{sup_part}{triangle_metadata}/>'
+            )
 
     parts.append("</triangles>")
     _raw_geometry_cache.setdefault(id(mesh_element), {})["triangles"] = "".join(parts)
@@ -504,7 +518,7 @@ def write_triangles(
     if segmentation_strings:
         debug(
             f"  [write_triangles] Wrote {seg_strings_written} segmentation strings",
-            f"to triangles (had {len(segmentation_strings)} available)"
+            f"to triangles (had {len(segmentation_strings)} available)",
         )
 
 
