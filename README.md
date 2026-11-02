@@ -13,7 +13,7 @@ It covers far more than raw mesh export. The add-on handles geometry, materials,
 ## Status
 
 - **Version 2.8.0**
-- Compatible with **Blender 4.2+**
+- Compatible with **Blender 4.5+** | Blender 4.2 EOS has passed, while still compatible no support will be given.
 - Primary development target: **Blender 5.0**
 - Actively maintained
 
