@@ -20,6 +20,7 @@ scene-level helpers in :mod:`scene` for mesh creation, material assignment,
 UV setup, origin placement, etc.
 """
 
+import os
 from typing import List, Optional, TYPE_CHECKING
 
 import bpy
@@ -656,6 +657,50 @@ def _apply_auto_smooth(
     bpy.context.view_layer.objects.active = blender_object
     blender_object.select_set(True)
     try:
-        bpy.ops.object.shade_auto_smooth(angle=angle)
+        result = bpy.ops.object.shade_auto_smooth(angle=angle)
     except Exception:
+        result = {"CANCELLED"}
+    if "FINISHED" in result:
+        return
+    # Blender 4.x cancels the operator while the essentials asset library is
+    # still loading (always the case in headless mode), so add the modifier
+    # from the bundled node group file directly.
+    if not _add_smooth_by_angle_modifier(blender_object, angle):
         warn(f"Failed to apply Smooth by Angle to {blender_object.name}")
+
+
+def _add_smooth_by_angle_modifier(
+    blender_object: bpy.types.Object,
+    angle: float,
+) -> bool:
+    """Add the bundled Smooth by Angle node group as a modifier.
+
+    :param blender_object: The Blender object to smooth.
+    :param angle: Maximum angle (radians) between face normals considered smooth.
+    :return: True if the modifier was added.
+    """
+    node_group = bpy.data.node_groups.get("Smooth by Angle")
+    if node_group is None:
+        path = os.path.join(
+            bpy.utils.system_resource("DATAFILES"),
+            "assets",
+            "geometry_nodes",
+            "smooth_by_angle.blend",
+        )
+        try:
+            with bpy.data.libraries.load(path, link=False) as (src, dst):
+                if "Smooth by Angle" not in src.node_groups:
+                    return False
+                dst.node_groups = ["Smooth by Angle"]
+        except Exception:
+            return False
+        node_group = bpy.data.node_groups.get("Smooth by Angle")
+        if node_group is None:
+            return False
+
+    modifier = blender_object.modifiers.new("Smooth by Angle", "NODES")
+    modifier.node_group = node_group
+    for item in node_group.interface.items_tree:
+        if item.in_out == "INPUT" and item.name == "Angle":
+            modifier[item.identifier] = angle
+    return True
