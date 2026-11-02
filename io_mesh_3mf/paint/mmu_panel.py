@@ -272,6 +272,8 @@ class VIEW3D_PT_mmu_paint(bpy.types.Panel):
                         )
                         edit.slot_index = item.index + 1
 
+                draw_project_filament_editor(layout, context, collapsible=True)
+
             else:
                 # --- Seam / Support layer palette ---
                 from .helpers import _layer_colors
@@ -385,34 +387,6 @@ class MMU_UL_mixed_filaments(bpy.types.UIList):
             else:
                 flt_flags.append(self.bitflag_filter_item)
         return flt_flags, []
-
-
-# ===================================================================
-#  Mix Colors sub-panel
-# ===================================================================
-
-
-class VIEW3D_PT_mmu_mix_colors(bpy.types.Panel):
-    """3MF project filament editor in Texture Paint mode.
-
-    The same editor is also exposed as a standalone panel outside Texture Paint.
-    """
-
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
-    bl_category = "3MF"
-    bl_label = "Mix Colors"
-    bl_parent_id = "VIEW3D_PT_mmu_paint"
-    bl_options = {'DEFAULT_CLOSED'}
-    bl_context = "imagepaint"
-
-    @classmethod
-    def poll(cls, context):
-        from .helpers import _get_paint_mesh
-        return _get_paint_mesh(context) is not None
-
-    def draw(self, context):
-        draw_project_filament_editor(self.layout, context)
 
 
 # ===================================================================

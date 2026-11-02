@@ -77,7 +77,6 @@ from .mmu_panel import (
     MMU_UL_filaments,
     MMU_UL_mixed_filaments,
     VIEW3D_PT_mmu_paint,
-    VIEW3D_PT_mmu_mix_colors,
     _on_depsgraph_update,
 )
 from .mixed_filament_editor import _EDITOR_CLASSES
@@ -117,7 +116,6 @@ _paint_classes = (
     MMU_UL_filaments,
     MMU_UL_mixed_filaments,
     VIEW3D_PT_mmu_paint,
-    VIEW3D_PT_mmu_mix_colors,
     *_EDITOR_CLASSES,
 )
 

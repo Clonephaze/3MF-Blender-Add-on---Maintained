@@ -1060,9 +1060,15 @@ class MMU_OT_recommend_project_filament(bpy.types.Operator):
         return {"FINISHED"}
 
 
-def draw_project_filament_editor(layout, context):
-    box = layout.box()
-    box.label(text="3MF Filament Slots", icon="COLOR")
+def draw_project_filament_editor(layout, context, *, collapsible=False):
+    if collapsible:
+        header, box = layout.panel("MMU_project_filaments", default_closed=True)
+        header.label(text="Project Filaments", icon="COLOR")
+        if box is None:
+            return
+    else:
+        box = layout.box()
+        box.label(text="Project Filaments", icon="COLOR")
     try:
         settings = _read_project_settings()
         colors = _colors(settings)

@@ -173,10 +173,15 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         ],
         default="KEEP",
     )
-    auto_smooth: bpy.props.BoolProperty(
-        name="Smooth by Angle",
-        description="Apply Smooth by Angle modifier to imported objects",
-        default=False,
+    normal_shading: bpy.props.EnumProperty(
+        name="Normal Shading",
+        description="Choose how imported mesh faces are shaded",
+        items=[
+            ("OFF", "Off", "Use flat shading on imported faces"),
+            ("SMOOTH", "Smooth", "Smooth shade all imported faces"),
+            ("AUTO_SMOOTH", "Auto Smooth", "Smooth faces by angle"),
+        ],
+        default="OFF",
     )
     auto_smooth_angle: bpy.props.FloatProperty(
         name="Angle",
@@ -264,9 +269,9 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
         layout.separator()
         smooth_box = layout.box()
-        smooth_box.label(text="Normals:", icon="MOD_SMOOTH")
-        smooth_box.prop(self, "auto_smooth")
-        if self.auto_smooth:
+        smooth_box.label(text="Normal Shading:", icon="MOD_SMOOTH")
+        smooth_box.prop(self, "normal_shading")
+        if self.normal_shading == "AUTO_SMOOTH":
             smooth_box.prop(self, "auto_smooth_angle")
 
         # --- Advanced settings (collapsible, only relevant for MMU Paint) ---
@@ -298,7 +303,9 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             if hasattr(prefs.preferences, "default_grid_spacing"):
                 self.grid_spacing = prefs.preferences.default_grid_spacing
             if hasattr(prefs.preferences, "default_auto_smooth"):
-                self.auto_smooth = prefs.preferences.default_auto_smooth
+                self.normal_shading = (
+                    "AUTO_SMOOTH" if prefs.preferences.default_auto_smooth else "OFF"
+                )
             if hasattr(prefs.preferences, "default_auto_smooth_angle"):
                 self.auto_smooth_angle = prefs.preferences.default_auto_smooth_angle
             if hasattr(prefs.preferences, "default_paint_uv_method"):
@@ -418,7 +425,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             import_location=self.import_location,
             origin_to_geometry=self.origin_to_geometry,
             grid_spacing=self.grid_spacing,
-            auto_smooth=self.auto_smooth,
+            normal_shading=self.normal_shading,
             auto_smooth_angle=self.auto_smooth_angle,
             paint_uv_method=self.paint_uv_method,
             paint_texture_size=int(self.paint_texture_size),

@@ -8,8 +8,9 @@ documents the implemented Blender controls and the export limitations.
 
 Open the **3MF** tab in the 3D Viewport sidebar. In Object Mode, the standalone
 **Mixed Filaments** panel exposes the slot editor. In Texture Paint mode, the
-same editor is available as **Mix Colors** under **MMU Paint** when the active
-mesh has an MMU paint texture.
+same **Project Filaments** editor appears in a collapsed-by-default section
+directly below the filament palette in **MMU Paint** when the active mesh has
+an MMU paint texture.
 
 Slot editor
 -----------

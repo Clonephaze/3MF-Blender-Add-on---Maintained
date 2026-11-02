@@ -374,6 +374,7 @@
         <span class="s2">&quot;thumbnail&quot;</span><span class="p">,</span>  <span class="c1"># Thumbnail generation (export)</span>
         <span class="s2">&quot;use_components&quot;</span><span class="p">,</span>  <span class="c1"># Component instancing for linked duplicates (export)</span>
         <span class="s2">&quot;auto_smooth&quot;</span><span class="p">,</span>  <span class="c1"># Auto smooth-by-angle on import</span>
+        <span class="s2">&quot;normal_shading&quot;</span><span class="p">,</span>  <span class="c1"># Off, smooth, or auto smooth on import</span>
         <span class="s2">&quot;subdivision_depth&quot;</span><span class="p">,</span>  <span class="c1"># Paint segmentation subdivision depth control</span>
         <span class="s2">&quot;flatten_hierarchy&quot;</span><span class="p">,</span>  <span class="c1"># Option to flatten parented meshes into top-level build items (export)</span>
         <span class="s2">&quot;modifier_parts&quot;</span><span class="p">,</span>  <span class="c1"># Orca/BambuStudio modifier part subtypes (import, export, inspect)</span>
@@ -880,6 +881,7 @@
     <span class="n">grid_spacing</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
     <span class="n">auto_smooth</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">auto_smooth_angle</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5236</span><span class="p">,</span>
+    <span class="n">normal_shading</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">paint_uv_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;SMART&quot;</span><span class="p">,</span>
     <span class="n">paint_texture_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
     <span class="n">scene_unit</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;KEEP&quot;</span><span class="p">,</span>
@@ -902,8 +904,12 @@
 <span class="sd">    :param origin_to_geometry: ``&quot;KEEP&quot;`` | ``&quot;CENTER&quot;`` | ``&quot;BOTTOM&quot;``.</span>
 <span class="sd">    :param grid_spacing: Spacing between objects in grid layout mode.</span>
 <span class="sd">    :param auto_smooth: Apply Smooth by Angle modifier to imported objects.</span>
+<span class="sd">        Retained for compatibility; ``normal_shading`` takes precedence when</span>
+<span class="sd">        provided.</span>
 <span class="sd">    :param auto_smooth_angle: Maximum angle (radians) for smooth shading</span>
 <span class="sd">        (default 0.5236 = 30 degrees).</span>
+<span class="sd">    :param normal_shading: ``&quot;OFF&quot;`` (flat), ``&quot;SMOOTH&quot;``, or</span>
+<span class="sd">        ``&quot;AUTO_SMOOTH&quot;``. ``None`` preserves the previous API behavior.</span>
 <span class="sd">    :param paint_uv_method: ``&quot;SMART&quot;`` (default) or ``&quot;LIGHTMAP&quot;``.</span>
 <span class="sd">        Smart UV groups adjacent faces; Lightmap gives each face unique space.</span>
 <span class="sd">    :param paint_texture_size: Override texture resolution (0 = auto).</span>
@@ -959,8 +965,9 @@
         <span class="n">import_location</span><span class="o">=</span><span class="n">import_location</span><span class="p">,</span>
         <span class="n">origin_to_geometry</span><span class="o">=</span><span class="n">origin_to_geometry</span><span class="p">,</span>
         <span class="n">grid_spacing</span><span class="o">=</span><span class="n">grid_spacing</span><span class="p">,</span>
-        <span class="n">auto_smooth</span><span class="o">=</span><span class="n">auto_smooth</span><span class="p">,</span>
+        <span class="n">auto_smooth</span><span class="o">=</span><span class="n">auto_smooth</span> <span class="ow">and</span> <span class="n">normal_shading</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">auto_smooth_angle</span><span class="o">=</span><span class="n">auto_smooth_angle</span><span class="p">,</span>
+        <span class="n">normal_shading</span><span class="o">=</span><span class="n">normal_shading</span><span class="p">,</span>
         <span class="n">paint_uv_method</span><span class="o">=</span><span class="n">paint_uv_method</span><span class="p">,</span>
         <span class="n">paint_texture_size</span><span class="o">=</span><span class="n">paint_texture_size</span><span class="p">,</span>
     <span class="p">)</span>

@@ -464,8 +464,8 @@ def _on_active_mix_filament_changed(self, context):
 def draw_add_mix_form(layout, settings):
     """Draw the inline add-mix form into *layout*.
 
-    Used by both VIEW3D_PT_mmu_mix_colors (mmu_panel.py) and the bake panel
-    (bake.py).  The box/panel wrapping is handled by the caller.
+    Used by the bake panel (bake.py). The box/panel wrapping is handled by
+    the caller.
     """
     col = layout.column(align=True)
     col.prop(settings, "add_mix_mode", text="")

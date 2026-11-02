@@ -28,7 +28,7 @@ Features and improvements organized by priority. Complexity ratings help with pl
 | ✅ Implemented | Blender authoring and paint palette | 🟡 | Edit physical slots and two-/three-component mixed slots; configure gradients; assign slots to objects; include mixed slots in paint palettes and bake/quantize color lists. |
 | ✅ Implemented | Color prediction and recommendations | 🟡 | Recompute mixed-slot swatches using the bundled Orca recipe data and blend model; recommend recipes from project filaments or CMYW/RYBW tables. |
 | ✅ Implemented | Mixed-settings AUTO export | 🟡 | Route projects with stashed Orca mixed slots to Orca export; integration tests cover authored settings through export and re-import. |
-| 📋 Manual validation pending | Slicer open and slice | 🟡 | Open Blender-authored and round-tripped files in OrcaSlicer or BambuStudio; inspect slot recipes, object assignments, colors, gradients, and painted regions, then slice a representative project. See `MANUAL_SLICER_VALIDATION.md`. |
+| ✅ OrcaSlicer manual validation complete | Slicer open and slice | 🟡 | The manual checklist passed with OrcaSlicer 2.5.0-dev, Blender 5.2.1, and add-on 2.8.0. BambuStudio has not been validated. See `MANUAL_SLICER_VALIDATION.md`. |
 
 ### OrcaSlicer-FullSpectrum (legacy format)
 

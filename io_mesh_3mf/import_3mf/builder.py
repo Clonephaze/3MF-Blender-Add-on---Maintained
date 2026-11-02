@@ -393,9 +393,11 @@ def build_object(
         ):
             blender_object.hide_render = True
 
-        # Apply Smooth by Angle modifier if requested
-        if ctx.options.auto_smooth:
+        if ctx.options.auto_smooth or ctx.options.normal_shading == "AUTO_SMOOTH":
             _apply_auto_smooth(blender_object, ctx.options.auto_smooth_angle)
+        elif ctx.options.normal_shading in {"OFF", "SMOOTH"}:
+            for polygon in blender_object.data.polygons:
+                polygon.use_smooth = ctx.options.normal_shading == "SMOOTH"
     else:
         # No mesh: either pass through parent, or create an Empty for
         # multi-part assemblies (Orca modifier groups) so the hierarchy

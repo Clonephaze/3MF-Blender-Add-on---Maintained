@@ -665,20 +665,6 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                 tip.label(text="Spec-compliant export with proper components.", icon="INFO")
                 tip.label(text="Materials exported as basematerials/textures.")
 
-        # --- Plates (Orca/Bambu) ---
-        header, body = layout.panel("EXPORT_3MF_plates", default_closed=True)
-        header.label(text="Plates", icon="MESH_GRID")
-        if body:
-            body.use_property_split = False
-            body.prop(self, "plate_per_material")
-            sub = body.column()
-            sub.active = self.plate_per_material
-            sub.prop(self, "split_assemblies_by_material")
-            tip = body.column(align=True)
-            tip.scale_y = 0.7
-            tip.label(text="Orca/Bambu format only. Use the 3MF sidebar", icon="INFO")
-            tip.label(text="to assign plates manually.")
-
         # --- Geometry ---
         header, body = layout.panel("EXPORT_3MF_geometry", default_closed=False)
         header.label(text="Geometry", icon="MESH_DATA")
@@ -703,6 +689,20 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             body.label(text="Thumbnail", icon="IMAGE_DATA")
             body.use_property_split = False
             body.row().prop(self, "thumbnail_mode", expand=True)
+
+        # --- Plates (Orca/Bambu) ---
+        header, body = layout.panel("EXPORT_3MF_plates", default_closed=True)
+        header.label(text="Plates", icon="MESH_GRID")
+        if body:
+            body.use_property_split = False
+            body.prop(self, "plate_per_material")
+            sub = body.column()
+            sub.active = self.plate_per_material
+            sub.prop(self, "split_assemblies_by_material")
+            tip = body.column(align=True)
+            tip.scale_y = 0.7
+            tip.label(text="Orca/Bambu format only. Use the 3MF sidebar", icon="INFO")
+            tip.label(text="to assign plates manually.")
             if self.thumbnail_mode == "AUTO":
                 body.use_property_split = True
                 body.prop(self, "thumbnail_resolution")
