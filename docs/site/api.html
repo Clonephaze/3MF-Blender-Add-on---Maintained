@@ -199,6 +199,7 @@
   <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="guide.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mixed-filaments.html">Orca / Bambu Mixed-Filament Authoring</a></li>
 <li class="toctree-l1"><a class="reference internal" href="recipes.html">Recipes</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Core API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="discovery.html">API Discovery</a></li>
@@ -699,9 +700,9 @@ is accepted.  Objects not present in this dict use project defaults.</p>
 <p>Example:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">object_settings</span><span class="o">=</span><span class="p">{</span>
     <span class="n">supports_obj</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">"layer_height"</span><span class="p">:</span> <span class="s2">"0.12"</span><span class="p">,</span>
-        <span class="s2">"wall_loops"</span><span class="p">:</span> <span class="s2">"2"</span><span class="p">,</span>
-        <span class="s2">"sparse_infill_speed"</span><span class="p">:</span> <span class="s2">"50"</span><span class="p">,</span>
+        <span class="s2">&quot;layer_height&quot;</span><span class="p">:</span> <span class="s2">&quot;0.12&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;wall_loops&quot;</span><span class="p">:</span> <span class="s2">&quot;2&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;sparse_infill_speed&quot;</span><span class="p">:</span> <span class="s2">&quot;50&quot;</span><span class="p">,</span>
     <span class="p">},</span>
     <span class="c1"># other objects use project defaults</span>
 <span class="p">}</span>
@@ -746,10 +747,10 @@ No Blender objects, meshes, or materials are created.</p>
 </dd>
 </dl>
 <p>Example:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">info</span> <span class="o">=</span> <span class="n">inspect_3mf</span><span class="p">(</span><span class="s2">"model.3mf"</span><span class="p">)</span>
-<span class="k">if</span> <span class="n">info</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">"OK"</span><span class="p">:</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">info</span> <span class="o">=</span> <span class="n">inspect_3mf</span><span class="p">(</span><span class="s2">&quot;model.3mf&quot;</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">info</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">&quot;OK&quot;</span><span class="p">:</span>
     <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">info</span><span class="o">.</span><span class="n">objects</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">obj</span><span class="p">[</span><span class="s1">'name'</span><span class="p">]</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">obj</span><span class="p">[</span><span class="s1">'num_triangles'</span><span class="p">]</span><span class="si">}</span><span class="s2"> tris"</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">obj</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">obj</span><span class="p">[</span><span class="s1">&#39;num_triangles&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> tris&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -783,12 +784,12 @@ and will be applied to every file.</p>
 </dl>
 <p>Example:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">results</span> <span class="o">=</span> <span class="n">batch_import</span><span class="p">(</span>
-    <span class="p">[</span><span class="s2">"a.3mf"</span><span class="p">,</span> <span class="s2">"b.3mf"</span><span class="p">,</span> <span class="s2">"c.3mf"</span><span class="p">],</span>
-    <span class="n">import_materials</span><span class="o">=</span><span class="s2">"PAINT"</span><span class="p">,</span>
-    <span class="n">target_collection</span><span class="o">=</span><span class="s2">"Imports"</span><span class="p">,</span>
+    <span class="p">[</span><span class="s2">&quot;a.3mf&quot;</span><span class="p">,</span> <span class="s2">&quot;b.3mf&quot;</span><span class="p">,</span> <span class="s2">&quot;c.3mf&quot;</span><span class="p">],</span>
+    <span class="n">import_materials</span><span class="o">=</span><span class="s2">&quot;PAINT&quot;</span><span class="p">,</span>
+    <span class="n">target_collection</span><span class="o">=</span><span class="s2">&quot;Imports&quot;</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="n">total</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">num_loaded</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">results</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Imported </span><span class="si">{</span><span class="n">total</span><span class="si">}</span><span class="s2"> objects total"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Imported </span><span class="si">{</span><span class="n">total</span><span class="si">}</span><span class="s2"> objects total&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -814,12 +815,12 @@ the export falls back to the <code class="docutils literal notranslate"><span cl
 </dd>
 </dl>
 <p>Example:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cubes</span> <span class="o">=</span> <span class="p">[</span><span class="n">o</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">bpy</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">objects</span> <span class="k">if</span> <span class="s2">"Cube"</span> <span class="ow">in</span> <span class="n">o</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
-<span class="n">spheres</span> <span class="o">=</span> <span class="p">[</span><span class="n">o</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">bpy</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">objects</span> <span class="k">if</span> <span class="s2">"Sphere"</span> <span class="ow">in</span> <span class="n">o</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cubes</span> <span class="o">=</span> <span class="p">[</span><span class="n">o</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">bpy</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">objects</span> <span class="k">if</span> <span class="s2">&quot;Cube&quot;</span> <span class="ow">in</span> <span class="n">o</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
+<span class="n">spheres</span> <span class="o">=</span> <span class="p">[</span><span class="n">o</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">bpy</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">objects</span> <span class="k">if</span> <span class="s2">&quot;Sphere&quot;</span> <span class="ow">in</span> <span class="n">o</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
 <span class="n">results</span> <span class="o">=</span> <span class="n">batch_export</span><span class="p">([</span>
-    <span class="p">(</span><span class="s2">"cubes.3mf"</span><span class="p">,</span> <span class="n">cubes</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">"spheres.3mf"</span><span class="p">,</span> <span class="n">spheres</span><span class="p">),</span>
-<span class="p">],</span> <span class="n">use_orca_format</span><span class="o">=</span><span class="s2">"AUTO"</span><span class="p">)</span>
+    <span class="p">(</span><span class="s2">&quot;cubes.3mf&quot;</span><span class="p">,</span> <span class="n">cubes</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;spheres.3mf&quot;</span><span class="p">,</span> <span class="n">spheres</span><span class="p">),</span>
+<span class="p">],</span> <span class="n">use_orca_format</span><span class="o">=</span><span class="s2">&quot;AUTO&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>

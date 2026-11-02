@@ -199,6 +199,7 @@
   <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="guide.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mixed-filaments.html">Orca / Bambu Mixed-Filament Authoring</a></li>
 <li class="toctree-l1"><a class="reference internal" href="recipes.html">Recipes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">Core API</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">API Discovery</a></li>
@@ -271,7 +272,7 @@ via <code class="docutils literal notranslate"><span class="pre">unregister()</s
 <p>Example:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">io_mesh_3mf.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">is_available</span>
 <span class="k">if</span> <span class="n">is_available</span><span class="p">():</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"3MF API is ready"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;3MF API is ready&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -296,7 +297,7 @@ is disabled.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">io_mesh_3mf.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_api</span>
 <span class="n">api</span> <span class="o">=</span> <span class="n">get_api</span><span class="p">()</span>
 <span class="k">if</span> <span class="n">api</span><span class="p">:</span>
-    <span class="n">result</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">import_3mf</span><span class="p">(</span><span class="s2">"/model.3mf"</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">import_3mf</span><span class="p">(</span><span class="s2">&quot;/model.3mf&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -317,7 +318,7 @@ checks. New capabilities may be added in minor versions.</p>
 </dl>
 <p>Example:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">io_mesh_3mf.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">has_capability</span>
-<span class="k">if</span> <span class="n">has_capability</span><span class="p">(</span><span class="s2">"object_settings"</span><span class="p">):</span>
+<span class="k">if</span> <span class="n">has_capability</span><span class="p">(</span><span class="s2">&quot;object_settings&quot;</span><span class="p">):</span>
     <span class="c1"># Safe to use object_settings parameter</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">export_3mf</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">object_settings</span><span class="o">=</span><span class="p">{</span><span class="o">...</span><span class="p">})</span>
 </pre></div>
@@ -362,13 +363,13 @@ regardless of addon load order.</p>
 <span class="k">def</span><span class="w"> </span><span class="nf">my_operator_execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
     <span class="n">api</span> <span class="o">=</span> <span class="n">get_threemf_api</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">api</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">report</span><span class="p">({</span><span class="s1">'ERROR'</span><span class="p">},</span> <span class="s2">"3MF Format addon not installed/enabled"</span><span class="p">)</span>
-        <span class="k">return</span> <span class="p">{</span><span class="s1">'CANCELLED'</span><span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">report</span><span class="p">({</span><span class="s1">&#39;ERROR&#39;</span><span class="p">},</span> <span class="s2">&quot;3MF Format addon not installed/enabled&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;CANCELLED&#39;</span><span class="p">}</span>
 
-    <span class="n">result</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">import_3mf</span><span class="p">(</span><span class="s2">"/path/to/model.3mf"</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">"FINISHED"</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">report</span><span class="p">({</span><span class="s1">'INFO'</span><span class="p">},</span> <span class="sa">f</span><span class="s2">"Imported </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">num_loaded</span><span class="si">}</span><span class="s2"> objects"</span><span class="p">)</span>
-    <span class="k">return</span> <span class="p">{</span><span class="s1">'FINISHED'</span><span class="p">}</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">import_3mf</span><span class="p">(</span><span class="s2">&quot;/path/to/model.3mf&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">&quot;FINISHED&quot;</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">report</span><span class="p">({</span><span class="s1">&#39;INFO&#39;</span><span class="p">},</span> <span class="sa">f</span><span class="s2">&quot;Imported </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">num_loaded</span><span class="si">}</span><span class="s2"> objects&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;FINISHED&#39;</span><span class="p">}</span>
 </pre></div>
 </div>
 <p><strong>Alternative — direct try/except</strong> (no helper needed):</p>
@@ -396,7 +397,7 @@ the module is registered for fast subsequent lookups.</p>
 <p>Example:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">api</span> <span class="o">=</span> <span class="n">get_threemf_api</span><span class="p">()</span>
 <span class="k">if</span> <span class="n">api</span><span class="p">:</span>
-    <span class="n">result</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">import_3mf</span><span class="p">(</span><span class="s2">"/model.3mf"</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">import_3mf</span><span class="p">(</span><span class="s2">&quot;/model.3mf&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>

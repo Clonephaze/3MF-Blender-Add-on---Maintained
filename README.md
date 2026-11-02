@@ -12,7 +12,7 @@ It covers far more than raw mesh export. The add-on handles geometry, materials,
 
 ## Status
 
-- **Version 2.0.0**
+- **Version 2.8.0**
 - Compatible with **Blender 4.2+**
 - Primary development target: **Blender 5.0**
 - Actively maintained
@@ -36,7 +36,7 @@ For Blender versions **2.80–3.6**, see the [original releases](https://github.
 | Slicer                        | Round-Trip Support | Notes                                                                                          |
 | ----------------------------- | ----------------- | ---------------------------------------------------------------------------------------------- |
 | **Standard 3MF**              | Full              | Spec-compliant geometry, materials, textures, metadata, and extension-aware export            |
-| **Orca Slicer / BambuStudio / PrusaSlicer / SuperSlicer** | Full              | Full paint, seam, support, multicolor, modifier-part, and slicer-config workflow support      |
+| **Orca Slicer / BambuStudio / PrusaSlicer / SuperSlicer** | Feature-specific | Orca/Bambu per-slot mixed-filament authoring is implemented; manual slicer validation is pending. FullSpectrum mixed-filament definitions are not supported. |
 
 ## Documentation
 
@@ -54,6 +54,8 @@ API and developer-facing docs:
 
 - [Generated API docs in this repo](docs/site/index.html)
 - [Local API reference source](API.md)
+- [Orca/Bambu mixed-filament authoring guide](docs/mixed-filaments.rst)
+- [Manual slicer validation checklist](MANUAL_SLICER_VALIDATION.md)
 
 
 ---

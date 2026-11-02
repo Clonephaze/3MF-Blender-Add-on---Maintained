@@ -3,7 +3,7 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Recipes" href="recipes.html"><link rel="prev" title="3MF Format — API Documentation" href="index.html">
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Orca / Bambu Mixed-Filament Authoring" href="mixed-filaments.html"><link rel="prev" title="3MF Format — API Documentation" href="index.html">
 
     <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
         <title>Getting Started - 3MF Format API — v1.4.0</title>
@@ -199,6 +199,7 @@
   <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
 <ul class="current">
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mixed-filaments.html">Orca / Bambu Mixed-Filament Authoring</a></li>
 <li class="toctree-l1"><a class="reference internal" href="recipes.html">Recipes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">Core API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="discovery.html">API Discovery</a></li>
@@ -252,15 +253,15 @@ suitable for:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">io_mesh_3mf.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">import_3mf</span><span class="p">,</span> <span class="n">export_3mf</span><span class="p">,</span> <span class="n">inspect_3mf</span>
 
 <span class="c1"># Import a 3MF file</span>
-<span class="n">result</span> <span class="o">=</span> <span class="n">import_3mf</span><span class="p">(</span><span class="s2">"/path/to/model.3mf"</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">import_3mf</span><span class="p">(</span><span class="s2">&quot;/path/to/model.3mf&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">status</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">num_loaded</span><span class="p">)</span>
 
 <span class="c1"># Export selected objects</span>
-<span class="n">result</span> <span class="o">=</span> <span class="n">export_3mf</span><span class="p">(</span><span class="s2">"/path/to/output.3mf"</span><span class="p">,</span> <span class="n">use_selection</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">export_3mf</span><span class="p">(</span><span class="s2">&quot;/path/to/output.3mf&quot;</span><span class="p">,</span> <span class="n">use_selection</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">status</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">num_written</span><span class="p">)</span>
 
 <span class="c1"># Inspect without importing (no Blender objects created)</span>
-<span class="n">info</span> <span class="o">=</span> <span class="n">inspect_3mf</span><span class="p">(</span><span class="s2">"/path/to/model.3mf"</span><span class="p">)</span>
+<span class="n">info</span> <span class="o">=</span> <span class="n">inspect_3mf</span><span class="p">(</span><span class="s2">&quot;/path/to/model.3mf&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">info</span><span class="o">.</span><span class="n">unit</span><span class="p">,</span> <span class="n">info</span><span class="o">.</span><span class="n">num_objects</span><span class="p">,</span> <span class="n">info</span><span class="o">.</span><span class="n">num_triangles_total</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -326,10 +327,10 @@ member properties, which win over automatic assignment.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">3mf_plate_name</span></code> — an optional name for the assigned plate.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">3mf_material_group</span></code> — overrides the material key for automatic grouping.</p></li>
 </ul>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">body</span><span class="p">[</span><span class="s2">"3mf_assembly"</span><span class="p">]</span> <span class="o">=</span> <span class="n">cap</span><span class="p">[</span><span class="s2">"3mf_assembly"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"Widget"</span>
-<span class="n">body</span><span class="p">[</span><span class="s2">"3mf_plate"</span><span class="p">]</span> <span class="o">=</span> <span class="mi">2</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">body</span><span class="p">[</span><span class="s2">&quot;3mf_assembly&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cap</span><span class="p">[</span><span class="s2">&quot;3mf_assembly&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;Widget&quot;</span>
+<span class="n">body</span><span class="p">[</span><span class="s2">&quot;3mf_plate&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">2</span>
 <span class="n">result</span> <span class="o">=</span> <span class="n">export_3mf</span><span class="p">(</span>
-    <span class="s2">"widget.3mf"</span><span class="p">,</span>
+    <span class="s2">&quot;widget.3mf&quot;</span><span class="p">,</span>
     <span class="n">objects</span><span class="o">=</span><span class="p">[</span><span class="n">body</span><span class="p">,</span> <span class="n">cap</span><span class="p">],</span>
     <span class="n">plate_per_material</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">split_assemblies_by_material</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
@@ -360,7 +361,7 @@ assemblies with a warning.</p>
 override print settings for a region of the parent without adding visible
 geometry.  The addon stores the part type as a custom property on the Blender
 <strong>Object</strong> (not Mesh):</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">obj</span><span class="p">[</span><span class="s2">"3mf_part_subtype"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"modifier_part"</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">obj</span><span class="p">[</span><span class="s2">&quot;3mf_part_subtype&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;modifier_part&quot;</span>
 </pre></div>
 </div>
 <p>Valid subtypes:</p>
@@ -377,13 +378,13 @@ panel (Part Type dropdown) or the API:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">io_mesh_3mf.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">export_3mf</span><span class="p">,</span> <span class="n">inspect_3mf</span>
 
 <span class="c1"># Tag an object as a modifier before export</span>
-<span class="n">bpy</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">"Cylinder"</span><span class="p">][</span><span class="s2">"3mf_part_subtype"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"support_enforcer"</span>
-<span class="n">export_3mf</span><span class="p">(</span><span class="s2">"output.3mf"</span><span class="p">,</span> <span class="n">use_orca_format</span><span class="o">=</span><span class="s2">"AUTO"</span><span class="p">)</span>
+<span class="n">bpy</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="s2">&quot;Cylinder&quot;</span><span class="p">][</span><span class="s2">&quot;3mf_part_subtype&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;support_enforcer&quot;</span>
+<span class="n">export_3mf</span><span class="p">(</span><span class="s2">&quot;output.3mf&quot;</span><span class="p">,</span> <span class="n">use_orca_format</span><span class="o">=</span><span class="s2">&quot;AUTO&quot;</span><span class="p">)</span>
 
 <span class="c1"># Inspect modifier parts without importing</span>
-<span class="n">info</span> <span class="o">=</span> <span class="n">inspect_3mf</span><span class="p">(</span><span class="s2">"model.3mf"</span><span class="p">)</span>
+<span class="n">info</span> <span class="o">=</span> <span class="n">inspect_3mf</span><span class="p">(</span><span class="s2">&quot;model.3mf&quot;</span><span class="p">)</span>
 <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">info</span><span class="o">.</span><span class="n">part_subtypes</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  Part </span><span class="si">{</span><span class="n">part</span><span class="p">[</span><span class="s1">'part_id'</span><span class="p">]</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">part</span><span class="p">[</span><span class="s1">'subtype'</span><span class="p">]</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">part</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'name'</span><span class="p">,</span><span class="w"> </span><span class="s1">''</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Part </span><span class="si">{</span><span class="n">part</span><span class="p">[</span><span class="s1">&#39;part_id&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">part</span><span class="p">[</span><span class="s1">&#39;subtype&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">part</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -393,15 +394,15 @@ panel (Part Type dropdown) or the API:</p>
 <a class="reference internal" href="api.html#io_mesh_3mf.api.import_3mf" title="io_mesh_3mf.api.import_3mf"><code class="xref py py-func docutils literal notranslate"><span class="pre">import_3mf()</span></code></a>, <a class="reference internal" href="api.html#io_mesh_3mf.api.export_3mf" title="io_mesh_3mf.api.export_3mf"><code class="xref py py-func docutils literal notranslate"><span class="pre">export_3mf()</span></code></a>, and
 the batch helpers.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">on_progress</span><span class="p">(</span><span class="n">percentage</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Called with 0-100 percentage and a status message."""</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"[</span><span class="si">{</span><span class="n">percentage</span><span class="si">:</span><span class="s2">3d</span><span class="si">}</span><span class="s2">%] </span><span class="si">{</span><span class="n">message</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Called with 0-100 percentage and a status message.&quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">percentage</span><span class="si">:</span><span class="s2">3d</span><span class="si">}</span><span class="s2">%] </span><span class="si">{</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">on_warning</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Called for each warning (non-manifold geometry, missing data, etc.)."""</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"WARNING: </span><span class="si">{</span><span class="n">message</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Called for each warning (non-manifold geometry, missing data, etc.).&quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;WARNING: </span><span class="si">{</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">on_object_created</span><span class="p">(</span><span class="n">blender_object</span><span class="p">,</span> <span class="n">resource_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Called after each Blender object is built during import."""</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Called after each Blender object is built during import.&quot;&quot;&quot;</span>
     <span class="n">blender_object</span><span class="o">.</span><span class="n">color</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># Tint red</span>
 </pre></div>
 </div>
@@ -410,11 +411,11 @@ the batch helpers.</p>
 <h2>Error Handling<a class="headerlink" href="#error-handling" title="Link to this heading">¶</a></h2>
 <p>All API functions return result dataclasses instead of raising exceptions.
 Check <code class="docutils literal notranslate"><span class="pre">result.status</span></code>:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">import_3mf</span><span class="p">(</span><span class="s2">"model.3mf"</span><span class="p">)</span>
-<span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">"FINISHED"</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Success: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">num_loaded</span><span class="si">}</span><span class="s2"> objects"</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">import_3mf</span><span class="p">(</span><span class="s2">&quot;model.3mf&quot;</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">&quot;FINISHED&quot;</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Success: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">num_loaded</span><span class="si">}</span><span class="s2"> objects&quot;</span><span class="p">)</span>
 <span class="k">else</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Failed: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">warnings</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">warnings</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 <ul class="simple">
@@ -430,32 +431,32 @@ with a separate <code class="docutils literal notranslate"><span class="pre">err
 <h2>CLI Usage<a class="headerlink" href="#cli-usage" title="Link to this heading">¶</a></h2>
 <p>Run from the command line using Blender’s <code class="docutils literal notranslate"><span class="pre">--python</span></code> flag:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Inspect a file</span>
-blender<span class="w"> </span>--background<span class="w"> </span>--python-expr<span class="w"> </span><span class="s2">"</span>
+blender<span class="w"> </span>--background<span class="w"> </span>--python-expr<span class="w"> </span><span class="s2">&quot;</span>
 <span class="s2">from io_mesh_3mf.api import inspect_3mf</span>
-<span class="s2">info = inspect_3mf('model.3mf')</span>
-<span class="s2">print(f'{info.num_objects} objects, {info.num_triangles_total} triangles')</span>
-<span class="s2">"</span>
+<span class="s2">info = inspect_3mf(&#39;model.3mf&#39;)</span>
+<span class="s2">print(f&#39;{info.num_objects} objects, {info.num_triangles_total} triangles&#39;)</span>
+<span class="s2">&quot;</span>
 
 <span class="c1"># Batch convert</span>
 blender<span class="w"> </span>--background<span class="w"> </span>--python<span class="w"> </span>my_script.py
 </pre></div>
 </div>
 <p><strong>Example script</strong> (<code class="docutils literal notranslate"><span class="pre">convert_to_orca.py</span></code>):</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="sd">"""Convert a standard 3MF to Orca Slicer format."""</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="sd">&quot;&quot;&quot;Convert a standard 3MF to Orca Slicer format.&quot;&quot;&quot;</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">io_mesh_3mf.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">import_3mf</span><span class="p">,</span> <span class="n">export_3mf</span>
 
-<span class="n">input_path</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">"--"</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
-<span class="n">output_path</span> <span class="o">=</span> <span class="n">input_path</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">".3mf"</span><span class="p">,</span> <span class="s2">"_orca.3mf"</span><span class="p">)</span>
+<span class="n">input_path</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">&quot;--&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+<span class="n">output_path</span> <span class="o">=</span> <span class="n">input_path</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.3mf&quot;</span><span class="p">,</span> <span class="s2">&quot;_orca.3mf&quot;</span><span class="p">)</span>
 
-<span class="n">result</span> <span class="o">=</span> <span class="n">import_3mf</span><span class="p">(</span><span class="n">input_path</span><span class="p">,</span> <span class="n">import_materials</span><span class="o">=</span><span class="s2">"MATERIALS"</span><span class="p">)</span>
-<span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">"FINISHED"</span><span class="p">:</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">import_3mf</span><span class="p">(</span><span class="n">input_path</span><span class="p">,</span> <span class="n">import_materials</span><span class="o">=</span><span class="s2">&quot;MATERIALS&quot;</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">&quot;FINISHED&quot;</span><span class="p">:</span>
     <span class="n">export_result</span> <span class="o">=</span> <span class="n">export_3mf</span><span class="p">(</span>
         <span class="n">output_path</span><span class="p">,</span>
         <span class="n">objects</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">objects</span><span class="p">,</span>
-        <span class="n">use_orca_format</span><span class="o">=</span><span class="s2">"AUTO"</span><span class="p">,</span>
+        <span class="n">use_orca_format</span><span class="o">=</span><span class="s2">&quot;AUTO&quot;</span><span class="p">,</span>
     <span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Converted: </span><span class="si">{</span><span class="n">export_result</span><span class="o">.</span><span class="n">num_written</span><span class="si">}</span><span class="s2"> objects → </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Converted: </span><span class="si">{</span><span class="n">export_result</span><span class="o">.</span><span class="n">num_written</span><span class="si">}</span><span class="s2"> objects → </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>blender<span class="w"> </span>--background<span class="w"> </span>--python<span class="w"> </span>convert_to_orca.py<span class="w"> </span>--<span class="w"> </span>input.3mf
@@ -486,12 +487,12 @@ It increments independently of the addon release version.</p></li>
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="recipes.html">
+          <a class="next-page" href="mixed-filaments.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Recipes</div>
+                <div class="title">Orca / Bambu Mixed-Filament Authoring</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
