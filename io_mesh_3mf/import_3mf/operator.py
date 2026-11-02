@@ -626,6 +626,9 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         debug(f"[TIMING]   slicer colors:    {_time.perf_counter() - _t:.3f}s")
 
         # Read modifier part subtypes from Orca/BambuStudio model_settings.
+        # orca_fullspectrum is a superset of orca: same file layout, same
+        # model_settings.config structure, so part_groups / part_extruders /
+        # part_names all need to be populated for either format.
         if detected_vendor == "orca" or ctx.plate_assignments:
             _t = _time.perf_counter()
             from .slicer.colors import read_orca_part_subtypes
