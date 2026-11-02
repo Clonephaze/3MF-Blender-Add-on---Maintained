@@ -198,27 +198,29 @@ def _sync_filaments_from_mesh(context):
         settings.filaments.clear()
         settings.loaded_mesh_name = ""
         return
+    try:
+        paint_colors = ast.literal_eval(
+            mesh.get("3mf_paint_internal_colors", colors_str)
+        )
+    except (ValueError, SyntaxError):
+        paint_colors = colors_dict
 
     settings.filaments.clear()
-    # If the mesh carries a stored physical-filament count, only load those
-    # entries from the colour dict.  Virtual (mix) entries are re-appended
-    # dynamically below from settings.mixed_filaments, which avoids duplicate
-    # slots and ensures num_physical_filaments is set correctly.
     stored_num_physical = int(mesh.get("3mf_num_physical_filaments", 0))
+    mixed_slots = {int(s) for s in mesh.get("3mf_paint_mixed_slots", [])}
     for idx in sorted(colors_dict.keys()):
-        if stored_num_physical > 0 and int(idx) >= stored_num_physical:
-            break  # Stop at the physical/virtual boundary
         item = settings.filaments.add()
         item.index = idx
-        item.name = f"Filament {idx + 1}"
+        item.is_mixed = int(idx) in mixed_slots
+        item.name = f"Filament {idx + 1}" + (" (Mixed)" if item.is_mixed else "")
         hex_col = colors_dict[idx]
         rgb = _rgb_from_hex(hex_col)
         item.color = rgb
+        item.paint_color = _rgb_from_hex(paint_colors.get(idx, hex_col))
 
-    # Append virtual (mixed) filament slots after the physical ones.
-    # They are marked is_virtual=True so the main palette UIList can hide them;
-    # the Mix Colors sub-panel exposes them for selection.
-    num_physical = len(settings.filaments)
+    num_physical = stored_num_physical or sum(
+        1 for item in settings.filaments if not item.is_mixed
+    )
     if hasattr(settings, "num_physical_filaments"):
         settings.num_physical_filaments = num_physical
     if getattr(settings, "has_mixed_filaments", False):
@@ -232,6 +234,7 @@ def _sync_filaments_from_mesh(context):
             item.name = f"Mix {mf_item.component_a}+{mf_item.component_b}"
             item.color = tuple(mf_item.display_color)
             item.is_virtual = True
+            item.paint_color = item.color
             mf_item.palette_index = virt_idx
             virt_idx += 1
 
@@ -242,28 +245,22 @@ def _sync_filaments_from_mesh(context):
 
 
 def _write_colors_to_mesh(context):
-    """Write the physical filament palette back to the mesh custom properties.
-
-    Only physical (non-virtual) entries are written so round-tripped files
-    do not accidentally re-import mixed-filament display colours as real slots.
-    ``3mf_num_physical_filaments`` is also kept in sync so
-    ``_sync_filaments_from_mesh`` can restore the physical/virtual boundary.
-    """
+    """Write the full paint palette and physical-slot count to mesh properties."""
     mesh = _get_paint_mesh(context)
     if mesh is None:
         return
     settings = context.scene.mmu_paint
-    num_physical = (
-        settings.num_physical_filaments
-        if settings.num_physical_filaments > 0
-        else sum(1 for f in settings.filaments if not f.is_virtual)
-    )
     colors_dict = {}
-    for i, item in enumerate(settings.filaments):
-        if i >= num_physical:
-            break
+    paint_colors_dict = {}
+    num_physical = 0
+    for item in settings.filaments:
+        if item.is_virtual:
+            continue
         colors_dict[item.index] = _hex_from_rgb(*item.color)
+        paint_colors_dict[item.index] = _hex_from_rgb(*item.paint_color)
+        num_physical += not item.is_mixed
     mesh["3mf_paint_extruder_colors"] = str(colors_dict)
+    mesh["3mf_paint_internal_colors"] = str(paint_colors_dict)
     mesh["3mf_num_physical_filaments"] = num_physical
 
 
@@ -308,6 +305,7 @@ def _refresh_virtual_slots_in_palette(settings) -> None:
         item.name = f"Mix {mf_item.component_a}+{mf_item.component_b}"
         item.color = tuple(mf_item.display_color)
         item.is_virtual = True
+        item.paint_color = item.color
         mf_item.palette_index = virt_idx
         virt_idx += 1
 
@@ -431,7 +429,7 @@ def _on_active_filament_changed(self, context):
         settings = context.scene.mmu_paint
         idx = settings.active_filament_index
         if 0 <= idx < len(settings.filaments):
-            color = tuple(settings.filaments[idx].color[:])
+            color = tuple(settings.filaments[idx].paint_color[:])
             _set_brush_color(context, color)
     except Exception:
         pass  # Silently ignore context errors during undo/redo
@@ -445,7 +443,11 @@ def _on_active_mix_filament_changed(self, context):
         if 0 <= idx < len(settings.mixed_filaments):
             mf = settings.mixed_filaments[idx]
             if mf.enabled and not mf.deleted:
-                color = tuple(mf.display_color[:])
+                color = (
+                    tuple(settings.filaments[mf.palette_index].paint_color[:])
+                    if 0 <= mf.palette_index < len(settings.filaments)
+                    else tuple(mf.display_color[:])
+                )
                 _set_brush_color(context, color)
                 # Also set active_filament_index to the virtual palette slot so
                 # export / bake tools see the right index.

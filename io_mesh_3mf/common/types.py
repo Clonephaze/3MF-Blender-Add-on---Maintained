@@ -49,6 +49,7 @@ class ResourceObject:
     segmentation_strings: Optional[dict] = None
     seam_strings: Optional[dict] = None
     support_strings: Optional[dict] = None
+    triangle_attributes: Optional[Dict[int, Dict[str, str]]] = None
     default_extruder: Optional[int] = None
 
 
@@ -94,9 +95,13 @@ class ResourceMaterial:
     # Multiproperties multi-texture support
     extra_texture_ids: Optional[List[str]] = None
 
+    # 1-based slicer filament slot (Orca/Bambu paint and extruder materials).
+    # Keeps slots with identical colours as distinct materials.
+    filament_slot: Optional[int] = None
+
     def __hash__(self):
-        """Hash based on name and color for use as dict keys / set members."""
-        return hash((self.name, self.color))
+        """Hash based on name, color and filament slot for use as dict keys / set members."""
+        return hash((self.name, self.color, self.filament_slot))
 
     def __eq__(self, other):
         if not isinstance(other, ResourceMaterial):

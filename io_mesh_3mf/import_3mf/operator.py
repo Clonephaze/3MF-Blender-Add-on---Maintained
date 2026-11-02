@@ -477,44 +477,11 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
         self._progress_update(100, "Finalizing import...")
 
-        # Store FullSpectrum mixed filament definitions on the scene so they
-        # survive and can be round-tripped on export.
-        if ctx.mixed_filament_definitions_raw:
-            context.scene["3mf_mixed_filament_definitions"] = ctx.mixed_filament_definitions_raw
-            context.scene["3mf_has_mixed_filaments"] = True
-            debug("Stored mixed filament definitions on scene")
-
-            # Populate the UI collection for the Mix Colors panel.
-            settings = context.scene.mmu_paint
-            settings.has_mixed_filaments = True
-            settings.mixed_filaments.clear()
-            from ..common.colors import hex_to_rgb
-            for mf in ctx.mixed_filament_entries:
-                item = settings.mixed_filaments.add()
-                item.component_a = mf.component_a
-                item.component_b = mf.component_b
-                item.mix_b_percent = mf.mix_b_percent
-                item.distribution_mode = str(mf.distribution_mode)
-                item.manual_pattern = mf.manual_pattern or ""
-                # Set UI type from mode + pattern presence
-                if mf.distribution_mode == 1:
-                    item.ui_type = "pointillism"
-                elif mf.distribution_mode == 0:
-                    item.ui_type = "layer_cycle"
-                elif mf.manual_pattern:
-                    item.ui_type = "pattern"
-                else:
-                    item.ui_type = "gradient"
-                item.stable_id = mf.stable_id
-                item.enabled = mf.enabled
-                item.deleted = mf.deleted
-                if mf.display_color:
-                    try:
-                        r, g, b = hex_to_rgb(mf.display_color)
-                        item.display_color = (r, g, b)
-                    except Exception:
-                        pass
-            debug(f"Populated {len(settings.mixed_filaments)} mixed filament UI entries")
+        # Legacy FullSpectrum scene state is no longer used; clear leftovers
+        # so they can't leak into a later export.
+        for legacy_key in ("3mf_mixed_filament_definitions", "3mf_has_mixed_filaments"):
+            if legacy_key in context.scene:
+                del context.scene[legacy_key]
 
         # Force-sync the filament palette.  For deferred solid-paint textures
         # (e.g. PeggyPalette shared-texture mode) the mesh custom properties
@@ -652,9 +619,6 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         debug(f"[TIMING]   slicer colors:    {_time.perf_counter() - _t:.3f}s")
 
         # Read modifier part subtypes from Orca/BambuStudio model_settings.
-        # orca_fullspectrum is a superset of orca: same file layout, same
-        # model_settings.config structure, so part_groups / part_extruders /
-        # part_names all need to be populated for either format.
         if detected_vendor == "orca" or ctx.plate_assignments:
             _t = _time.perf_counter()
             from .slicer.colors import read_orca_part_subtypes

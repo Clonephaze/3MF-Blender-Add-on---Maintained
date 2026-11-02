@@ -96,6 +96,9 @@ def read_vertices(
 
 # Threshold to distinguish short Orca paint codes from PrusaSlicer segmentation strings
 _PRUSA_SEGMENTATION_THRESHOLD = 10
+_TEXTURE_DISPLACEMENT_ATTRIBUTES = tuple(
+    f"paint_texture_{index}" for index in range(8)
+)
 
 
 def read_triangles(
@@ -116,6 +119,7 @@ def read_triangles(
     Dict[int, str],
     Dict[int, str],
     int,
+    Dict[int, Dict[str, str]],
 ]:
     """Read triangles from an ``<object>`` element.
 
@@ -133,7 +137,8 @@ def read_triangles(
     :param paint_only: If ``True``, skip texture-group / multiproperties handling
         (used for external model objects that only carry ``paint_color``).
     :return: ``(triangles, materials, triangle_uvs, vertex_list,
-        segmentation_strings, seam_strings, support_strings, default_extruder)``
+        segmentation_strings, seam_strings, support_strings, default_extruder,
+        triangle_attributes)``
     """
     vertices: List[Tuple[int, int, int]] = []
     materials: List[Optional[ResourceMaterial]] = []
@@ -141,6 +146,7 @@ def read_triangles(
     segmentation_strings: Dict[int, str] = {}
     seam_strings: Dict[int, str] = {}
     support_strings: Dict[int, str] = {}
+    triangle_attributes: Dict[int, Dict[str, str]] = {}
 
     vertex_list = list(vertex_coords) if vertex_coords else []
 
@@ -172,9 +178,17 @@ def read_triangles(
                 warn("Triangle containing negative index to vertex list.")
                 ctx.safe_report({"WARNING"}, "Triangle containing negative index to vertex list")
                 continue
+            attrs = {
+                key: attrib[key]
+                for key in _TEXTURE_DISPLACEMENT_ATTRIBUTES
+                if key in attrib
+            }
+            if attrs:
+                triangle_attributes[len(vertices)] = attrs
             vertices.append((v1, v2, v3))
         return (
-            vertices, [], None, vertex_list, {}, {}, {}, default_extruder
+            vertices, [], None, vertex_list, {}, {}, {}, default_extruder,
+            triangle_attributes,
         )
 
     for tri_index, triangle in enumerate(
@@ -184,6 +198,7 @@ def read_triangles(
     ):
         attrib = triangle.attrib
         try:
+            face_start = len(vertices)
             v1 = int(attrib["v1"])
             v2 = int(attrib["v2"])
             v3 = int(attrib["v3"])
@@ -230,6 +245,14 @@ def read_triangles(
                         default_material,
                     )
                     if handled:
+                        attrs = {
+                            key: attrib[key]
+                            for key in _TEXTURE_DISPLACEMENT_ATTRIBUTES
+                            if key in attrib
+                        }
+                        if attrs:
+                            for face_index in range(face_start, len(vertices)):
+                                triangle_attributes[face_index] = attrs
                         # Store seam/support at the face index just created
                         if import_materials == "PAINT":
                             face_idx = len(vertices) - 1
@@ -261,6 +284,13 @@ def read_triangles(
             vertices.append((v1, v2, v3))
             materials.append(material)
             triangle_uvs.append(uvs)
+            attrs = {
+                key: attrib[key]
+                for key in _TEXTURE_DISPLACEMENT_ATTRIBUTES
+                if key in attrib
+            }
+            if attrs:
+                triangle_attributes[len(vertices) - 1] = attrs
 
             # Store seam/support for triangles without paint_code
             if import_materials == "PAINT":
@@ -290,6 +320,7 @@ def read_triangles(
         seam_strings,
         support_strings,
         default_extruder,
+        triangle_attributes,
     )
 
 
@@ -699,6 +730,7 @@ def read_objects(
             seam_strings,
             support_strings,
             default_extruder,
+            triangle_attributes,
         ) = read_triangles(ctx, object_node, material, pid, verts, objectid)
         _tri_elapsed = _time.perf_counter() - _t_tri
         _total_verts += len(verts)
@@ -770,6 +802,7 @@ def read_objects(
             segmentation_strings=segmentation_strings if segmentation_strings else None,
             seam_strings=seam_strings if seam_strings else None,
             support_strings=support_strings if support_strings else None,
+            triangle_attributes=triangle_attributes if triangle_attributes else None,
             default_extruder=default_extruder,
         )
 
@@ -824,6 +857,7 @@ def read_external_model_objects(
             seam_strings,
             support_strings,
             default_extruder,
+            triangle_attributes,
         ) = read_triangles(
             ctx, object_node, None, None, verts, objectid, paint_only=True
         )
@@ -862,6 +896,7 @@ def read_external_model_objects(
             segmentation_strings=segmentation_strings if segmentation_strings else None,
             seam_strings=seam_strings if seam_strings else None,
             support_strings=support_strings if support_strings else None,
+            triangle_attributes=triangle_attributes if triangle_attributes else None,
             default_extruder=default_extruder,
         )
         debug(

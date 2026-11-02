@@ -28,6 +28,7 @@ This module keeps:
 """
 
 import ast
+import json
 import bmesh
 import numpy as np
 import bpy
@@ -190,6 +191,46 @@ def _get_texture_size(mesh, override_size=0):
         return 8192
 
 
+def _stashed_project_paint_palette():
+    text = bpy.data.texts.get(".3mf_config/Metadata/project_settings.config")
+    if text is None:
+        return None
+    from ..import_3mf.archive import get_stashed_config
+
+    raw = get_stashed_config("Metadata/project_settings.config")
+    if raw is None:
+        raise ValueError(
+            "The stashed Orca project settings are unreadable; painting was stopped "
+            "to avoid losing filament-slot data."
+        )
+    try:
+        project = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("The stashed Orca project settings are invalid.") from exc
+    if not isinstance(project, dict):
+        raise ValueError("The stashed Orca project settings must be a JSON object.")
+
+    from ..common.color_recipes import recompute_mixed_slot_colors
+    from ..common.mixed_slots import mixed_slot_flags, parse_mixed_slots
+    from .roundtrip import collision_safe_palette
+
+    colors = project.get("filament_colour")
+    if not isinstance(colors, list) or not colors:
+        raise ValueError("The stashed Orca project settings have no filament colors.")
+    display = recompute_mixed_slot_colors(
+        [str(color) for color in colors],
+        parse_mixed_slots(project),
+    )
+    flags = mixed_slot_flags(project, len(display))
+    paint = collision_safe_palette(dict(enumerate(display)))
+    return {
+        "display": display,
+        "paint": paint,
+        "physical_count": sum(not flag for flag in flags),
+        "mixed_slots": [index for index, flag in enumerate(flags) if flag],
+    }
+
+
 def _get_filament_colors_from_settings(context):
     """Read the init_filaments list from MMUPaintSettings.
 
@@ -197,14 +238,19 @@ def _get_filament_colors_from_settings(context):
     space of ``image.pixels`` for sRGB-tagged images (Blender's default
     for newly-created images).
 
-    When OrcaSlicer-FullSpectrum mixed filaments are present
-    (``settings.has_mixed_filaments``), the computed display colors for
-    all enabled, non-deleted virtual filament entries are appended after
-    the physical filament colors.  This extends the quantization palette
-    so that pixels painted with a virtual mixed color are assigned the
-    correct virtual filament index on bake/quantize.
+    Orca project settings are authoritative when present, including mixed
+    slots. The returned palette uses collision-safe internal paint colors.
     """
     settings = context.scene.mmu_paint
+    if settings.filaments:
+        return [tuple(item.paint_color[:3]) for item in settings.filaments if not item.is_virtual]
+    project_palette = _stashed_project_paint_palette()
+    if project_palette is not None:
+        return [
+            tuple(_rgb_from_hex(project_palette["paint"][index]))
+            for index in range(len(project_palette["display"]))
+        ]
+
     colors = []
     for item in settings.init_filaments:
         colors.append(tuple(item.color[:3]))
@@ -414,7 +460,11 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
         mesh = obj.data
         settings = context.scene.mmu_paint
 
-        filament_colors = _get_filament_colors_from_settings(context)
+        try:
+            filament_colors = _get_filament_colors_from_settings(context)
+        except ValueError as exc:
+            self.report({"ERROR"}, str(exc))
+            return {"CANCELLED"}
         if len(filament_colors) < 2:
             self.report({"ERROR"}, "At least 2 filaments required")
             return {"CANCELLED"}
@@ -963,20 +1013,41 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
             material_indices = [0] * num_faces
             mesh.polygons.foreach_set("material_index", material_indices)
 
-        # --- Set up 3mf custom properties ---
-        # Write ONLY the physical filament colors to the mesh palette.  Mixed
-        # filament display colors are virtual and must NOT be stored as physical
-        # entries — _sync_filaments_from_mesh re-appends them from
-        # settings.mixed_filaments, but only when it knows the physical boundary.
-        num_physical = len(settings.init_filaments)
-        colors_dict = {}
-        for i in range(num_physical):
-            colors_dict[i] = _hex_from_rgb(*filament_colors[i])
+        # --- Set up 3MF paint palette metadata ---
+        if settings.filaments:
+            paint_items = [item for item in settings.filaments if not item.is_virtual]
+            colors_dict = {
+                item.index: _hex_from_rgb(*item.color[:3])
+                for item in paint_items
+            }
+            internal_colors = {
+                item.index: _hex_from_rgb(*item.paint_color[:3])
+                for item in paint_items
+            }
+            mixed_slots = [item.index for item in paint_items if item.is_mixed]
+            num_physical = sum(not item.is_mixed for item in paint_items)
+        else:
+            project_palette = _stashed_project_paint_palette()
+            if project_palette is not None:
+                colors_dict = dict(enumerate(project_palette["display"]))
+                internal_colors = dict(project_palette["paint"])
+                mixed_slots = project_palette["mixed_slots"]
+                num_physical = project_palette["physical_count"]
+            else:
+                num_physical = len(settings.init_filaments)
+                colors_dict = {
+                    index: _hex_from_rgb(*filament_colors[index])
+                    for index in range(num_physical)
+                }
+                internal_colors = dict(colors_dict)
+                mixed_slots = []
 
         mesh["3mf_is_paint_texture"] = True
         mesh["3mf_paint_default_extruder"] = 1  # 1-based
         mesh["3mf_paint_extruder_colors"] = str(colors_dict)
+        mesh["3mf_paint_internal_colors"] = str(internal_colors)
         mesh["3mf_num_physical_filaments"] = num_physical
+        mesh["3mf_paint_mixed_slots"] = mixed_slots
 
         # --- Sync the paint panel ---
         settings.loaded_mesh_name = ""  # Force reload
@@ -998,7 +1069,7 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
         # Set brush to first filament color
         if len(settings.filaments) > 0:
             from .helpers import _set_brush_color
-            _set_brush_color(context, settings.filaments[0].color[:])
+            _set_brush_color(context, settings.filaments[0].paint_color[:])
 
         self.report(
             {"INFO"},
@@ -1041,10 +1112,17 @@ class MMU_OT_quantize_texture(bpy.types.Operator):
 
         # Get filament colors — include mixed virtual slots so that pixels
         # painted with a mixed color are preserved (not snapped back to physical).
-        filament_colors = _get_filament_colors_from_settings(context)
+        try:
+            filament_colors = _get_filament_colors_from_settings(context)
+        except ValueError as exc:
+            self.report({"ERROR"}, str(exc))
+            return {"CANCELLED"}
         if len(filament_colors) < 2:
             # Fall back to reading from mesh if settings are unavailable
-            colors_str = mesh.get("3mf_paint_extruder_colors", "")
+            colors_str = mesh.get(
+                "3mf_paint_internal_colors",
+                mesh.get("3mf_paint_extruder_colors", ""),
+            )
             if not colors_str:
                 self.report({"ERROR"}, "No filament colors stored on mesh")
                 return {"CANCELLED"}

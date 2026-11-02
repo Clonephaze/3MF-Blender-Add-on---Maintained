@@ -101,9 +101,12 @@ class ExportContext:
     project_template_path: Optional[str] = None  # Custom JSON template path
     # Per-object Orca overrides (keyed by object name)
     object_settings: Dict[str, Dict[str, str]] = field(default_factory=dict)
-    # OrcaSlicer-FullSpectrum: raw mixed_filament_definitions string for round-trip.
-    # Populated from the scene custom property written on import.
-    mixed_filament_definitions_raw: str = ""
+    # Ordered filament slot table (export_3mf.filament_slots.FilamentSlotTable).
+    slot_table: object = None
+    # Blender material name -> 1-based filament slot.
+    material_slots: Dict[str, int] = field(default_factory=dict)
+    # project_settings.config stashed by a previous Orca import (slot source of truth).
+    import_project_settings: Optional[dict] = None
 
     # --- Extension tracking -------------------------------------------------
     extension_manager: ExtensionManager = field(default_factory=ExtensionManager)

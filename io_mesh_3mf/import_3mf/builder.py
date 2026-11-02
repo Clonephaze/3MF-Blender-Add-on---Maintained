@@ -307,6 +307,12 @@ def build_object(
 
         if not is_component_instance:
             origin_shift = set_object_origin(blender_object, ctx.options.origin_to_geometry)
+            if mesh.get("3mf_is_paint_texture"):
+                from ..paint.roundtrip import store_original_segmentation
+
+                store_original_segmentation(
+                    mesh, resource_object.segmentation_strings or {},
+                )
         transformation = transformation @ mathutils.Matrix.Translation(origin_shift)
 
         # Adjust transformation for import_location
@@ -333,7 +339,7 @@ def build_object(
             if ctx.options.import_materials != "NONE":
                 apply_subtype_material(blender_object, part_subtype)
 
-        # Apply per-part filament color (Orca/FullSpectrum per-part extruder mode).
+        # Apply per-part filament color (Orca/Bambu per-part extruder mode).
         # Only applied when no materials were created by the 3MF spec or paint pipeline
         # (e.g. a PeggyPalette file where each sphere has extruder= but no paint_color).
         # Parts with no explicit extruder= metadata fall back to their wrapper
@@ -355,7 +361,17 @@ def build_object(
                 ctx.pending_solid_paint_parts.append((mesh, extruder_1based))
             else:
                 _apply_extruder_material(mesh, extruder_1based, hex_color)
-
+        elif (
+            ctx.options.import_materials == "MATERIALS"
+            and mesh.materials
+            and any(m is None for m in resource_object.materials)
+            and any(m is not None and m.filament_slot is not None for m in resource_object.materials)
+        ):
+            # Partially painted part: unpainted faces and state-0 leaves use
+            # the part's own extruder.
+            extruder_1based = _part_extruder or resource_object.default_extruder or 1
+            hex_color = ctx.orca_filament_colors.get(extruder_1based - 1, "#808080")
+            _assign_default_faces(mesh, resource_object, extruder_1based, hex_color)
         # Stash per-part slicer setting overrides for round-trip export.
         if subtype_key and subtype_key in ctx.part_metadata:
             import json as _json
@@ -508,6 +524,9 @@ def _build_mesh(
         debug(f"Stored passthrough pid={ctx.object_passthrough_pids[current_objectid]} on mesh")
 
     # Paint texture (if PAINT mode) — skip standard material assignment if rendered
+    resolved_extruder = _resolve_object_extruder(ctx, objectid_stack_trace)
+    if resolved_extruder is not None and resource_object.default_extruder is not None:
+        resource_object.default_extruder = resolved_extruder
     paint_rendered = render_paint_texture(ctx, mesh, resource_object)
     debug(f"[TIMING]       render_paint:    {_time.perf_counter() - _t:.3f}s")
     _t = _time.perf_counter()
@@ -530,21 +549,71 @@ def _build_mesh(
     return mesh
 
 
+def _resolve_object_extruder(ctx: "ImportContext", objectid_stack_trace: List[str]) -> Optional[int]:
+    """1-based extruder of the part at the top of ``objectid_stack_trace``.
+
+    Orca keys extruders by wrapper object (and part), so this can only be
+    resolved with the full build stack.  Returns ``None`` when unspecified.
+    """
+    if not objectid_stack_trace:
+        return None
+    wrapper_id = objectid_stack_trace[0]
+    extruder = ctx.part_extruders.get((wrapper_id, objectid_stack_trace[-1]))
+    if extruder is None:
+        extruder = ctx.object_default_extruders.get(wrapper_id)
+    return extruder
+
+
+def _assign_default_faces(
+    mesh: bpy.types.Mesh,
+    resource_object: ResourceObject,
+    extruder_1based: int,
+    hex_color: str,
+) -> None:
+    """Point faces without a material at the part's extruder material."""
+    n_faces = len(mesh.polygons)
+    if len(resource_object.materials) != n_faces:
+        warn(f"Face/material count mismatch on {mesh.name}; unpainted faces keep slot 0")
+        return
+    slot_index = next(
+        (i for i, m in enumerate(mesh.materials)
+         if m is not None and m.get("3mf_extruder_material")
+         and m.get("3mf_filament_slot") == extruder_1based),
+        None,
+    )
+    if slot_index is None:
+        _apply_extruder_material(mesh, extruder_1based, hex_color)
+        slot_index = len(mesh.materials) - 1
+    indices = np.empty(n_faces, dtype=np.int32)
+    mesh.polygons.foreach_get("material_index", indices)
+    unset = np.fromiter((m is None for m in resource_object.materials), dtype=bool, count=n_faces)
+    indices[unset] = slot_index
+    mesh.polygons.foreach_set("material_index", indices)
+
+
 def _apply_extruder_material(mesh: bpy.types.Mesh, extruder_1based: int, hex_color: str) -> None:
     """Create or reuse a simple solid-color material for a per-part extruder assignment.
 
-    Used for Orca/FullSpectrum files that assign filament via ``extruder=`` metadata in
+    Used for Orca/Bambu files that assign filament via ``extruder=`` metadata in
     ``model_settings.config`` (per-part mode, e.g. PeggyPalette) rather than per-triangle
-    segmentation strings.  The material is named ``3MF_Extruder_N`` so it is shared across
-    parts that use the same extruder.
+    segmentation strings.  The material is named ``3MF_Extruder_N`` and tagged with
+    ``3mf_filament_slot`` so slots sharing a colour stay distinct on export.
 
     :param mesh: Blender mesh data to append the material to.
     :param extruder_1based: 1-based extruder index.
     :param hex_color: Hex color string (``#RRGGBB``).
     """
     import bpy as _bpy
+    from .materials.base import parse_hex_color
+
     mat_name = f"3MF_Extruder_{extruder_1based}"
-    mat = _bpy.data.materials.get(mat_name)
+    hex_key = hex_color.upper()
+    mat = next(
+        (m for m in _bpy.data.materials
+         if m.get("3mf_filament_slot") == extruder_1based
+         and m.get("3mf_filament_hex") == hex_key),
+        None,
+    )
     if mat is None:
         mat = _bpy.data.materials.new(mat_name)
         mat.use_nodes = True
@@ -556,16 +625,16 @@ def _apply_extruder_material(mesh: bpy.types.Mesh, extruder_1based: int, hex_col
         out = nodes.new("ShaderNodeOutputMaterial")
         out.location = (300, 0)
         links.new(bsdf.outputs["BSDF"], out.inputs["Surface"])
-        # Apply color
-        if hex_color.startswith("#") and len(hex_color) == 7:
-            r = int(hex_color[1:3], 16) / 255.0
-            g = int(hex_color[3:5], 16) / 255.0
-            b = int(hex_color[5:7], 16) / 255.0
-        else:
-            r, g, b = 0.5, 0.5, 0.5
-        bsdf.inputs["Base Color"].default_value = (r, g, b, 1.0)
-        mat.diffuse_color = (r, g, b, 1.0)
-        debug(f"Created material {mat_name!r} for extruder {extruder_1based} ({hex_color})")
+        try:
+            rgba = parse_hex_color(hex_color)
+        except (ValueError, TypeError):
+            rgba = (0.5, 0.5, 0.5, 1.0)
+        bsdf.inputs["Base Color"].default_value = rgba
+        mat.diffuse_color = rgba
+        mat["3mf_filament_slot"] = int(extruder_1based)
+        mat["3mf_filament_hex"] = hex_key
+        mat["3mf_extruder_material"] = True
+        debug(f"Created material {mat.name!r} for extruder {extruder_1based} ({hex_color})")
     mesh.materials.append(mat)
 
 

@@ -894,6 +894,19 @@ def import_3mf(
         # Build items (pass progress_callback through if available).
         builder_mod.build_items(ctx, root, scale_unit, progress_callback=on_progress)
 
+        # Finalize deferred solid-paint parts (per-object extruders in PAINT mode).
+        if ctx.pending_solid_paint_parts:
+            if on_progress:
+                on_progress(80, "Creating paint texture(s)…")
+            if ctx.options.shared_paint_texture:
+                from .import_3mf.scene import finalize_shared_solid_texture
+                finalize_shared_solid_texture(ctx)
+            else:
+                from .import_3mf.scene import create_solid_paint_texture
+                for mesh, extruder_1based in list(ctx.pending_solid_paint_parts):
+                    create_solid_paint_texture(ctx, mesh, extruder_1based)
+                ctx.pending_solid_paint_parts.clear()
+
     # Fire on_object_created for each built object.
     if on_object_created is not None:
         for obj in ctx.imported_objects:
@@ -1055,6 +1068,7 @@ def export_3mf(
     from .export_3mf.archive import create_archive
     from .export_3mf.components import collect_mesh_objects
     from .export_3mf.context import ExportContext, ExportOptions
+    from .export_3mf.filament_slots import has_stashed_mixed_filaments
     from .export_3mf.geometry import check_non_manifold_geometry
     from .export_3mf.operator import (
         _assembly_export_requested,
@@ -1242,14 +1256,19 @@ def export_3mf(
 
     plates_requested = _plate_export_requested(ctx, blender_objects, mesh_objects)
     assemblies_requested = _assembly_export_requested(ctx, mesh_objects)
-
     # Dispatch to exporter.
     try:  # must keep _pw.finish() in finally
         try:
+            has_mixed_slots = has_stashed_mixed_filaments()
             if use_orca_format == "PAINT":
                 if mmu_slicer_format == "ORCA":
                     exporter = OrcaExporter(ctx)
                 else:
+                    if has_mixed_slots:
+                        warn(
+                            "PrusaSlicer export does not support Orca mixed-filament "
+                            "definitions; those definitions will not be exported."
+                        )
                     if plates_requested:
                         _warn_ignored_plate_options(ctx, "PrusaSlicer")
                     if assemblies_requested:
@@ -1262,6 +1281,11 @@ def export_3mf(
                     exporter = PrusaExporter(ctx)
             elif use_orca_format == "STANDARD":
                 # Explicit standard mode — always spec-compliant
+                if has_mixed_slots:
+                    warn(
+                        "Standard 3MF export does not support Orca mixed-filament "
+                        "definitions; those definitions will not be exported."
+                    )
                 if plates_requested:
                     _warn_ignored_plate_options(ctx, "standard 3MF")
                 if assemblies_requested:
@@ -1271,6 +1295,16 @@ def export_3mf(
             else:
                 # AUTO mode
                 if ctx.project_template_path or ctx.object_settings:
+                    exporter = OrcaExporter(ctx)
+                elif has_mixed_slots:
+                    warn(
+                        "Orca mixed-filament definitions detected; AUTO is using Orca export."
+                    )
+                    ctx.options.use_orca_format = "PAINT" if any(
+                        obj.data.get("3mf_is_paint_texture")
+                        for obj in mesh_objects
+                        if obj.type == "MESH" and obj.data is not None
+                    ) else "AUTO"
                     exporter = OrcaExporter(ctx)
                 else:
                     # Check for MMU paint textures

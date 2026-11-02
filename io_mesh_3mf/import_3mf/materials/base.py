@@ -79,7 +79,8 @@ def parse_hex_color(hex_color: str) -> Tuple[float, float, float, float]:
 
 
 def find_existing_material(
-    op, name: str, color: Tuple[float, float, float, float]
+    op, name: str, color: Tuple[float, float, float, float],
+    filament_slot: Optional[int] = None,
 ) -> Optional[bpy.types.Material]:
     """
     Find an existing Blender material that matches the given name and color.
@@ -87,12 +88,21 @@ def find_existing_material(
     :param op: The Import3MF operator instance.
     :param name: The desired material name.
     :param color: The RGBA color tuple (values 0-1).
+    :param filament_slot: When set, materials tagged with a different
+        ``3mf_filament_slot`` are skipped so equal-coloured slots stay distinct.
+        Untagged materials still qualify (the caller claims them by tagging).
     :return: Matching material if found, None otherwise.
     """
+    def slot_matches(material) -> bool:
+        if filament_slot is None:
+            return True
+        tag = material.get("3mf_filament_slot")
+        return tag is None or tag == filament_slot
+
     # First try exact name match
     if name in bpy.data.materials:
         material = bpy.data.materials[name]
-        if material.use_nodes:
+        if material.use_nodes and slot_matches(material):
             principled = bpy_extras.node_shader_utils.PrincipledBSDFWrapper(material, is_readonly=True)
             # Check if colors match (within small tolerance for float comparison)
             existing_color = (*principled.base_color, principled.alpha)
@@ -103,7 +113,7 @@ def find_existing_material(
     # Try to find any material with matching color (fuzzy name match)
     color_tolerance = 0.001
     for mat in bpy.data.materials:
-        if mat.use_nodes:
+        if mat.use_nodes and slot_matches(mat):
             principled = bpy_extras.node_shader_utils.PrincipledBSDFWrapper(mat, is_readonly=True)
             existing_color = (*principled.base_color, principled.alpha)
             if all(abs(existing_color[i] - color[i]) < color_tolerance for i in range(4)):
