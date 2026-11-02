@@ -57,6 +57,8 @@ class ExportOptions:
     thumbnail_mode: str = "AUTO"  # "AUTO" | "CUSTOM" | "NONE"
     thumbnail_resolution: int = 256  # Width & height in pixels
     thumbnail_image: str = ""  # File path for CUSTOM mode
+    plate_per_material: bool = False  # Orca: one plate per material
+    split_assemblies_by_material: bool = True  # with plate_per_material
 
 
 # ---------------------------------------------------------------------------

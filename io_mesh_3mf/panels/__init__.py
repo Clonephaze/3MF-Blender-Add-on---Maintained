@@ -15,15 +15,18 @@ Each module provides one or more ``bpy.types.Panel`` subclasses that appear
 in the 3D Viewport sidebar under the **3MF** tab.  These are independent of
 the MMU paint subsystem and show in different Blender modes:
 
+- ``assembly`` — Object-mode panel with the Create Assembly button
 - ``metadata`` — Object-mode panel for viewing/editing 3MF metadata
 - ``triangle_sets`` — Sculpt-mode panel for naming face sets as 3MF triangle sets
 """
 
+from . import assembly  # noqa: F401
 from . import metadata  # noqa: F401
 from . import triangle_sets  # noqa: F401
 
 
 def register():
+    assembly.register()
     metadata.register()
     triangle_sets.register()
 
@@ -31,3 +34,4 @@ def register():
 def unregister():
     triangle_sets.unregister()
     metadata.unregister()
+    assembly.unregister()

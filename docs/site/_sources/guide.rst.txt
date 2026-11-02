@@ -62,9 +62,56 @@ Export Format Reference
 In **AUTO** mode the addon inspects your scene and picks the best path:
 
 - Objects with MMU paint textures → Orca exporter with segmentation
-- Objects with material slots → Standard exporter with basematerials/colorgroups
+- Objects with material slots → Orca exporter for slicer-compatible colors
 - Geometry-only objects → Standard exporter, geometry only
 - If *project_template* or *object_settings* is provided → Orca exporter
+- If a plate is assigned, *plate_per_material* is enabled, or a mesh has a
+  ``3mf_assembly`` property → Orca exporter
+
+
+Assemblies and Plates (Orca / BambuStudio)
+------------------------------------------
+
+The **3MF → Assemblies** sidebar can create or clear Empty-based assemblies
+and assign or clear plates. Scripts can use Object custom properties:
+
+- ``3mf_assembly`` — a shared non-empty name; overrides Empty parenting.
+  Without it, an Empty parent forms an assembly only when the Empty itself
+  is exported (selected, or under a selected object).
+- ``3mf_plate`` — one-based plate number (1–36). The assembly Empty wins over
+  member properties, which win over automatic assignment.
+- ``3mf_plate_name`` — an optional name for the assigned plate.
+- ``3mf_material_group`` — overrides the material key for automatic grouping.
+
+.. code-block:: python
+
+   body["3mf_assembly"] = cap["3mf_assembly"] = "Widget"
+   body["3mf_plate"] = 2
+   result = export_3mf(
+       "widget.3mf",
+       objects=[body, cap],
+       plate_per_material=True,
+       split_assemblies_by_material=True,
+   )
+   print(result.status, result.warnings)
+
+``plate_per_material`` is off by default. When enabled, objects with the
+same material share a plate; explicit assignments reserve their plate. Mixed
+assemblies are split unless ``split_assemblies_by_material`` is false. This
+groups whole objects by dominant material color or default paint extruder;
+it does not split a single mesh's face colors or painted regions. Parts
+retain their relative XY positions and are not automatically packed.
+
+Import reads saved Orca/Bambu plate membership and names, then removes plate
+grid offsets when bed dimensions are available. A single plate leaves
+``3mf_plate`` unset; if it is named, only ``3mf_plate_name`` is kept and
+Orca/Bambu export applies it to plate 1. It retains assembled frames
+in the internal ``3mf_assemble_transform`` property; remove that property to
+use the current Blender positions instead. Missing bed dimensions, invalid
+assignments, and conflicting metadata are reported as warnings. Repeated
+build instances import as linked meshes; re-export writes separate wrappers.
+Explicit Standard and Prusa exports ignore plate settings and property-defined
+assemblies with a warning.
 
 
 Modifier Parts (Orca / BambuStudio)

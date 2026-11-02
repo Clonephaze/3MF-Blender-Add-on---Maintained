@@ -23,7 +23,7 @@ first argument instead of ``op``.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 from ..common.extensions import ExtensionManager
 from ..common.types import (
@@ -37,6 +37,11 @@ from ..common.types import (
     ResourceColorgroup,
     ResourcePBRDisplayProps,
 )
+
+if TYPE_CHECKING:
+    import bpy
+
+    from .slicer.plates import PlateAssignment
 
 
 # ---------------------------------------------------------------------------
@@ -95,7 +100,9 @@ class ImportContext:
     object_passthrough_pids: Dict[str, str] = field(default_factory=dict)
 
     # --- Component instance cache (for linked-duplicate detection) ----------
-    component_instance_cache: Dict[str, Tuple[object, int]] = field(default_factory=dict)
+    component_instance_cache: Dict[
+        str, Tuple[bpy.types.Mesh, int, Tuple[float, float, float]]
+    ] = field(default_factory=dict)
 
     # --- Slicer-specific data -----------------------------------------------
     vendor_format: Optional[str] = None  # "orca" | None
@@ -120,13 +127,16 @@ class ImportContext:
     # Part names from model_settings.config.
     # Keyed by (wrapper_id, part_id), values are display names.
     part_names: Dict[Tuple[str, str], str] = field(default_factory=dict)
+    plate_assignments: Dict[Tuple[str, int], PlateAssignment] = field(default_factory=dict)
+    has_plate_metadata: bool = False
+    plate_count: int = 0
 
     # --- Extension tracking -------------------------------------------------
     extension_manager: ExtensionManager = field(default_factory=ExtensionManager)
 
     # --- Import progress / result tracking ----------------------------------
     num_loaded: int = 0
-    imported_objects: List[object] = field(default_factory=list)  # bpy.types.Object list
+    imported_objects: List[bpy.types.Object] = field(default_factory=list)
     _paint_object_names: List[str] = field(default_factory=list)
     current_archive_path: Optional[str] = None
     # Number of physical (non-virtual) filament slots.  Set by read_orca_filament_colors

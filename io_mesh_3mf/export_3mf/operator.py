@@ -111,23 +111,83 @@ def _maybe_show_rating_nudge(context) -> None:
         pass  # Never let the nudge break an export
 
 
-def _select_exporter(ctx, context, mesh_objects, has_materials):
+def _plate_export_requested(ctx, blender_objects, mesh_objects) -> bool:
+    from .grouping import resolve_assembly_groups
+
+    if ctx.options.plate_per_material:
+        return True
+    mesh_objects = list(mesh_objects)
+    if any(obj.get("3mf_plate") is not None for obj in mesh_objects):
+        return True
+    # Only an Empty that forms an exported assembly can carry a plate.
+    resolved = resolve_assembly_groups(blender_objects, mesh_objects)
+    used_keys = set(resolved.mesh_to_key.values())
+    return any(
+        group.empty is not None
+        and group.key in used_keys
+        and group.empty.get("3mf_plate") is not None
+        for group in resolved.groups
+    )
+
+
+def _assembly_export_requested(ctx, mesh_objects) -> bool:
+    from .grouping import ASSEMBLY_PROPERTY
+
+    requested = False
+    for obj in mesh_objects:
+        value = obj.get(ASSEMBLY_PROPERTY)
+        if value is None:
+            continue
+        if isinstance(value, str) and value.strip():
+            requested = True
+        else:
+            ctx.safe_report(
+                {"WARNING"},
+                f"Invalid {ASSEMBLY_PROPERTY} on '{obj.name}'; ignoring the assembly assignment.",
+            )
+    return requested
+
+
+def _warn_ignored_plate_options(ctx, target: str) -> None:
+    ctx.safe_report(
+        {"WARNING"},
+        f"Plate assignments and Plate per Material require Orca/Bambu export; "
+        f"they are ignored for {target}.",
+    )
+
+
+def _warn_ignored_assembly_properties(ctx, target: str) -> None:
+    ctx.safe_report(
+        {"WARNING"},
+        f"3mf_assembly property groups require Orca/Bambu export; "
+        f"they are ignored for {target}.",
+    )
+
+
+def _select_exporter(ctx, context, blender_objects, mesh_objects, has_materials):
     """Choose the right exporter based on mode, scene data, and user options.
 
     :param ctx: The ExportContext.
     :param context: The Blender context.
+    :param blender_objects: Objects selected for export (before mesh collection).
     :param mesh_objects: List of mesh objects being exported.
     :param has_materials: Whether any mesh has material slots.
     :return: An exporter instance (StandardExporter, OrcaExporter, or PrusaExporter).
     """
     mode = ctx.options.use_orca_format
     slicer = ctx.options.mmu_slicer_format
+    plates_requested = _plate_export_requested(ctx, blender_objects, mesh_objects)
+    assemblies_requested = _assembly_export_requested(ctx, mesh_objects)
 
     # --- Explicit PAINT mode ---
     if mode == "PAINT":
         if slicer == "ORCA":
             return OrcaExporter(ctx)
         elif slicer == "PRUSA":
+            if plates_requested:
+                _warn_ignored_plate_options(ctx, "PrusaSlicer")
+            if assemblies_requested:
+                _warn_ignored_assembly_properties(ctx, "PrusaSlicer")
             if ctx.project_template_path or ctx.object_settings:
                 warn(
                     "project_template and object_settings are Orca-specific "
@@ -138,6 +198,10 @@ def _select_exporter(ctx, context, mesh_objects, has_materials):
 
     # --- Explicit STANDARD mode — always spec-compliant ---
     if mode == "STANDARD":
+        if plates_requested:
+            _warn_ignored_plate_options(ctx, "standard 3MF")
+        if assemblies_requested:
+            _warn_ignored_assembly_properties(ctx, "standard 3MF")
         debug("Standard mode: using spec-compliant StandardExporter")
         return StandardExporter(ctx)
 
@@ -158,7 +222,14 @@ def _select_exporter(ctx, context, mesh_objects, has_materials):
         if slicer == "ORCA":
             return OrcaExporter(ctx)
         elif slicer == "PRUSA":
+            if plates_requested:
+                _warn_ignored_plate_options(ctx, "PrusaSlicer")
+            if assemblies_requested:
+                _warn_ignored_assembly_properties(ctx, "PrusaSlicer")
             return PrusaExporter(ctx)
+        return OrcaExporter(ctx)
+
+    if plates_requested or assemblies_requested:
         return OrcaExporter(ctx)
 
     if has_materials:
@@ -231,6 +302,8 @@ class EXPORT_OT_threemf_preset(AddPresetBase, bpy.types.Operator):
         "op.subdivision_depth",
         "op.thumbnail_mode",
         "op.thumbnail_resolution",
+        "op.plate_per_material",
+        "op.split_assemblies_by_material",
     ]
 
 
@@ -333,6 +406,24 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             "and objects in excluded collections"
         ),
         default=False,
+    )
+    plate_per_material: bpy.props.BoolProperty(
+        name="Plate per Material",
+        description=(
+            "Orca/Bambu only: put each material on its own plate (like Orca's "
+            "auto-arrange with 'allow multiple materials on a single plate' off). "
+            "Objects with a 3mf_plate property keep their requested plate"
+        ),
+        default=False,
+    )
+    split_assemblies_by_material: bpy.props.BoolProperty(
+        name="Split Assemblies by Material",
+        description=(
+            "With Plate per Material, split an assembly that has several materials "
+            "into one sub-assembly per material. Assembled positions are kept. "
+            "When off, a mixed assembly stays whole on its own plate"
+        ),
+        default=True,
     )
     global_scale: bpy.props.FloatProperty(
         name="Scale", default=1.0, soft_min=0.001, soft_max=1000.0, min=1e-6, max=1e6
@@ -547,6 +638,20 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                 tip.label(text="Spec-compliant export with proper components.", icon="INFO")
                 tip.label(text="Materials exported as basematerials/textures.")
 
+        # --- Plates (Orca/Bambu) ---
+        header, body = layout.panel("EXPORT_3MF_plates", default_closed=True)
+        header.label(text="Plates", icon="MESH_GRID")
+        if body:
+            body.use_property_split = False
+            body.prop(self, "plate_per_material")
+            sub = body.column()
+            sub.active = self.plate_per_material
+            sub.prop(self, "split_assemblies_by_material")
+            tip = body.column(align=True)
+            tip.scale_y = 0.7
+            tip.label(text="Orca/Bambu format only. Use the 3MF sidebar", icon="INFO")
+            tip.label(text="to assign plates manually.")
+
         # --- Geometry ---
         header, body = layout.panel("EXPORT_3MF_geometry", default_closed=False)
         header.label(text="Geometry", icon="MESH_DATA")
@@ -607,6 +712,8 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             slicer_profile=self.slicer_profile,
             thumbnail_mode=self.thumbnail_mode,
             thumbnail_resolution=self.thumbnail_resolution,
+            plate_per_material=self.plate_per_material,
+            split_assemblies_by_material=self.split_assemblies_by_material,
             thumbnail_image=(
                 self.thumbnail_image_path
                 if self.thumbnail_image == "__CUSTOM_PATH__"
@@ -736,7 +843,9 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                 ctx.progress.update(0.05, 1, f"{len(mesh_objects)} object(s)")
 
             # Dispatch to format-specific exporter
-            exporter = _select_exporter(ctx, context, mesh_objects, has_materials)
+            exporter = _select_exporter(
+                ctx, context, blender_objects, mesh_objects, has_materials
+            )
 
             result = exporter.execute(context, archive, blender_objects, global_scale)
             if result == {"FINISHED"}:

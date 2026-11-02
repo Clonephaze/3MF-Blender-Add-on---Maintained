@@ -1,3 +1,19 @@
+Unreleased
+====
+
+Features
+----
+* **Orca/Bambu assemblies and multi-plate projects** — Create or clear Empty-based assemblies from the 3MF sidebar, assign plates to objects or assemblies, and import saved plate assignments and names with bed-local positions.
+* **Plate per Material** — Optionally group objects by material across plates, split mixed assemblies into per-material subassemblies, and preserve their assembled positions. Explicit plate assignments and `3mf_material_group` overrides take precedence.
+* **API discovery** — API 1.4.0 adds `assemblies`, `multi_plate`, and `plate_per_material` capabilities and documents the related options and custom properties.
+
+Bug Fixes
+----
+* **Assembly round trips** — Preserve assembled frames separately from print placement, including rotated and off-origin parts, linked import instances, and import origin adjustments. Warn about invalid or conflicting plate and assembly metadata.
+* **Plate layout and explode offsets** — Avoid unintended collisions between automatic and explicitly assigned material plates, keep same-named mixed assemblies separate, place multi-plate exports inside custom beds, and account for rotation and scale when calculating single-part explode offsets.
+
+----
+
 2.7.8
 ====
 
