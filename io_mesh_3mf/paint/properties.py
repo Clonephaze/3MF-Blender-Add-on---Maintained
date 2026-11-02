@@ -175,6 +175,15 @@ class MMUFilamentItem(bpy.types.PropertyGroup):
         default=(0.8, 0.8, 0.8),
         description="Filament swatch color (read-only display, sRGB)",
     )
+    paint_color: bpy.props.FloatVectorProperty(
+        name="Paint Color",
+        subtype="COLOR_GAMMA",
+        size=3,
+        min=0.0,
+        max=1.0,
+        default=(0.8, 0.8, 0.8),
+        description="Unique internal color used to preserve this filament slot while painting",
+    )
     index: bpy.props.IntProperty(
         name="Extruder Index",
         description="0-based extruder index",
@@ -183,6 +192,11 @@ class MMUFilamentItem(bpy.types.PropertyGroup):
     is_virtual: bpy.props.BoolProperty(
         name="Is Virtual",
         description="True for mixed-filament virtual slots (not shown in main palette)",
+        default=False,
+    )
+    is_mixed: bpy.props.BoolProperty(
+        name="Is Mixed",
+        description="Slot is an OrcaSlicer mixed filament (blend of other slots)",
         default=False,
     )
 

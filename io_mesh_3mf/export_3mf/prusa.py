@@ -344,10 +344,14 @@ class PrusaExporter(BaseExporter):
                 "3mf_is_paint_texture" in original_mesh_data
                 and original_mesh_data["3mf_is_paint_texture"]
             ):
-                if "3mf_paint_extruder_colors" in original_mesh_data:
+                paint_colors = original_mesh_data.get(
+                    "3mf_paint_internal_colors",
+                    original_mesh_data.get("3mf_paint_extruder_colors"),
+                )
+                if paint_colors:
                     try:
                         extruder_colors_hex = ast.literal_eval(
-                            original_mesh_data["3mf_paint_extruder_colors"]
+                            paint_colors
                         )
                         # Add all colors from this paint texture to vertex_colors
                         for idx, hex_color in extruder_colors_hex.items():

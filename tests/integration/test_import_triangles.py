@@ -52,7 +52,7 @@ class ReadTrianglesBasicTests(unittest.TestCase):
         """No triangles returns empty lists."""
         node = _obj_node(vertices_xml=_QUAD_VERTS)
         ctx = _ctx()
-        tris, mats, uvs, verts, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, None, None
         )
         self.assertEqual(tris, [])
@@ -64,7 +64,7 @@ class ReadTrianglesBasicTests(unittest.TestCase):
         tri_xml = '<triangle v1="0" v2="1" v3="2" />'
         node = _obj_node(vertices_xml=_QUAD_VERTS, triangles_xml=tri_xml)
         ctx = _ctx()
-        tris, mats, uvs, verts, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, None, None
         )
         self.assertEqual(len(tris), 1)
@@ -80,7 +80,7 @@ class ReadTrianglesBasicTests(unittest.TestCase):
         )
         node = _obj_node(vertices_xml=_QUAD_VERTS, triangles_xml=tri_xml)
         ctx = _ctx()
-        tris, mats, uvs, verts, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, None, None
         )
         self.assertEqual(len(tris), 4)
@@ -91,7 +91,7 @@ class ReadTrianglesBasicTests(unittest.TestCase):
         node = _obj_node(vertices_xml=_QUAD_VERTS, triangles_xml=tri_xml)
         ctx = _ctx()
         default_mat = ResourceMaterial(name="Default", color="#FF0000")
-        tris, mats, uvs, verts, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, default_mat, None
         )
         self.assertEqual(len(mats), 1)
@@ -102,7 +102,7 @@ class ReadTrianglesBasicTests(unittest.TestCase):
         tri_xml = '<triangle v1="0" v2="1" v3="2" />'
         node = _obj_node(vertices_xml=_QUAD_VERTS, triangles_xml=tri_xml)
         ctx = _ctx()
-        tris, mats, uvs, verts, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, None, None
         )
         self.assertEqual(defext, 1)
@@ -116,7 +116,7 @@ class ReadTrianglesErrorHandlingTests(unittest.TestCase):
         tri_xml = '<triangle v1="-1" v2="1" v3="2" />'
         node = _obj_node(vertices_xml=_QUAD_VERTS, triangles_xml=tri_xml)
         ctx = _ctx()
-        tris, mats, uvs, verts, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, None, None
         )
         self.assertEqual(len(tris), 0, "Negative index triangle should be skipped")
@@ -127,7 +127,7 @@ class ReadTrianglesErrorHandlingTests(unittest.TestCase):
         tri_xml = '<triangle v1="0" v2="1" />'
         node = _obj_node(vertices_xml=_QUAD_VERTS, triangles_xml=tri_xml)
         ctx = _ctx()
-        tris, mats, uvs, verts, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, None, None
         )
         self.assertEqual(len(tris), 0, "Triangle missing v3 should be skipped")
@@ -137,7 +137,7 @@ class ReadTrianglesErrorHandlingTests(unittest.TestCase):
         tri_xml = '<triangle v1="abc" v2="1" v3="2" />'
         node = _obj_node(vertices_xml=_QUAD_VERTS, triangles_xml=tri_xml)
         ctx = _ctx()
-        tris, mats, uvs, verts, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, None, None
         )
         self.assertEqual(len(tris), 0, "Non-integer vertex should be skipped")
@@ -150,7 +150,7 @@ class ReadTrianglesErrorHandlingTests(unittest.TestCase):
         )
         node = _obj_node(vertices_xml=_QUAD_VERTS, triangles_xml=tri_xml)
         ctx = _ctx()
-        tris, mats, uvs, verts, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, None, None
         )
         self.assertEqual(len(tris), 1, "Should still parse the valid triangle")
@@ -169,7 +169,7 @@ class ReadTrianglesMaterialTests(unittest.TestCase):
         blue = ResourceMaterial(name="Blue", color="#0000FF")
         ctx.resource_materials["1"] = {0: red, 1: blue}
 
-        tris, mats, uvs, verts, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, None, "1"
         )
         self.assertEqual(len(mats), 1)
@@ -184,7 +184,7 @@ class ReadTrianglesMaterialTests(unittest.TestCase):
         blue = ResourceMaterial(name="Blue", color="#0000FF")
         ctx.resource_materials["1"] = {0: red, 1: blue}
 
-        tris, mats, uvs, verts, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, None, "1"
         )
         self.assertEqual(len(mats), 1)
@@ -197,7 +197,7 @@ class ReadTrianglesMaterialTests(unittest.TestCase):
         ctx = _ctx()
         default = ResourceMaterial(name="Fallback", color="#CCCCCC")
 
-        tris, mats, uvs, verts, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, default, None
         )
         self.assertEqual(len(mats), 1)
@@ -211,7 +211,7 @@ class ReadTrianglesMaterialTests(unittest.TestCase):
         mat = ResourceMaterial(name="ObjMat", color="#00FF00")
         ctx.resource_materials["5"] = {0: mat}
 
-        tris, mats, uvs, verts, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, None, "5"
         )
         self.assertEqual(len(mats), 1)
@@ -226,7 +226,7 @@ class ReadTrianglesMaterialTests(unittest.TestCase):
         ctx.resource_materials["1"] = {0: mat}
         default = ResourceMaterial(name="Default", color="#FFFFFF")
 
-        tris, mats, uvs, verts, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, default, "1"
         )
         # NONE mode fast-path skips all material lookups — mats list is empty
@@ -243,7 +243,7 @@ class ReadTrianglesPaintCodeTests(unittest.TestCase):
         ctx = _ctx(import_materials="PAINT")
         verts = [(0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1)]
 
-        tris, mats, uvs, verts_out, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts_out, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, None, None, vertex_coords=verts
         )
         self.assertEqual(len(tris), 1)
@@ -257,7 +257,7 @@ class ReadTrianglesPaintCodeTests(unittest.TestCase):
         ctx = _ctx(import_materials="PAINT")
         verts = [(0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1)]
 
-        tris, mats, uvs, verts_out, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts_out, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, None, None, vertex_coords=verts
         )
         self.assertIn(0, seam)
@@ -272,7 +272,7 @@ class ReadTrianglesPaintCodeTests(unittest.TestCase):
         ctx = _ctx(import_materials="PAINT")
         verts = [(0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1)]
 
-        tris, mats, uvs, verts_out, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts_out, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, None, None, vertex_coords=verts, paint_only=True
         )
         self.assertEqual(len(tris), 1)
@@ -286,7 +286,7 @@ class ReadTrianglesPaintCodeTests(unittest.TestCase):
         ctx = _ctx(import_materials="PAINT")
         verts = [(0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1)]
 
-        tris, mats, uvs, verts_out, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts_out, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, None, None, vertex_coords=verts
         )
         self.assertEqual(len(seg), 0)
@@ -298,7 +298,7 @@ class ReadTrianglesPaintCodeTests(unittest.TestCase):
         ctx = _ctx()
         ctx.object_default_extruders["42"] = 3
 
-        tris, mats, uvs, verts, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, None, None, object_id="42"
         )
         self.assertEqual(defext, 3)
@@ -312,7 +312,7 @@ class ReadTrianglesPaintCodeTests(unittest.TestCase):
         ctx = _ctx(import_materials="PAINT")
         verts = [(0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1)]
 
-        tris, mats, uvs, verts_out, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts_out, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, None, None, vertex_coords=verts
         )
         # Triangle is added via normal path, seam/support stored at face index
@@ -324,16 +324,16 @@ class ReadTrianglesPaintCodeTests(unittest.TestCase):
 
 
 class ReadTrianglesReturnStructureTests(unittest.TestCase):
-    """Verify the 8-tuple return structure is correct."""
+    """Verify the 9-tuple return structure is correct."""
 
     def test_return_type(self):
-        """All 8 return values have correct types."""
+        """All 9 return values have correct types."""
         tri_xml = '<triangle v1="0" v2="1" v3="2" />'
         node = _obj_node(vertices_xml=_QUAD_VERTS, triangles_xml=tri_xml)
         ctx = _ctx()
         result = read_triangles(ctx, node, None, None)
 
-        self.assertEqual(len(result), 8)
+        self.assertEqual(len(result), 9)
         self.assertIsInstance(result[0], list)  # triangles
         self.assertIsInstance(result[1], list)  # materials
         self.assertIsInstance(result[2], list)  # triangle_uvs
@@ -342,6 +342,7 @@ class ReadTrianglesReturnStructureTests(unittest.TestCase):
         self.assertIsInstance(result[5], dict)  # seam_strings
         self.assertIsInstance(result[6], dict)  # support_strings
         self.assertIsInstance(result[7], int)  # default_extruder
+        self.assertIsInstance(result[8], dict)  # triangle_attributes
 
     def test_vertex_list_propagated(self):
         """Vertex coords passed in are returned (possibly extended)."""
@@ -350,10 +351,18 @@ class ReadTrianglesReturnStructureTests(unittest.TestCase):
         ctx = _ctx()
         input_verts = [(0, 0, 0), (1, 0, 0), (0, 1, 0)]
 
-        tris, mats, uvs, verts, seg, seam, support, defext = read_triangles(
+        tris, mats, uvs, verts, seg, seam, support, defext, *_ = read_triangles(
             ctx, node, None, None, vertex_coords=input_verts
         )
         self.assertGreaterEqual(len(verts), 3)
+
+    def test_texture_displacement_attributes_returned(self):
+        tri_xml = (
+            '<triangle v1="0" v2="1" v3="2" paint_texture_0="paint.bin" />'
+        )
+        node = _obj_node(vertices_xml=_QUAD_VERTS, triangles_xml=tri_xml)
+        result = read_triangles(_ctx(), node, None, None)
+        self.assertEqual(result[8], {0: {"paint_texture_0": "paint.bin"}})
 
 
 if __name__ == "__main__":

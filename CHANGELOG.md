@@ -3,6 +3,9 @@ Unreleased
 
 Features
 ----
+* **Orca mixed-filament color parity** — Recompute mixed-slot swatches with OrcaSlicer's measured recipe data and blend model during import and export; the upstream recipe data and AGPL license are bundled with the add-on.
+* **Mixed-filament recipe solver** — Recommend two- or three-filament recipes from the physical palette and look up CMYW/RYBW standard recipes using OrcaSlicer's material filtering and ΔE76 ranking.
+* **Mixed-filament authoring** — Edit physical and mixed slots in Blender, configure two- and three-component recipes and gradients, preview gradient colors, assign slots to objects, and paint with mixed slots. AUTO export preserves the Orca project settings.
 * **Orca/Bambu assemblies and multi-plate projects** — Create or clear Empty-based assemblies from the 3MF sidebar, assign plates to objects or assemblies, and import saved plate assignments and names with bed-local positions.
 * **Plate per Material** — Optionally group objects by material across plates, split mixed assemblies into per-material subassemblies, and preserve their assembled positions. Explicit plate assignments and `3mf_material_group` overrides take precedence.
 * **API discovery** — API 1.4.0 adds `assemblies`, `multi_plate`, and `plate_per_material` capabilities and documents the related options and custom properties.

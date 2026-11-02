@@ -37,6 +37,7 @@ from .archive import create_archive
 from .components import collect_mesh_objects
 from .context import ExportContext, ExportOptions
 from .geometry import check_non_manifold_geometry
+from .filament_slots import has_stashed_mixed_filaments
 from .orca import OrcaExporter
 from .prusa import PrusaExporter
 from .standard import StandardExporter
@@ -178,12 +179,18 @@ def _select_exporter(ctx, context, blender_objects, mesh_objects, has_materials)
     slicer = ctx.options.mmu_slicer_format
     plates_requested = _plate_export_requested(ctx, blender_objects, mesh_objects)
     assemblies_requested = _assembly_export_requested(ctx, mesh_objects)
+    has_mixed_slots = has_stashed_mixed_filaments()
 
     # --- Explicit PAINT mode ---
     if mode == "PAINT":
         if slicer == "ORCA":
             return OrcaExporter(ctx)
         elif slicer == "PRUSA":
+            if has_mixed_slots:
+                warn(
+                    "PrusaSlicer export does not support Orca mixed-filament "
+                    "definitions; those definitions will not be exported."
+                )
             if plates_requested:
                 _warn_ignored_plate_options(ctx, "PrusaSlicer")
             if assemblies_requested:
@@ -194,10 +201,20 @@ def _select_exporter(ctx, context, blender_objects, mesh_objects, has_materials)
                     "features and will be ignored for PrusaSlicer export"
                 )
             return PrusaExporter(ctx)
+        if has_mixed_slots:
+            warn(
+                "Standard 3MF export does not support Orca mixed-filament "
+                "definitions; those definitions will not be exported."
+            )
         return StandardExporter(ctx)
 
     # --- Explicit STANDARD mode — always spec-compliant ---
     if mode == "STANDARD":
+        if has_mixed_slots:
+            warn(
+                "Standard 3MF export does not support Orca mixed-filament "
+                "definitions; those definitions will not be exported."
+            )
         if plates_requested:
             _warn_ignored_plate_options(ctx, "standard 3MF")
         if assemblies_requested:
@@ -208,6 +225,16 @@ def _select_exporter(ctx, context, blender_objects, mesh_objects, has_materials)
     # --- AUTO mode — detect and dispatch ---
     # Orca-specific API features force OrcaExporter
     if ctx.project_template_path or ctx.object_settings:
+        return OrcaExporter(ctx)
+
+    if has_mixed_slots:
+        warn("Orca mixed-filament definitions detected; AUTO is using Orca export.")
+        if any(
+            obj.data.get("3mf_is_paint_texture")
+            for obj in mesh_objects
+            if obj.type == "MESH" and obj.data is not None
+        ):
+            ctx.options.use_orca_format = "PAINT"
         return OrcaExporter(ctx)
 
     # Check for MMU paint textures — route to slicer exporter
@@ -638,20 +665,6 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                 tip.label(text="Spec-compliant export with proper components.", icon="INFO")
                 tip.label(text="Materials exported as basematerials/textures.")
 
-        # --- Plates (Orca/Bambu) ---
-        header, body = layout.panel("EXPORT_3MF_plates", default_closed=True)
-        header.label(text="Plates", icon="MESH_GRID")
-        if body:
-            body.use_property_split = False
-            body.prop(self, "plate_per_material")
-            sub = body.column()
-            sub.active = self.plate_per_material
-            sub.prop(self, "split_assemblies_by_material")
-            tip = body.column(align=True)
-            tip.scale_y = 0.7
-            tip.label(text="Orca/Bambu format only. Use the 3MF sidebar", icon="INFO")
-            tip.label(text="to assign plates manually.")
-
         # --- Geometry ---
         header, body = layout.panel("EXPORT_3MF_geometry", default_closed=False)
         header.label(text="Geometry", icon="MESH_DATA")
@@ -676,6 +689,20 @@ class Export3MF(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             body.label(text="Thumbnail", icon="IMAGE_DATA")
             body.use_property_split = False
             body.row().prop(self, "thumbnail_mode", expand=True)
+
+        # --- Plates (Orca/Bambu) ---
+        header, body = layout.panel("EXPORT_3MF_plates", default_closed=True)
+        header.label(text="Plates", icon="MESH_GRID")
+        if body:
+            body.use_property_split = False
+            body.prop(self, "plate_per_material")
+            sub = body.column()
+            sub.active = self.plate_per_material
+            sub.prop(self, "split_assemblies_by_material")
+            tip = body.column(align=True)
+            tip.scale_y = 0.7
+            tip.label(text="Orca/Bambu format only. Use the 3MF sidebar", icon="INFO")
+            tip.label(text="to assign plates manually.")
             if self.thumbnail_mode == "AUTO":
                 body.use_property_split = True
                 body.prop(self, "thumbnail_resolution")

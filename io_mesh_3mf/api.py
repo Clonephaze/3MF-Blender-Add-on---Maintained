@@ -136,6 +136,7 @@ API_CAPABILITIES = frozenset(
         "thumbnail",  # Thumbnail generation (export)
         "use_components",  # Component instancing for linked duplicates (export)
         "auto_smooth",  # Auto smooth-by-angle on import
+        "normal_shading",  # Off, smooth, or auto smooth on import
         "subdivision_depth",  # Paint segmentation subdivision depth control
         "flatten_hierarchy",  # Option to flatten parented meshes into top-level build items (export)
         "modifier_parts",  # Orca/BambuStudio modifier part subtypes (import, export, inspect)
@@ -616,6 +617,7 @@ def import_3mf(
     grid_spacing: float = 0.1,
     auto_smooth: bool = False,
     auto_smooth_angle: float = 0.5236,
+    normal_shading: str | None = None,
     paint_uv_method: str = "SMART",
     paint_texture_size: int = 0,
     scene_unit: str = "KEEP",
@@ -638,8 +640,12 @@ def import_3mf(
     :param origin_to_geometry: ``"KEEP"`` | ``"CENTER"`` | ``"BOTTOM"``.
     :param grid_spacing: Spacing between objects in grid layout mode.
     :param auto_smooth: Apply Smooth by Angle modifier to imported objects.
+        Retained for compatibility; ``normal_shading`` takes precedence when
+        provided.
     :param auto_smooth_angle: Maximum angle (radians) for smooth shading
         (default 0.5236 = 30 degrees).
+    :param normal_shading: ``"OFF"`` (flat), ``"SMOOTH"``, or
+        ``"AUTO_SMOOTH"``. ``None`` preserves the previous API behavior.
     :param paint_uv_method: ``"SMART"`` (default) or ``"LIGHTMAP"``.
         Smart UV groups adjacent faces; Lightmap gives each face unique space.
     :param paint_texture_size: Override texture resolution (0 = auto).
@@ -695,8 +701,9 @@ def import_3mf(
         import_location=import_location,
         origin_to_geometry=origin_to_geometry,
         grid_spacing=grid_spacing,
-        auto_smooth=auto_smooth,
+        auto_smooth=auto_smooth and normal_shading is None,
         auto_smooth_angle=auto_smooth_angle,
+        normal_shading=normal_shading,
         paint_uv_method=paint_uv_method,
         paint_texture_size=paint_texture_size,
     )
@@ -894,6 +901,19 @@ def import_3mf(
         # Build items (pass progress_callback through if available).
         builder_mod.build_items(ctx, root, scale_unit, progress_callback=on_progress)
 
+        # Finalize deferred solid-paint parts (per-object extruders in PAINT mode).
+        if ctx.pending_solid_paint_parts:
+            if on_progress:
+                on_progress(80, "Creating paint texture(s)…")
+            if ctx.options.shared_paint_texture:
+                from .import_3mf.scene import finalize_shared_solid_texture
+                finalize_shared_solid_texture(ctx)
+            else:
+                from .import_3mf.scene import create_solid_paint_texture
+                for mesh, extruder_1based in list(ctx.pending_solid_paint_parts):
+                    create_solid_paint_texture(ctx, mesh, extruder_1based)
+                ctx.pending_solid_paint_parts.clear()
+
     # Fire on_object_created for each built object.
     if on_object_created is not None:
         for obj in ctx.imported_objects:
@@ -1055,6 +1075,7 @@ def export_3mf(
     from .export_3mf.archive import create_archive
     from .export_3mf.components import collect_mesh_objects
     from .export_3mf.context import ExportContext, ExportOptions
+    from .export_3mf.filament_slots import has_stashed_mixed_filaments
     from .export_3mf.geometry import check_non_manifold_geometry
     from .export_3mf.operator import (
         _assembly_export_requested,
@@ -1242,14 +1263,19 @@ def export_3mf(
 
     plates_requested = _plate_export_requested(ctx, blender_objects, mesh_objects)
     assemblies_requested = _assembly_export_requested(ctx, mesh_objects)
-
     # Dispatch to exporter.
     try:  # must keep _pw.finish() in finally
         try:
+            has_mixed_slots = has_stashed_mixed_filaments()
             if use_orca_format == "PAINT":
                 if mmu_slicer_format == "ORCA":
                     exporter = OrcaExporter(ctx)
                 else:
+                    if has_mixed_slots:
+                        warn(
+                            "PrusaSlicer export does not support Orca mixed-filament "
+                            "definitions; those definitions will not be exported."
+                        )
                     if plates_requested:
                         _warn_ignored_plate_options(ctx, "PrusaSlicer")
                     if assemblies_requested:
@@ -1262,6 +1288,11 @@ def export_3mf(
                     exporter = PrusaExporter(ctx)
             elif use_orca_format == "STANDARD":
                 # Explicit standard mode — always spec-compliant
+                if has_mixed_slots:
+                    warn(
+                        "Standard 3MF export does not support Orca mixed-filament "
+                        "definitions; those definitions will not be exported."
+                    )
                 if plates_requested:
                     _warn_ignored_plate_options(ctx, "standard 3MF")
                 if assemblies_requested:
@@ -1271,6 +1302,16 @@ def export_3mf(
             else:
                 # AUTO mode
                 if ctx.project_template_path or ctx.object_settings:
+                    exporter = OrcaExporter(ctx)
+                elif has_mixed_slots:
+                    warn(
+                        "Orca mixed-filament definitions detected; AUTO is using Orca export."
+                    )
+                    ctx.options.use_orca_format = "PAINT" if any(
+                        obj.data.get("3mf_is_paint_texture")
+                        for obj in mesh_objects
+                        if obj.type == "MESH" and obj.data is not None
+                    ) else "AUTO"
                     exporter = OrcaExporter(ctx)
                 else:
                     # Check for MMU paint textures

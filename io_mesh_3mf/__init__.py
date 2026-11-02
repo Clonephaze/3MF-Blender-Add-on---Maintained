@@ -122,16 +122,6 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
         default=True,
     )
 
-    show_mixed_filaments: bpy.props.BoolProperty(
-        name="Show Mixed Filaments",
-        description=(
-            "Show the Mix Colors sub-panel in the MMU Paint suite. "
-            "Enables creating virtual mixed-color filaments (OrcaSlicer-FullSpectrum). "
-            "Auto-enabled when importing a file with mixed filament definitions"
-        ),
-        default=False,
-    )
-
     # ---- Precision settings ----
     default_coordinate_precision: bpy.props.IntProperty(
         name="Coordinate Precision",
@@ -479,15 +469,10 @@ class ThreeMFPreferences(bpy.types.AddonPreferences):
                 box.label(text="No profiles saved", icon="INFO")
             box.operator("threemf.load_slicer_profile", icon="FILEBROWSER")
 
-        # ---- Mixed Filaments (FullSpectrum) ----
-        layout.separator()
-        box = layout.box()
-        box.prop(self, "show_mixed_filaments", icon="COLORSET_13_VEC")
-
-
 # ---------------------------------------------------------------------------
 # Rating nudge
 # ---------------------------------------------------------------------------
+
 
 _EXTENSIONS_URL = "https://extensions.blender.org/add-ons/threemf-io/"
 

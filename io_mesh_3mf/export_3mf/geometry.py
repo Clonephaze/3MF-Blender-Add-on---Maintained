@@ -23,9 +23,11 @@ Functions for writing mesh geometry to the 3MF XML model:
 """
 
 import bmesh
+import json
 import numpy as np
 import time
 import xml.etree.ElementTree
+from xml.sax.saxutils import quoteattr
 from typing import Optional, Dict, List
 
 import bpy
@@ -41,6 +43,52 @@ from ..common.constants import MODEL_NAMESPACE
 # Entries MUST be cleared after each element is written to prevent unbounded
 # growth across multiple exports in the same Blender session.
 _raw_geometry_cache: Dict[int, Dict[str, str]] = {}
+_TEXTURE_DISPLACEMENT_ATTRIBUTES = tuple(f"paint_texture_{index}" for index in range(8))
+
+
+def get_triangle_metadata(mesh_data) -> tuple[Dict[int, Dict[str, str]], Optional[int]]:
+    """Read imported per-face texture-displacement attributes from a mesh."""
+    raw = mesh_data.get("3mf_triangle_metadata") if mesh_data is not None else None
+    if not raw:
+        return {}, None
+    try:
+        payload = json.loads(raw)
+    except (json.JSONDecodeError, TypeError) as e:
+        warn(f"Invalid 3MF triangle metadata on '{mesh_data.name}': {e}")
+        return {}, None
+    if not isinstance(payload, dict) or not isinstance(payload.get("faces"), dict):
+        warn(f"Invalid 3MF triangle metadata on '{mesh_data.name}': expected face map")
+        return {}, None
+    try:
+        face_count = int(payload["source_face_count"])
+    except (KeyError, TypeError, ValueError):
+        warn(f"Invalid 3MF triangle metadata on '{mesh_data.name}': missing face count")
+        return {}, None
+
+    attributes = {}
+    for face_key, face_values in payload["faces"].items():
+        try:
+            face_index = int(face_key)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(face_values, dict):
+            continue
+        clean_values = {
+            key: value
+            for key, value in face_values.items()
+            if key in _TEXTURE_DISPLACEMENT_ATTRIBUTES and isinstance(value, str)
+        }
+        if 0 <= face_index < face_count and clean_values:
+            attributes[face_index] = clean_values
+    return attributes, face_count
+
+
+def format_triangle_metadata(attributes: Dict[str, str]) -> str:
+    return "".join(
+        f" {key}={quoteattr(attributes[key])}"
+        for key in _TEXTURE_DISPLACEMENT_ATTRIBUTES
+        if key in attributes
+    )
 
 
 def get_raw_geometry(mesh_element: xml.etree.ElementTree.Element):
@@ -213,6 +261,8 @@ def write_triangles(
     segmentation_strings: Optional[Dict[int, str]] = None,
     seam_strings: Optional[Dict[int, str]] = None,
     support_strings: Optional[Dict[int, str]] = None,
+    triangle_attributes: Optional[Dict[int, Dict[str, str]]] = None,
+    triangle_attribute_face_count: Optional[int] = None,
 ) -> None:
     """
     Writes triangle geometry into the specified mesh element.
@@ -239,7 +289,7 @@ def write_triangles(
     """
     debug(
         f"[write_triangles] mode={use_orca_format}, slicer={mmu_slicer_format},",
-        f" seg_strings={len(segmentation_strings) if segmentation_strings else 0}"
+        f" seg_strings={len(segmentation_strings) if segmentation_strings else 0}",
     )
 
     # Always use plain (unqualified) attribute names in the raw XML string.
@@ -261,6 +311,18 @@ def write_triangles(
     if n_tris == 0:
         return
 
+    if (
+        triangle_attributes
+        and triangle_attribute_face_count is not None
+        and mesh is not None
+        and len(mesh.polygons) != triangle_attribute_face_count
+    ):
+        warn(
+            f"Cannot preserve texture-displacement paint on '{mesh.name}': "
+            "mesh face count changed during export"
+        )
+        triangle_attributes = None
+
     _t0 = time.perf_counter()
 
     # --- Pre-computation phase: bulk-extract mesh data to avoid per-triangle
@@ -276,9 +338,14 @@ def write_triangles(
     mat_flat = np.empty(n_tris, dtype=np.int32)
     triangles.foreach_get("material_index", mat_flat)
     mat_indices_list = mat_flat.tolist()
+    polygon_indices = np.empty(n_tris, dtype=np.int32)
+    if triangle_attributes:
+        triangles.foreach_get("polygon_index", polygon_indices)
 
     _t1 = time.perf_counter()
-    timing_debug(f"write_triangles foreach_get verts+mat ({n_tris} tris)", (_t1 - _t0) * 1000)
+    timing_debug(
+        f"write_triangles foreach_get verts+mat ({n_tris} tris)", (_t1 - _t0) * 1000
+    )
 
     # Pre-compute per-slot attribute dicts so the hot loop avoids repeated
     # material_slots[i].material.name lookups and dict rebuilds per triangle.
@@ -358,18 +425,29 @@ def write_triangles(
     for tri_idx in range(n_tris):
         base = tri_idx * 3
         v0, v1_, v2_ = v[base], v[base + 1], v[base + 2]
+        triangle_metadata = ""
+        if triangle_attributes:
+            face_attrs = triangle_attributes.get(int(polygon_indices[tri_idx]))
+            if face_attrs:
+                triangle_metadata = format_triangle_metadata(face_attrs)
 
         # --- PAINT mode: segmentation strings ---
         if has_segmentation:
             seg_str = segmentation_strings.get(tri_idx)
             if seg_str:
                 seg_strings_written += 1
-                seg_part = f' {prusa_seg_attr}="{seg_str}"' if is_prusa else f' paint_color="{seg_str}"'
+                seg_part = (
+                    f' {prusa_seg_attr}="{seg_str}"'
+                    if is_prusa
+                    else f' paint_color="{seg_str}"'
+                )
                 seam = seam_strings.get(tri_idx) if seam_strings else None
                 sup = support_strings.get(tri_idx) if support_strings else None
                 seam_part = f' paint_seam="{seam}"' if seam else ""
                 sup_part = f' paint_supports="{sup}"' if sup else ""
-                append(f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}"{seg_part}{seam_part}{sup_part}/>')
+                append(
+                    f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}"{seg_part}{seam_part}{sup_part}{triangle_metadata}/>'
+                )
                 continue
 
         # --- BASEMATERIAL mode with vertex colors ---
@@ -382,7 +460,10 @@ def write_triangles(
                     if colorgroup_id < len(ORCA_FILAMENT_CODES):
                         paint_code = ORCA_FILAMENT_CODES[colorgroup_id]
                         if paint_code:
-                            append(f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}" {prusa_seg_attr}="{paint_code}"/>')
+                            append(
+                                f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}"'
+                                f' {prusa_seg_attr}="{paint_code}"{triangle_metadata}/>'
+                            )
                             continue
                 else:
                     paint_extra = ""
@@ -390,9 +471,12 @@ def write_triangles(
                         paint_code = ORCA_FILAMENT_CODES[colorgroup_id]
                         if paint_code:
                             paint_extra = f' paint_color="{paint_code}"'
-                    append(f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}" pid="{colorgroup_id}" p1="0"{paint_extra}/>')
+                    append(
+                        f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}"'
+                        f' pid="{colorgroup_id}" p1="0"{paint_extra}{triangle_metadata}/>'
+                    )
                     continue
-            append(f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}"/>')
+            append(f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}"{triangle_metadata}/>')
         else:
             # --- Standard material path (pre-computed slot fragments) ---
             mat_slot_idx = mat_indices_list[tri_idx]
@@ -420,7 +504,9 @@ def write_triangles(
             sup = support_strings.get(tri_idx) if support_strings else None
             seam_part = f' paint_seam="{seam}"' if seam else ""
             sup_part = f' paint_supports="{sup}"' if sup else ""
-            append(f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}"{extra}{seam_part}{sup_part}/>')
+            append(
+                f'<triangle v1="{v0}" v2="{v1_}" v3="{v2_}"{extra}{seam_part}{sup_part}{triangle_metadata}/>'
+            )
 
     parts.append("</triangles>")
     _raw_geometry_cache.setdefault(id(mesh_element), {})["triangles"] = "".join(parts)
@@ -432,7 +518,7 @@ def write_triangles(
     if segmentation_strings:
         debug(
             f"  [write_triangles] Wrote {seg_strings_written} segmentation strings",
-            f"to triangles (had {len(segmentation_strings)} available)"
+            f"to triangles (had {len(segmentation_strings)} available)",
         )
 
 

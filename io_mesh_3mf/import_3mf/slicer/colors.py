@@ -49,6 +49,10 @@ def read_all_slicer_colors(ctx: "ImportContext", archive_path: str) -> None:
     :param ctx: Import context.
     :param archive_path: Filesystem path to the 3MF archive.
     """
+    ctx.mixed_slots = []
+    ctx.filament_slot_count = 0
+    ctx.fullspectrum_fallback = False
+    ctx._slot_fallback_warned = False
     try:
         with zipfile.ZipFile(archive_path, "r") as archive:
             read_orca_filament_colors(ctx, archive_path, archive=archive)
@@ -95,60 +99,36 @@ def read_orca_filament_colors(
             if filament_colours:
                 for idx, hex_color in enumerate(filament_colours):
                     ctx.orca_filament_colors[idx] = hex_color
-                # Record physical count so render_paint_texture can tag meshes
-                ctx.num_physical_filaments = len(filament_colours)
+                ctx.filament_slot_count = len(filament_colours)
                 debug(f"Loaded {len(filament_colours)} Orca filament colors: {filament_colours}")
                 ctx.safe_report(
                     {"INFO"},
                     f"Loaded {len(filament_colours)} Orca filament colors",
                 )
 
-            # --- OrcaSlicer-FullSpectrum: mixed filament definitions ---
-            mixed_defs = config.get("mixed_filament_definitions", "")
-            if mixed_defs:
-                from ...common.mixed_filaments import (
-                    parse_mixed_filament_definitions,
-                    populate_display_colors,
-                )
-                from .detection import detect_fullspectrum
-                ctx.mixed_filament_definitions_raw = mixed_defs
-                ctx.has_mixed_filaments = True
-                if detect_fullspectrum(config):
-                    ctx.vendor_format = "orca_fullspectrum"
-                    debug("Detected OrcaSlicer-FullSpectrum format")
+            from ...common.mixed_slots import parse_mixed_slots
+            ctx.mixed_slots = parse_mixed_slots(config)
+            if ctx.mixed_slots:
+                from ...common.color_recipes import recompute_mixed_slot_colors
 
-                # Build a 0-indexed list of physical colors for display computation
-                num_physical = len(filament_colours)
-                physical_colors = [filament_colours[i] for i in range(num_physical)]
-
-                entries = parse_mixed_filament_definitions(mixed_defs)
-                populate_display_colors(entries, physical_colors)
-                ctx.mixed_filament_entries = entries
-
-                # Append virtual display colors into orca_filament_colors so
-                # paint materials can look them up by index (num_physical onwards).
-                #
-                # PAINT files (e.g. Dragon): OrcaSlicer's paint_color codes count
-                # only active (enabled, non-deleted) virtual slots sequentially, so
-                # "1C"=first active mix, "2C"=second, etc.  We must filter here so
-                # the code→index lookup matches the paint codes written in the file.
-                #
-                # PARTS files (e.g. PeggyPalette): extruder=N uses positional slot
-                # numbers that include deleted entries.  That case is handled in
-                # create_solid_paint_texture, which builds a separate positional
-                # color table from ctx.mixed_filament_entries directly.
-                for virt_idx, mf in enumerate(
-                    e for e in entries if e.enabled and not e.deleted
-                ):
-                    ctx.orca_filament_colors[num_physical + virt_idx] = mf.display_color
-
+                palette = [
+                    str(ctx.orca_filament_colors.get(idx, "#808080"))
+                    for idx in range(ctx.filament_slot_count)
+                ]
+                recomputed = recompute_mixed_slot_colors(palette, ctx.mixed_slots)
+                ctx.orca_filament_colors.update(enumerate(recomputed))
                 debug(
-                    f"Loaded {len(entries)} mixed filament definitions "
-                    f"({sum(1 for e in entries if e.enabled and not e.deleted)} enabled)"
+                    "Mixed filament slots: "
+                    + ", ".join(f"{s.slot + 1}={s.raw.get('filament_mixed_components')}"
+                                for s in ctx.mixed_slots)
                 )
-                ctx.safe_report(
-                    {"INFO"},
-                    f"Loaded {len(entries)} FullSpectrum mixed filament definitions",
+
+            from .detection import detect_fullspectrum
+            if detect_fullspectrum(config):
+                ctx.fullspectrum_fallback = True
+                warn(
+                    "OrcaSlicer-FullSpectrum mixed filament definitions are not supported "
+                    "and will be dropped; virtual filament references use filament 1"
                 )
 
     if archive is not None:
@@ -457,7 +437,7 @@ def read_orca_part_subtypes(
                         group_name = value
                     elif key == "extruder" and wrapper_id:
                         try:
-                            ctx.object_default_extruders[wrapper_id] = int(value)
+                            ctx.object_default_extruders[wrapper_id] = ctx.resolve_filament_slot(int(value))
                         except (ValueError, TypeError):
                             pass
                     elif key not in _OBJ_STANDARD_KEYS:
@@ -493,7 +473,7 @@ def read_orca_part_subtypes(
                             part_name = value
                         elif key == "extruder" and wrapper_id:
                             try:
-                                ctx.part_extruders[(wrapper_id, part_id)] = int(value)
+                                ctx.part_extruders[(wrapper_id, part_id)] = ctx.resolve_filament_slot(int(value))
                             except (ValueError, TypeError):
                                 pass
                         elif key not in _PART_STANDARD_KEYS:

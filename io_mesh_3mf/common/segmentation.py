@@ -24,7 +24,9 @@ Format Reference (from PrusaSlicer TriangleSelector.cpp):
   - ``yy`` = number of split sides (0=leaf, 1-3=subdivided)
   - ``xx`` = special_side (if split) OR state (if leaf with state < 3)
 
-- If leaf AND ``xx == 0b11``: next nibble contains ``(state - 3)``
+- If leaf AND ``xx == 0b11``: next nibble contains ``(state - 3)`` for states
+  3-17; for states 18-32 it is ``0b1111`` followed by a nibble of ``(state - 18)``
+  (OrcaSlicer ``TriangleSelector::serialize``)
 - Tree is traversed depth-first, children in reverse order
 """
 
@@ -60,6 +62,45 @@ class TriangleState(IntEnum):
     EXTRUDER_13 = 13
     EXTRUDER_14 = 14
     EXTRUDER_15 = 15
+    EXTRUDER_16 = 16
+    EXTRUDER_17 = 17
+    EXTRUDER_18 = 18
+    EXTRUDER_19 = 19
+    EXTRUDER_20 = 20
+    EXTRUDER_21 = 21
+    EXTRUDER_22 = 22
+    EXTRUDER_23 = 23
+    EXTRUDER_24 = 24
+    EXTRUDER_25 = 25
+    EXTRUDER_26 = 26
+    EXTRUDER_27 = 27
+    EXTRUDER_28 = 28
+    EXTRUDER_29 = 29
+    EXTRUDER_30 = 30
+    EXTRUDER_31 = 31
+    EXTRUDER_32 = 32
+
+
+# Highest paint state (upstream ``EnforcerBlockerType::ExtruderMax``).
+MAX_TRIANGLE_STATE = 32
+
+
+def append_leaf_nibbles(nibbles: List[int], state: int) -> None:
+    """Append the root-first nibbles for a leaf (``TriangleSelector::serialize``).
+
+    States 0-2 fit in the code nibble.  States 3-17 use ``0b1100`` plus a
+    nibble of ``state - 3``.  States 18-32 use ``0b1100``, ``0b1111`` and a
+    nibble of ``state - 18``.
+    """
+    if state >= 3:
+        nibbles.append(0b1100)
+        if state <= 17:
+            nibbles.append(state - 3)
+        else:
+            nibbles.append(0b1111)
+            nibbles.append(state - 18)
+    else:
+        nibbles.append(state << 2)
 
 
 @dataclass
@@ -184,11 +225,12 @@ class SegmentationDecoder:
 
         if split_sides == 0:
             if special_side == 0b11:
-                state = self._read_nibble() + 3
+                nibble = self._read_nibble()
+                state = self._read_nibble() + 18 if nibble == 0b1111 else nibble + 3
             else:
                 state = special_side
 
-            return SegmentationNode(state=TriangleState(min(state, 15)))
+            return SegmentationNode(state=TriangleState(state))
         else:
             num_children = split_sides + 1
 
@@ -354,12 +396,7 @@ class SegmentationEncoder:
     def _encode_node(self, node: SegmentationNode):
         """Recursively encode a node to nibbles."""
         if node.is_leaf:
-            state = int(node.state)
-            if state >= 3:
-                self._nibbles.append(0b1100)
-                self._nibbles.append(state - 3)
-            else:
-                self._nibbles.append((state << 2) | 0)
+            append_leaf_nibbles(self._nibbles, int(node.state))
         else:
             code = (node.special_side << 2) | node.split_sides
             self._nibbles.append(code)

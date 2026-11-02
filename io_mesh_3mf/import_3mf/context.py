@@ -58,7 +58,8 @@ class ImportOptions:
     import_location: str = "KEEP"  # "ORIGIN" | "CURSOR" | "KEEP" | "GRID"
     origin_to_geometry: str = "KEEP"  # "KEEP" | "CENTER" | "BOTTOM"
     grid_spacing: float = 0.1
-    auto_smooth: bool = False
+    normal_shading: str | None = None  # "OFF" | "SMOOTH" | "AUTO_SMOOTH"
+    auto_smooth: bool = False  # Legacy API option; implies AUTO_SMOOTH
     auto_smooth_angle: float = 0.5236  # 30 degrees in radians
     paint_uv_method: str = "SMART"  # "SMART" | "LIGHTMAP"
     paint_texture_size: int = 0  # 0 = auto
@@ -106,12 +107,16 @@ class ImportContext:
 
     # --- Slicer-specific data -----------------------------------------------
     vendor_format: Optional[str] = None  # "orca" | None
-    has_mixed_filaments: bool = False    # True when mixed_filament_definitions found
     orca_filament_colors: Dict[int, str] = field(default_factory=dict)
-    # Raw mixed_filament_definitions string — preserved for exact round-trip export.
-    mixed_filament_definitions_raw: str = ""
-    # Parsed mixed filament entries — populated by read_orca_filament_colors.
-    mixed_filament_entries: List = field(default_factory=list)
+    # OrcaSlicer per-slot mixed filaments (``common.mixed_slots.MixedSlot``),
+    # parsed from project_settings.config by read_orca_filament_colors.
+    mixed_slots: List = field(default_factory=list)
+    # Number of filament slots in project_settings.config (0 = unknown).
+    filament_slot_count: int = 0
+    # Set when an OrcaSlicer-FullSpectrum file is detected.  Its virtual
+    # filament references are unsupported and fall back to filament 1.
+    fullspectrum_fallback: bool = False
+    _slot_fallback_warned: bool = False
     object_default_extruders: Dict[str, int] = field(default_factory=dict)
     part_subtypes: Dict[Tuple[str, str], str] = field(default_factory=dict)
     part_groups: Dict[str, Dict] = field(default_factory=dict)
@@ -139,10 +144,6 @@ class ImportContext:
     imported_objects: List[bpy.types.Object] = field(default_factory=list)
     _paint_object_names: List[str] = field(default_factory=list)
     current_archive_path: Optional[str] = None
-    # Number of physical (non-virtual) filament slots.  Set by read_orca_filament_colors
-    # so render_paint_texture / create_solid_paint_texture can tag meshes with the correct
-    # boundary between physical and virtual extruder indices.
-    num_physical_filaments: int = 0
 
     # Deferred solid-paint parts: collected during build_object so all parts from
     # a single archive can be baked into ONE shared texture instead of N separate ones.
@@ -169,3 +170,27 @@ class ImportContext:
                 warn(message)
             else:
                 debug(message)
+
+    def resolve_filament_slot(self, slot_1based: int) -> int:
+        """Clamp a 1-based slot reference to the file's slot table.
+
+        References beyond ``filament_slot_count`` (e.g. FullSpectrum virtual
+        filaments) fall back to slot 1 with a single warning per archive.
+        """
+        count = self.filament_slot_count
+        if count <= 0 or 1 <= slot_1based <= count:
+            return slot_1based
+        if not self._slot_fallback_warned:
+            self._slot_fallback_warned = True
+            if self.fullspectrum_fallback:
+                message = (
+                    "OrcaSlicer-FullSpectrum mixed filaments are not supported; "
+                    "objects and paint that use them were assigned to filament 1"
+                )
+            else:
+                message = (
+                    f"Filament {slot_1based} is out of range ({count} slots); "
+                    "using filament 1"
+                )
+            self.safe_report({"WARNING"}, message)
+        return 1

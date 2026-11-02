@@ -98,6 +98,24 @@ class TestImport3MF(Blender3mfTestCase):
         self.assertGreater(result.num_loaded, 0)
         self.assertGreater(len(result.objects), 0)
 
+    def test_import_normal_shading(self):
+        """The public API exposes the new normal-shading choices."""
+        fpath = self.test_resources_dir / "3mf_consortium" / "pyramid_vertexcolor.3mf"
+        if not fpath.exists():
+            self.skipTest(f"Resource not found: {fpath}")
+
+        result = import_3mf(str(fpath), normal_shading="OFF")
+        self.assertEqual(result.status, "FINISHED")
+        mesh_objects = [obj for obj in result.objects if obj.type == "MESH"]
+        self.assertTrue(mesh_objects)
+        self.assertTrue(
+            all(
+                not polygon.use_smooth
+                for obj in mesh_objects
+                for polygon in obj.data.polygons
+            )
+        )
+
     def test_import_nonexistent_file(self):
         result = import_3mf("/nonexistent/model.3mf")
         self.assertEqual(result.status, "CANCELLED")

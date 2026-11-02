@@ -12,7 +12,7 @@ It covers far more than raw mesh export. The add-on handles geometry, materials,
 
 ## Status
 
-- **Version 2.0.0**
+- **Version 2.8.0**
 - Compatible with **Blender 4.2+**
 - Primary development target: **Blender 5.0**
 - Actively maintained
@@ -26,6 +26,7 @@ For Blender versions **2.80–3.6**, see the [original releases](https://github.
 - Import and export real 3MF files instead of flattening everything to STL-style geometry
 - Preserve colors, materials, textures, metadata, and slicer-specific project data
 - Export for **standard 3MF**, **Orca Slicer / BambuStudio**, and **PrusaSlicer / SuperSlicer** workflows
+- Author Orca/Bambu mixed-filament recipes in Blender, including gradients, color recommendations, and per-object slot assignment
 - Create paint, seam, and support data directly in Blender with the built-in **MMU Paint Suite**
 - Bake existing textures and vertex colors into quantized slicer-ready paint data
 - Save and reuse **slicer profiles** so exports open with the right machine and filament setup
@@ -35,7 +36,7 @@ For Blender versions **2.80–3.6**, see the [original releases](https://github.
 | Slicer                        | Round-Trip Support | Notes                                                                                          |
 | ----------------------------- | ----------------- | ---------------------------------------------------------------------------------------------- |
 | **Standard 3MF**              | Full              | Spec-compliant geometry, materials, textures, metadata, and extension-aware export            |
-| **Orca Slicer / BambuStudio / PrusaSlicer / SuperSlicer** | Full              | Full paint, seam, support, multicolor, modifier-part, and slicer-config workflow support      |
+| **Orca Slicer / BambuStudio / PrusaSlicer / SuperSlicer** | Feature-specific | Orca/Bambu per-slot mixed-filament authoring is implemented; manual slicer validation is pending. FullSpectrum mixed-filament definitions are not supported. |
 
 ## Documentation
 
@@ -53,6 +54,8 @@ API and developer-facing docs:
 
 - [Generated API docs in this repo](docs/site/index.html)
 - [Local API reference source](API.md)
+- [Orca/Bambu mixed-filament authoring guide](docs/mixed-filaments.rst)
+- [Manual slicer validation checklist](MANUAL_SLICER_VALIDATION.md)
 
 
 ---
@@ -314,3 +317,5 @@ All original attribution and **GPL v2+ license** are preserved.
 ## License
 
 GPL v2+
+
+Orca mixed-filament prediction and recipe data include portions ported from OrcaSlicer and are attributed in the source files; those portions and data are provided under AGPL-3.0-or-later. See `io_mesh_3mf/common/AGPL-3.0-or-later.txt`.

@@ -37,8 +37,7 @@ from ..components import collect_mesh_objects
 # Orca Slicer paint_color encoding for filament IDs.
 # This matches CONST_FILAMENTS in OrcaSlicer's Model.cpp.
 # Index 0 = no color (base extruder); 1+ = filament IDs.
-# Extended through index 62 to cover OrcaSlicer-FullSpectrum virtual mixed filaments
-# (which can reach indices 5+ with 4 physical filaments and 40+ virtual definitions).
+# Index 32 is the highest slot (upstream `EnforcerBlockerType::ExtruderMax`).
 ORCA_FILAMENT_CODES = [
     "",
     "4",
@@ -75,38 +74,6 @@ ORCA_FILAMENT_CODES = [
     "CFC",
     "DFC",
     "EFC",
-    # Tier 4: 0FFC–EFFC (indices 33–47)
-    "0FFC",
-    "1FFC",
-    "2FFC",
-    "3FFC",
-    "4FFC",
-    "5FFC",
-    "6FFC",
-    "7FFC",
-    "8FFC",
-    "9FFC",
-    "AFFC",
-    "BFFC",
-    "CFFC",
-    "DFFC",
-    "EFFC",
-    # Tier 5: 0FFFC–EFFFC (indices 48–62)
-    "0FFFC",
-    "1FFFC",
-    "2FFFC",
-    "3FFFC",
-    "4FFFC",
-    "5FFFC",
-    "6FFFC",
-    "7FFFC",
-    "8FFFC",
-    "9FFFC",
-    "AFFFC",
-    "BFFFC",
-    "CFFFC",
-    "DFFFC",
-    "EFFFC",
 ]
 
 

@@ -478,7 +478,7 @@ class MMU_OT_select_filament(bpy.types.Operator):
         settings = context.scene.mmu_paint
         if 0 <= self.index < len(settings.filaments):
             settings.active_filament_index = self.index
-            _set_brush_color(context, settings.filaments[self.index].color[:])
+            _set_brush_color(context, settings.filaments[self.index].paint_color[:])
         return {"FINISHED"}
 
 
@@ -491,54 +491,10 @@ class MMU_OT_add_filament(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        mesh = _get_paint_mesh(context)
-        if mesh is None:
-            return False
-        settings = context.scene.mmu_paint
-        num_physical = (
-            settings.num_physical_filaments
-            if settings.num_physical_filaments > 0
-            else sum(1 for f in settings.filaments if not f.is_virtual)
-        )
-        return num_physical < 16
+        return _get_paint_mesh(context) is not None
 
     def execute(self, context):
-        settings = context.scene.mmu_paint
-        num_physical = (
-            settings.num_physical_filaments
-            if settings.num_physical_filaments > 0
-            else sum(1 for f in settings.filaments if not f.is_virtual)
-        )
-
-        if num_physical >= 16:
-            self.report({"ERROR"}, "Maximum 16 filaments supported")
-            return {"CANCELLED"}
-
-        # Trim any virtual slots off the end so the new physical item can be
-        # appended cleanly at position num_physical.  _refresh_virtual_slots_in_palette
-        # will re-append them correctly afterward.
-        while len(settings.filaments) > num_physical:
-            settings.filaments.remove(len(settings.filaments) - 1)
-
-        new_index = num_physical
-        new_color = DEFAULT_PALETTE[new_index % len(DEFAULT_PALETTE)]
-
-        item = settings.filaments.add()
-        item.index = new_index
-        item.name = f"Filament {new_index + 1}"
-        item.color = new_color
-        item.is_virtual = False
-
-        settings.num_physical_filaments = num_physical + 1
-        _write_colors_to_mesh(context)
-        _refresh_virtual_slots_in_palette(settings)
-
-        self.report(
-            {"WARNING"},
-            f"Added filament {new_index + 1}. "
-            f"Ensure your printer profile supports {num_physical + 1} filaments.",
-        )
-        return {"FINISHED"}
+        return bpy.ops.mmu.add_project_filament("INVOKE_DEFAULT")
 
 
 class MMU_OT_remove_filament(bpy.types.Operator):
@@ -559,86 +515,20 @@ class MMU_OT_remove_filament(bpy.types.Operator):
             if settings.num_physical_filaments > 0
             else sum(1 for f in settings.filaments if not f.is_virtual)
         )
-        return num_physical > 2
+        return num_physical > 1
 
     def execute(self, context):
         settings = context.scene.mmu_paint
         idx = settings.active_filament_index
         if idx < 0 or idx >= len(settings.filaments):
             return {"CANCELLED"}
-
-        num_physical = (
-            settings.num_physical_filaments
-            if settings.num_physical_filaments > 0
-            else sum(1 for f in settings.filaments if not f.is_virtual)
+        item = settings.filaments[idx]
+        if item.is_virtual or item.is_mixed:
+            self.report({"WARNING"}, "Select a physical filament to remove.")
+            return {"CANCELLED"}
+        return bpy.ops.mmu.remove_project_filament(
+            "INVOKE_DEFAULT", slot_index=item.index + 1,
         )
-
-        if num_physical <= 2:
-            self.report({"ERROR"}, "Minimum 2 filaments required")
-            return {"CANCELLED"}
-
-        # Guard: only allow removing physical filaments from this operator.
-        if idx >= num_physical:
-            self.report({"WARNING"}, "Select a physical filament to remove")
-            return {"CANCELLED"}
-
-        removed = settings.filaments[idx]
-        removed_color = tuple(removed.color[:])
-
-        # Determine the new base color (what will be filament 0 after removal).
-        # If removing filament 0, the new base is current filament 1.
-        # Otherwise, the base stays filament 0.
-        if idx == 0:
-            new_base_color = tuple(settings.filaments[1].color[:])
-        else:
-            new_base_color = tuple(settings.filaments[0].color[:])
-
-        # Replace all pixels of the removed color with the new base color
-        obj = context.active_object
-        image = _get_paint_image(obj)
-        replaced_count = 0
-
-        if image is not None:
-            w, h = image.size
-            pixels_flat = np.empty(w * h * 4, dtype=np.float32)
-            image.pixels.foreach_get(pixels_flat)
-            pixels = pixels_flat.reshape(h, w, 4)
-
-            old_arr = np.array(removed_color, dtype=np.float32)
-            new_arr = np.array(new_base_color, dtype=np.float32)
-
-            tolerance = 3.0 / 255.0
-            mask = np.all(np.abs(pixels[:, :, :3] - old_arr) < tolerance, axis=2)
-            replaced_count = int(np.count_nonzero(mask))
-
-            if replaced_count > 0:
-                pixels[mask, 0] = new_arr[0]
-                pixels[mask, 1] = new_arr[1]
-                pixels[mask, 2] = new_arr[2]
-                image.pixels.foreach_set(pixels.ravel())
-                image.update()
-
-        settings.filaments.remove(idx)
-        num_physical_new = num_physical - 1
-
-        # Re-index physical items only; virtual slots will be rebuilt below.
-        for i in range(min(num_physical_new, len(settings.filaments))):
-            settings.filaments[i].index = i
-            settings.filaments[i].name = f"Filament {i + 1}"
-
-        # Clamp selection to physical range
-        if settings.active_filament_index >= num_physical_new:
-            settings.active_filament_index = max(0, num_physical_new - 1)
-
-        settings.num_physical_filaments = num_physical_new
-        _write_colors_to_mesh(context)
-        _refresh_virtual_slots_in_palette(settings)
-
-        msg = f"Removed filament. {num_physical_new} remaining."
-        if replaced_count > 0:
-            msg += f" Replaced {replaced_count} painted pixels with base color."
-        self.report({"INFO"}, msg)
-        return {"FINISHED"}
 
 
 class MMU_OT_fix_falloff(bpy.types.Operator):
@@ -739,18 +629,21 @@ class MMU_OT_reassign_filament_color(bpy.types.Operator):
         if mesh is None:
             return False
         settings = context.scene.mmu_paint
-        return len(settings.filaments) > 0 and settings.active_filament_index < len(
-            settings.filaments
+        index = settings.active_filament_index
+        return (
+            0 <= index < len(settings.filaments)
+            and not settings.filaments[index].is_mixed
+            and not settings.filaments[index].is_virtual
         )
 
     def invoke(self, context, event):
         settings = context.scene.mmu_paint
         idx = settings.active_filament_index
-        if idx < len(settings.filaments):
-            # Initialize color picker with current color
-            self.new_color = settings.filaments[idx].color[:]
-        wm = context.window_manager
-        return wm.invoke_props_dialog(self, width=300)
+        if idx < 0 or idx >= len(settings.filaments):
+            return {"CANCELLED"}
+        return bpy.ops.mmu.edit_project_filament(
+            "INVOKE_DEFAULT", slot_index=settings.filaments[idx].index + 1,
+        )
 
     def draw(self, context):
         layout = self.layout
@@ -770,58 +663,15 @@ class MMU_OT_reassign_filament_color(bpy.types.Operator):
     def execute(self, context):
         settings = context.scene.mmu_paint
         idx = settings.active_filament_index
-
-        if idx >= len(settings.filaments):
+        if idx < 0 or idx >= len(settings.filaments):
             return {"CANCELLED"}
-
         item = settings.filaments[idx]
-        obj = context.active_object
-        image = _get_paint_image(obj)
-        if image is None:
-            self.report({"WARNING"}, "No paint texture found")
+        if item.is_mixed or item.is_virtual:
+            self.report({"WARNING"}, "Mixed filament colors are derived from their components.")
             return {"CANCELLED"}
-
-        old_rgb = tuple(item.color[:])
-        new_rgb = tuple(self.new_color[:])
-
-        # Skip if colors are identical
-        if all(abs(o - n) < 0.002 for o, n in zip(old_rgb, new_rgb)):
-            return {"CANCELLED"}
-
-        # Bulk pixel replacement
-        w, h = image.size
-        pixel_count = w * h * 4
-        pixels_flat = np.empty(pixel_count, dtype=np.float32)
-        image.pixels.foreach_get(pixels_flat)
-        pixels = pixels_flat.reshape(h, w, 4)
-
-        old_arr = np.array(old_rgb, dtype=np.float32)
-        new_arr = np.array(new_rgb, dtype=np.float32)
-
-        tolerance = 3.0 / 255.0
-        mask = np.all(np.abs(pixels[:, :, :3] - old_arr) < tolerance, axis=2)
-
-        num_changed = np.count_nonzero(mask)
-        if num_changed == 0:
-            self.report({"INFO"}, "No pixels found with the current color")
-            return {"CANCELLED"}
-
-        pixels[mask, 0] = new_arr[0]
-        pixels[mask, 1] = new_arr[1]
-        pixels[mask, 2] = new_arr[2]
-
-        image.pixels.foreach_set(pixels.ravel())
-        image.update()
-
-        # Update stored color
-        item.color = new_rgb
-        _write_colors_to_mesh(context)
-
-        # Update brush if this is the active filament
-        _set_brush_color(context, new_rgb)
-
-        self.report({"INFO"}, f"Reassigned {num_changed} pixels to new color")
-        return {"FINISHED"}
+        return bpy.ops.mmu.edit_project_filament(
+            "INVOKE_DEFAULT", slot_index=item.index + 1,
+        )
 
 
 class MMU_OT_import_paint_popup(bpy.types.Operator):

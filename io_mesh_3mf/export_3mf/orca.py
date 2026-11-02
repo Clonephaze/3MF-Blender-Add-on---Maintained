@@ -21,6 +21,7 @@ multi-material data.
 from __future__ import annotations
 
 import ast
+import copy
 import datetime
 import io
 import json
@@ -58,13 +59,25 @@ from ..common.plates import (
 from ..common.xml import format_transformation
 from ..common.units import scale_transform_translation
 
-from .geometry import _raw_geometry_cache
+from .geometry import (
+    _raw_geometry_cache,
+    format_triangle_metadata,
+    get_triangle_metadata,
+)
+from .filament_slots import FilamentSlotTable
 from .materials import (
     ORCA_FILAMENT_CODES,
-    collect_face_colors,
-    get_triangle_color,
     material_to_hex_color,
 )
+from ..common.mixed_slots import (
+    mixed_slot_flags,
+    parse_mixed_slots,
+    resize_slot_arrays,
+    strip_fullspectrum_keys,
+    validate_mixed_filament_params,
+    write_mixed_slots,
+)
+from ..common.color_recipes import recompute_mixed_slot_colors
 from .components import collect_mesh_objects
 from .grouping import resolve_assembly_groups
 from .plate_layout import plate_origin
@@ -75,6 +88,29 @@ from .standard import BaseExporter, _stream_model_to_file
 from .thumbnail import write_thumbnail
 from ..import_3mf.archive import get_stashed_config
 from ..slicer_profiles import get_profile_config
+
+
+# Per-slot settings without the ``filament_`` prefix that older templates
+# carry.  Most are also in FILAMENT_OPTION_KEYS; listed for safety.
+_LEGACY_PER_SLOT_KEYS = (
+    "activate_air_filtration",
+    "activate_chamber_temp_control",
+    "additional_cooling_fan_speed",
+    "chamber_temperature",
+    "close_fan_the_first_x_layers",
+    "complete_print_exhaust_fan_speed",
+    "cool_plate_temp",
+    "cool_plate_temp_initial_layer",
+    "default_filament_colour",
+    "eng_plate_temp",
+    "eng_plate_temp_initial_layer",
+    "hot_plate_temp",
+    "hot_plate_temp_initial_layer",
+    "nozzle_temperature",
+    "nozzle_temperature_initial_layer",
+    "textured_plate_temp",
+    "textured_plate_temp_initial_layer",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -148,110 +184,11 @@ class OrcaExporter(BaseExporter):
 
         # Collect face colors for Orca export
         ctx.safe_report({"INFO"}, "Collecting face colors for Orca export...")
+        self._build_slot_table(blender_objects)
 
-        # Sync mixed filament definitions from UI collection if user has edited them.
-        settings = getattr(context.scene, "mmu_paint", None)
-        if settings and settings.has_mixed_filaments and settings.mixed_filaments:
-            from ..common.mixed_filaments import MixedFilament, serialize_mixed_filament_definitions
-            from ..common.colors import rgb_to_hex
-            entries = []
-            for item in settings.mixed_filaments:
-                # Copy the already-computed display color from the UI item so
-                # filament_colour gets accurate swatches without needing to
-                # re-derive physical colors at this point in the pipeline.
-                disp = rgb_to_hex(*item.display_color[:]) if item.display_color else ""
-                entries.append(MixedFilament(
-                    component_a=item.component_a,
-                    component_b=item.component_b,
-                    enabled=item.enabled,
-                    deleted=item.deleted,
-                    custom=True,
-                    mix_b_percent=item.mix_b_percent,
-                    distribution_mode=int(item.distribution_mode),
-                    manual_pattern=item.manual_pattern,
-                    stable_id=item.stable_id,
-                    display_color=disp,
-                ))
-            ctx.mixed_filament_definitions_raw = serialize_mixed_filament_definitions(entries)
-            debug(f"Synced {len(entries)} mixed filament entries from UI to raw string")
+        debug(f"Orca mode enabled with {len(ctx.slot_table)} filament slots")
 
-        # Read mixed filament definitions from scene custom property (set on import).
-        if not ctx.mixed_filament_definitions_raw:
-            scene_defs = context.scene.get("3mf_mixed_filament_definitions", "")
-            if scene_defs:
-                ctx.mixed_filament_definitions_raw = str(scene_defs)
-                debug(f"Loaded mixed filament definitions from scene property ({len(scene_defs)} chars)")
-
-        # For PAINT mode, collect colors from paint texture metadata instead of face materials
-        paint_colors_collected = False
-        # FullSpectrum "parts mode": each part carries its own extruder assignment via
-        # 3mf_paint_default_extruder.  Only physical filament colors belong in
-        # ctx.vertex_colors / filament_colour; virtual slot display colors must NOT be
-        # added here (the slicer derives them from mixed_filament_definitions at runtime).
-        is_fullspectrum_parts = bool(ctx.mixed_filament_definitions_raw)
-        if ctx.options.use_orca_format == "PAINT":
-            mesh_objs_for_paint = collect_mesh_objects(
-                blender_objects,
-                export_hidden=ctx.options.export_hidden,
-                include_disabled=ctx.options.include_disabled,
-            )
-            for blender_object in mesh_objs_for_paint:
-                original_object = blender_object
-                if hasattr(blender_object, "original"):
-                    original_object = blender_object.original
-
-                original_mesh_data = original_object.data
-                if (
-                    "3mf_is_paint_texture" in original_mesh_data
-                    and original_mesh_data["3mf_is_paint_texture"]
-                ):
-                    if "3mf_paint_extruder_colors" in original_mesh_data:
-                        try:
-                            extruder_colors_hex = ast.literal_eval(
-                                original_mesh_data["3mf_paint_extruder_colors"]
-                            )
-                            # For FullSpectrum parts mode, only record the physical
-                            # filament colors (indices 0..num_physical-1) with 1-based
-                            # extruder numbers.  Virtual display colors are excluded so
-                            # that filament_colour stays at the physical-filament count.
-                            if is_fullspectrum_parts:
-                                num_physical = int(
-                                    original_mesh_data.get(
-                                        "3mf_num_physical_filaments",
-                                        len(extruder_colors_hex),
-                                    )
-                                )
-                                for idx, hex_color in extruder_colors_hex.items():
-                                    if int(idx) < num_physical and hex_color not in ctx.vertex_colors:
-                                        ctx.vertex_colors[hex_color] = int(idx) + 1
-                                debug(
-                                    f"FullSpectrum parts mode: collected {min(num_physical, len(extruder_colors_hex))} "
-                                    f"physical colors (skipping virtual slots)"
-                                )
-                            else:
-                                for idx, hex_color in extruder_colors_hex.items():
-                                    if hex_color not in ctx.vertex_colors:
-                                        ctx.vertex_colors[hex_color] = idx
-                                debug(
-                                    f"Collected {len(extruder_colors_hex)} colors from paint texture metadata"
-                                )
-                            paint_colors_collected = True
-                        except Exception as e:
-                            warn(f"Failed to parse extruder colors from metadata: {e}")
-
-        # If no paint colors found, fall back to face material colors
-        if not paint_colors_collected:
-            ctx.vertex_colors = collect_face_colors(
-                blender_objects,
-                ctx.options.use_mesh_modifiers,
-                ctx.safe_report,
-                export_hidden=ctx.options.export_hidden,
-                include_disabled=ctx.options.include_disabled,
-            )
-
-        debug(f"Orca mode enabled with {len(ctx.vertex_colors)} color zones")
-
-        if len(ctx.vertex_colors) == 0:
+        if len(ctx.slot_table) == 0:
             warn("No face colors found! Assign materials to faces for color zones.")
             ctx.safe_report(
                 {"WARNING"},
@@ -260,7 +197,7 @@ class OrcaExporter(BaseExporter):
         else:
             ctx.safe_report(
                 {"INFO"},
-                f"Detected {len(ctx.vertex_colors)} color zones for Orca export",
+                f"Detected {len(ctx.slot_table)} filament slots for Orca export",
             )
 
         # Generate build UUID
@@ -450,6 +387,166 @@ class OrcaExporter(BaseExporter):
         ctx._progress_update(100, "Finalizing export...")
         return ctx.finalize_export(archive, "Orca-compatible ")
 
+    # ------------------------------------------------------------------
+    # Filament slots
+    # ------------------------------------------------------------------
+
+    def _load_import_stash(self) -> Optional[dict]:
+        """``project_settings.config`` stashed by a previous Orca import, if any.
+
+        An explicit custom template takes precedence and disables the stash.
+        """
+        ctx = self.ctx
+        if ctx.project_template_path and os.path.isfile(ctx.project_template_path):
+            return None
+        raw = get_stashed_config("Metadata/project_settings.config")
+        if raw is None:
+            return None
+        try:
+            stash = json.loads(raw.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError) as e:
+            warn(f"Stashed project_settings.config is invalid: {e}. Using built-in template.")
+            return None
+        return stash if isinstance(stash, dict) else None
+
+    def _used_materials(self, blender_object) -> list:
+        """Materials referenced by at least one face of ``blender_object``."""
+        ctx = self.ctx
+        if ctx.options.use_mesh_modifiers:
+            eval_object = blender_object.evaluated_get(bpy.context.evaluated_depsgraph_get())
+        else:
+            eval_object = blender_object
+        try:
+            mesh = eval_object.to_mesh()
+        except RuntimeError:
+            warn(f"Could not get mesh for object: {blender_object.name}")
+            return []
+        if mesh is None:
+            return []
+        materials = []
+        n_slots = len(eval_object.material_slots)
+        if n_slots and len(mesh.polygons):
+            indices = np.empty(len(mesh.polygons), dtype=np.int32)
+            mesh.polygons.foreach_get("material_index", indices)
+            for slot_idx in sorted(set(indices.tolist())):
+                if slot_idx < n_slots:
+                    material = eval_object.material_slots[slot_idx].material
+                    if material is not None:
+                        materials.append(material)
+        eval_object.to_mesh_clear()
+        return materials
+
+    def _build_slot_table(self, blender_objects) -> None:
+        """Build ``ctx.slot_table`` / ``ctx.material_slots`` for this export.
+
+        Order of precedence: stashed import slots (kept in place), paint
+        palettes (slot-indexed), materials tagged ``3mf_filament_slot``, then
+        untagged material colours (matched to an existing slot or appended).
+        """
+        ctx = self.ctx
+        stash = self._load_import_stash()
+        ctx.import_project_settings = stash
+        base_colors: list = []
+        mixed_flags: list = []
+        if stash and isinstance(stash.get("filament_colour"), list):
+            base_colors = [str(c) for c in stash["filament_colour"]]
+            mixed_flags = mixed_slot_flags(stash, len(base_colors))
+        table = FilamentSlotTable(base_colors, mixed_flags)
+        ctx.slot_table = table
+        ctx.material_slots = {}
+
+        mesh_objects = collect_mesh_objects(
+            blender_objects,
+            export_hidden=ctx.options.export_hidden,
+            include_disabled=ctx.options.include_disabled,
+        )
+
+        palette_meshes = set()
+        if ctx.options.use_orca_format == "PAINT":
+            for blender_object in mesh_objects:
+                mesh_data = getattr(blender_object, "original", blender_object).data
+                if not mesh_data.get("3mf_is_paint_texture"):
+                    continue
+                raw = mesh_data.get("3mf_paint_extruder_colors")
+                if not raw:
+                    continue
+                try:
+                    palette = ast.literal_eval(raw)
+                except (ValueError, SyntaxError) as e:
+                    warn(f"Failed to parse extruder colors on '{blender_object.name}': {e}")
+                    continue
+                for idx in sorted(palette, key=int):
+                    table.assign_slot(int(idx) + 1, palette[idx], extend=True)
+                palette_meshes.add(mesh_data.name)
+
+        tagged: dict = {}
+        untagged: dict = {}
+        for blender_object in mesh_objects:
+            mesh_data = getattr(blender_object, "original", blender_object).data
+            if mesh_data.name in palette_meshes:
+                continue
+            for material in self._used_materials(blender_object):
+                hex_color = material_to_hex_color(material)
+                if not hex_color:
+                    continue
+                tag = material.get("3mf_filament_slot")
+                if isinstance(tag, int) and tag > 0:
+                    tagged[material.name] = (tag, hex_color)
+                else:
+                    untagged[material.name] = hex_color
+
+        for name, (slot, hex_color) in sorted(tagged.items(), key=lambda kv: (kv[1][0], kv[0])):
+            ctx.material_slots[name] = table.assign_slot(slot, hex_color)
+        for name, hex_color in sorted(untagged.items(), key=lambda kv: (kv[1], kv[0])):
+            ctx.material_slots[name] = table.assign_color(hex_color)
+
+        ctx.vertex_colors = table.color_to_slot()
+        debug(
+            f"Filament slots: {len(table)} ({table.base_count} from import, "
+            f"{len(ctx.material_slots)} materials mapped)"
+        )
+
+    def _slot_for_material(self, material) -> Optional[int]:
+        """1-based filament slot for a Blender material (``None`` if unknown)."""
+        if material is None:
+            return None
+        slot = self.ctx.material_slots.get(material.name)
+        if slot is None:
+            hex_color = material_to_hex_color(material)
+            slot = self.ctx.vertex_colors.get(hex_color) if hex_color else None
+        return slot
+
+    def _dominant_slot(self, blender_object) -> Optional[int]:
+        """Slot of the most-used face material of ``blender_object``."""
+        hex_color, name = self._get_dominant_material_info(blender_object)
+        if name is not None and name in self.ctx.material_slots:
+            return self.ctx.material_slots[name]
+        if hex_color:
+            return self.ctx.vertex_colors.get(hex_color)
+        return None
+
+    def _object_extruder(self, blender_object) -> Optional[int]:
+        """Object-level extruder: explicit assignment, paint default, then material."""
+        if blender_object is not None and "3mf_object_extruder" in blender_object:
+            try:
+                assigned = int(blender_object["3mf_object_extruder"])
+            except (TypeError, ValueError):
+                warn(
+                    f"Invalid 3MF filament assignment on object "
+                    f"'{blender_object.name}'; using its paint/material default."
+                )
+            else:
+                if assigned > 0:
+                    return assigned
+                warn(
+                    f"Invalid 3MF filament assignment on object "
+                    f"'{blender_object.name}'; using its paint/material default."
+                )
+        mesh_data = blender_object.data if blender_object else None
+        if mesh_data and mesh_data.get("3mf_paint_default_extruder"):
+            return int(mesh_data["3mf_paint_default_extruder"])
+        return self._dominant_slot(blender_object)
+
     def write_object_model(
         self,
         archive: zipfile.ZipFile,
@@ -511,17 +608,20 @@ class OrcaExporter(BaseExporter):
         # Adaptive pre-subdivision for PAINT mode: split large faces so each
         # triangle can be encoded at full segmentation depth.
         # Skip for non-normal parts (modifiers, support enforcers/blockers, etc.)
-        # Also skip for FullSpectrum parts mode (no per-triangle encoding needed).
         is_normal_part = blender_object.get("3mf_part_subtype", "normal_part") == "normal_part"
-        _fs_mode = bool(
-            hasattr(ctx, "mixed_filament_definitions_raw") and ctx.mixed_filament_definitions_raw
-        )
-        if is_normal_part and ctx.options.use_orca_format == "PAINT" and mesh.uv_layers.active and not _fs_mode:
+        if is_normal_part and ctx.options.use_orca_format == "PAINT" and mesh.uv_layers.active:
             original_object = blender_object
             if hasattr(blender_object, "original"):
                 original_object = blender_object.original
             paint_img = self._find_paint_texture(original_object)
-            if paint_img:
+            from ..paint.roundtrip import unchanged_original_segmentation
+            can_reuse_original = bool(
+                paint_img
+                and unchanged_original_segmentation(
+                    mesh, paint_img, original_object.data,
+                ) is not None
+            )
+            if paint_img and not can_reuse_original:
                 from .segmentation import subdivide_mesh_for_segmentation
                 subdivide_mesh_for_segmentation(
                     mesh,
@@ -578,20 +678,13 @@ class OrcaExporter(BaseExporter):
 
         # Generate segmentation strings from UV texture if in PAINT mode.
         # Non-normal parts (modifiers, support, negative) get no paint data.
-        # FullSpectrum "parts mode" files use extruder=N in model_settings.config
-        # instead of per-triangle paint_color; skip the segmentation encoder entirely
-        # for those objects so no paint_color attributes are written.
         segmentation_strings = {}
         seam_strings = {}
         support_strings = {}
-        is_fullspectrum_parts_mode = bool(
-            hasattr(ctx, "mixed_filament_definitions_raw") and ctx.mixed_filament_definitions_raw
-        )
         if (
             is_normal_part
             and ctx.options.use_orca_format == "PAINT"
             and mesh.uv_layers.active
-            and not is_fullspectrum_parts_mode
         ):
             # Read from original object's data, not the temporary evaluated mesh
             original_object = blender_object
@@ -610,10 +703,14 @@ class OrcaExporter(BaseExporter):
                 )
 
                 # Get the stored extruder colors
-                if "3mf_paint_extruder_colors" in original_mesh_data:
+                internal_colors = original_mesh_data.get(
+                    "3mf_paint_internal_colors",
+                    original_mesh_data.get("3mf_paint_extruder_colors"),
+                )
+                if internal_colors:
                     try:
                         extruder_colors_hex = ast.literal_eval(
-                            original_mesh_data["3mf_paint_extruder_colors"]
+                            internal_colors
                         )
                         for idx, hex_color in extruder_colors_hex.items():
                             extruder_colors[idx] = hex_to_rgb(hex_color)
@@ -649,15 +746,26 @@ class OrcaExporter(BaseExporter):
                             )
 
                     try:
-                        segmentation_strings = texture_to_segmentation(
-                            blender_object,
-                            paint_texture,
-                            extruder_colors,
-                            default_extruder,
-                            progress_callback=orca_seg_progress,
-                            max_depth=ctx.options.subdivision_depth,
-                            mesh=mesh,
+                        from ..paint.roundtrip import unchanged_original_segmentation
+
+                        segmentation_strings = unchanged_original_segmentation(
+                            original_mesh_data, paint_texture,
                         )
+                        if segmentation_strings is None:
+                            segmentation_strings = texture_to_segmentation(
+                                blender_object,
+                                paint_texture,
+                                extruder_colors,
+                                default_extruder,
+                                progress_callback=orca_seg_progress,
+                                max_depth=ctx.options.subdivision_depth,
+                                mesh=mesh,
+                            )
+                        else:
+                            debug(
+                                f"  Reusing {len(segmentation_strings)} unchanged "
+                                "source paint segmentation strings"
+                            )
                         debug(
                             f"  Generated {len(segmentation_strings)} segmentation strings"
                         )
@@ -687,27 +795,59 @@ class OrcaExporter(BaseExporter):
         mesh.loop_triangles.foreach_get("vertices", verts_flat)
         mat_flat = np.empty(n_tris, dtype=np.int32)
         mesh.loop_triangles.foreach_get("material_index", mat_flat)
+        triangle_attributes, triangle_attribute_face_count = get_triangle_metadata(
+            blender_object.data
+        )
+        if (
+            triangle_attributes
+            and triangle_attribute_face_count is not None
+            and len(mesh.polygons) != triangle_attribute_face_count
+        ):
+            warn(
+                f"Cannot preserve texture-displacement paint on '{blender_object.name}': "
+                "mesh face count changed during export"
+            )
+            triangle_attributes = {}
+        polygon_indices = np.empty(n_tris, dtype=np.int32)
+        if triangle_attributes:
+            mesh.loop_triangles.foreach_get("polygon_index", polygon_indices)
         verts_list = verts_flat.reshape(n_tris, 3).tolist()
         mat_list = mat_flat.tolist()
         _t_tri1 = time.perf_counter()
         timing_debug(f"orca write_triangles foreach_get ({n_tris} tris)", (_t_tri1 - _t_tri0) * 1000)
 
         # Pre-compute per-slot paint code fragment — O(n_slots) instead of O(n_triangles).
+        # Faces using an importer-created extruder material that matches the
+        # object's own extruder stay unpainted, as in the source file.
         n_slots = len(eval_object.material_slots)
         slot_paint_frags = []
         if is_normal_part:
+            object_extruder = None
+            if any(m is not None and m.get("3mf_extruder_material") for m in mesh.materials):
+                # Derived from the already-extracted face indices: re-evaluating
+                # the object here would free ``mesh``.
+                paint_default = blender_object.data.get("3mf_paint_default_extruder") if blender_object.data else None
+                if paint_default:
+                    object_extruder = int(paint_default)
+                elif mat_list:
+                    counts = np.bincount(mat_flat[mat_flat >= 0])
+                    dominant = int(counts.argmax()) if counts.size else 0
+                    if dominant < len(mesh.materials):
+                        object_extruder = self._slot_for_material(mesh.materials[dominant])
             for slot_idx in range(n_slots):
                 frag = ""
                 if slot_idx < len(mesh.materials):
                     mat = mesh.materials[slot_idx]
-                    if mat is not None:
-                        hex_color = material_to_hex_color(mat)
-                        if hex_color and hex_color in ctx.vertex_colors:
-                            filament_index = ctx.vertex_colors[hex_color]
-                            if filament_index < len(ORCA_FILAMENT_CODES):
-                                paint_code = ORCA_FILAMENT_CODES[filament_index]
-                                if paint_code:
-                                    frag = f' paint_color="{paint_code}"'
+                    filament_index = self._slot_for_material(mat)
+                    unpainted = (
+                        mat is not None
+                        and mat.get("3mf_extruder_material")
+                        and filament_index == object_extruder
+                    )
+                    if filament_index and not unpainted and filament_index < len(ORCA_FILAMENT_CODES):
+                        paint_code = ORCA_FILAMENT_CODES[filament_index]
+                        if paint_code:
+                            frag = f' paint_color="{paint_code}"'
                 slot_paint_frags.append(frag)
         else:
             slot_paint_frags = [""] * n_slots
@@ -721,6 +861,11 @@ class OrcaExporter(BaseExporter):
         for tri_idx in range(n_tris):
             v = verts_list[tri_idx]
             base_tri = f'<triangle v1="{v[0]}" v2="{v[1]}" v3="{v[2]}"'
+            triangle_metadata = ""
+            if triangle_attributes:
+                face_attrs = triangle_attributes.get(int(polygon_indices[tri_idx]))
+                if face_attrs:
+                    triangle_metadata = format_triangle_metadata(face_attrs)
 
             # Check for segmentation string first (PAINT mode with UV texture)
             if has_segmentation:
@@ -736,7 +881,10 @@ class OrcaExporter(BaseExporter):
                         sup = support_strings.get(tri_idx)
                         if sup:
                             sup_part = f' paint_supports="{sup}"'
-                    tappend(f'{base_tri} paint_color="{seg_str}"{seam_part}{sup_part}/>')
+                    tappend(
+                        f'{base_tri} paint_color="{seg_str}"'
+                        f'{seam_part}{sup_part}{triangle_metadata}/>'
+                    )
                     continue
 
             # Fallback: pre-computed slot paint fragment
@@ -757,7 +905,10 @@ class OrcaExporter(BaseExporter):
                 if sup:
                     sup_part = f' paint_supports="{sup}"'
 
-            tappend(f'{base_tri}{paint_frag}{seam_part}{sup_part}/>')
+            tappend(
+                f'{base_tri}{paint_frag}{seam_part}{sup_part}'
+                f'{triangle_metadata}/>'
+            )
 
         tparts.append("</triangles>")
         _raw_geometry_cache.setdefault(id(mesh_elem), {})["triangles"] = "".join(tparts)
@@ -1075,7 +1226,7 @@ class OrcaExporter(BaseExporter):
         """``(key, label)`` identifying the filament/material of an object.
 
         A custom material group takes precedence over the dominant colour or
-        the stored extruder for FullSpectrum parts.
+        the stored paint default extruder.
         """
         group = blender_object.get("3mf_material_group")
         if isinstance(group, str) and group.strip():
@@ -1468,16 +1619,13 @@ class OrcaExporter(BaseExporter):
                     f"Falling back to built-in template."
                 )
 
-        # Priority 2: stashed config from a previous import.
+        # Priority 2: project settings stashed by a previous import.
+        from_import = False
         stashed_config = None
-        if template_path == builtin_path:
-            stashed_raw = get_stashed_config("Metadata/project_settings.config")
-            if stashed_raw is not None:
-                try:
-                    stashed_config = json.loads(stashed_raw.decode("utf-8"))
-                    debug("Using stashed project_settings.config from previous import")
-                except (json.JSONDecodeError, UnicodeDecodeError) as e:
-                    warn(f"Stashed project_settings.config is invalid: {e}. Using built-in template.")
+        if template_path == builtin_path and ctx.import_project_settings is not None:
+            stashed_config = copy.deepcopy(ctx.import_project_settings)
+            from_import = True
+            debug("Using stashed project_settings.config from previous import")
 
         # Priority 3: user-selected slicer profile from addon settings.
         if stashed_config is None and template_path == builtin_path:
@@ -1519,98 +1667,65 @@ class OrcaExporter(BaseExporter):
             else:
                 raise
 
-        sorted_colors = sorted(ctx.vertex_colors.items(), key=lambda x: x[1])
-        color_list = [color_hex for color_hex, _ in sorted_colors]
-
-        if not color_list:
-            color_list = ["#FFFFFF"]
-
-        # For FullSpectrum files, the stashed filament_colour is the canonical list of
-        # physical filament colors.  Re-exporting a FullSpectrum file must preserve all
-        # physical filaments even when some are not applied to any visible face — the
-        # mixed_filament_definitions reference slots by 1-based index, so losing a slot
-        # would corrupt the virtual filament recipe.
-        if stashed_config and "filament_colour" in stashed_config and ctx.mixed_filament_definitions_raw:
-            stashed_physical = [c.upper() for c in stashed_config["filament_colour"]]
-            stashed_set = set(stashed_physical)
-            # Preserve original order; append any new colours that appeared in the mesh.
-            for c in color_list:
-                if c.upper() not in stashed_set:
-                    stashed_physical.append(c.upper())
-                    stashed_set.add(c.upper())
-            color_list = stashed_physical
-
-        # Append virtual (mixed) filament display colors after the physical ones.
-        # This extends the filament_colour array so the slicer can display blended
-        # swatches for each virtual filament slot.
-        mixed_defs_to_write = ""
-        if hasattr(ctx, "mixed_filament_definitions_raw") and ctx.mixed_filament_definitions_raw:
-            mixed_defs_to_write = ctx.mixed_filament_definitions_raw
-            from ..common.mixed_filaments import parse_mixed_filament_definitions, populate_display_colors
-            entries = parse_mixed_filament_definitions(mixed_defs_to_write)
-            # Compute display colors using the physical palette we just built.
-            # (UI-synced entries already have display_color set; this fills in
-            # any that are missing, e.g. stash-loaded entries.)
-            missing = [mf for mf in entries if not mf.display_color]
-            if missing:
-                populate_display_colors(entries, color_list)
-            # For FullSpectrum "parts mode" files the slicer computes virtual filament
-            # display colours itself from mixed_filament_definitions at runtime.
-            # Do NOT append them to filament_colour here — that would inflate the
-            # physical-filament count and cause filament array length mismatches in
-            # the slicer (it would try to create 44 extruder slots instead of 4).
-
+        table = ctx.slot_table if ctx.slot_table is not None else FilamentSlotTable()
+        color_list = list(table.colors) or ["#FFFFFF"]
         num_colors = len(color_list)
+
+        old_colors = settings.get("filament_colour")
+        old_colors = [str(c) for c in old_colors] if isinstance(old_colors, list) else []
+        old_count = len(old_colors)
+
+        if from_import and old_count == table.base_count:
+            # Import slots keep their position; appended slots are new.
+            sources = [src if src is not None else old_count - 1 for src in table.sources]
+            new_slots = {i for i, src in enumerate(table.sources) if src is None}
+        else:
+            # Template/profile: its filament list only supplies defaults.
+            sources = [min(i, old_count - 1) for i in range(num_colors)]
+            new_slots = set(range(old_count, num_colors))
+        if not table.colors:
+            sources, new_slots = [0], set()
+
+        if old_count > 0:
+            resize_slot_arrays(
+                settings, old_count, sources, new_slots,
+                extra_keys=_LEGACY_PER_SLOT_KEYS,
+            )
         settings["filament_colour"] = color_list
 
-        # Resize all filament arrays to match the number of colors
-        for key, value in list(settings.items()):
-            if (
-                isinstance(value, list)
-                and key.startswith("filament_")
-                and key != "filament_colour"
-            ):
-                if len(value) > 0:
-                    if len(value) < num_colors:
-                        settings[key] = value + [value[-1]] * (num_colors - len(value))
-                    elif len(value) > num_colors:
-                        settings[key] = value[:num_colors]
+        # Upstream keeps filament_multi_colour in sync with filament_colour.
+        multi = settings.get("filament_multi_colour")
+        if isinstance(multi, list) and len(multi) == num_colors:
+            for i, color in enumerate(color_list):
+                src = sources[i]
+                unchanged = (
+                    i not in new_slots and src < old_count
+                    and old_colors[src].upper() == color.upper()
+                )
+                if not unchanged:
+                    multi[i] = color
 
-        # Also handle other arrays that need to match filament count
-        array_keys_to_resize = [
-            "activate_air_filtration",
-            "activate_chamber_temp_control",
-            "additional_cooling_fan_speed",
-            "chamber_temperature",
-            "close_fan_the_first_x_layers",
-            "complete_print_exhaust_fan_speed",
-            "cool_plate_temp",
-            "cool_plate_temp_initial_layer",
-            "default_filament_colour",
-            "eng_plate_temp",
-            "eng_plate_temp_initial_layer",
-            "hot_plate_temp",
-            "hot_plate_temp_initial_layer",
-            "nozzle_temperature",
-            "nozzle_temperature_initial_layer",
-            "textured_plate_temp",
-            "textured_plate_temp_initial_layer",
-        ]
+        # Mixed slots: keep arrays in lockstep with the slot count.
+        write_mixed_slots(settings, [], num_colors)
+        mixed_slots = parse_mixed_slots(settings)
+        if mixed_slots:
+            color_list = recompute_mixed_slot_colors(color_list, mixed_slots)
+            settings["filament_colour"] = color_list
+            multi = settings.get("filament_multi_colour")
+            if isinstance(multi, list) and len(multi) == num_colors:
+                for slot in mixed_slots:
+                    if 0 <= slot.slot < num_colors:
+                        multi[slot.slot] = color_list[slot.slot]
 
-        for key in array_keys_to_resize:
-            if key in settings and isinstance(settings[key], list):
-                value = settings[key]
-                if len(value) > 0:
-                    if len(value) < num_colors:
-                        settings[key] = value + [value[-1]] * (num_colors - len(value))
-                    elif len(value) > num_colors:
-                        settings[key] = value[:num_colors]
-
-        # Write mixed filament definitions (FullSpectrum).  The stashed
-        # project_settings already carries these, but if the user has re-exported
-        # from scratch (no stash) we still write the definitions if we have them.
-        if mixed_defs_to_write:
-            settings["mixed_filament_definitions"] = mixed_defs_to_write
+        removed = strip_fullspectrum_keys(settings)
+        if removed:
+            warn(
+                "Dropped OrcaSlicer-FullSpectrum settings that are not supported: "
+                + ", ".join(sorted(removed))
+            )
+        for key, message in validate_mixed_filament_params(settings).items():
+            warn(f"Mixed filament settings: {key}: {message}")
+            ctx.safe_report({"WARNING"}, f"Mixed filament settings: {message}")
 
         return settings
 
@@ -1654,9 +1769,9 @@ class OrcaExporter(BaseExporter):
             if group_empty is not None:
                 _write_stashed_settings(object_elem, group_empty)
 
-            # Determine dominant extruder for entire group by aggregating part colors
+            # Determine dominant extruder for entire group by aggregating part slots
             group_dominant_extruder = "1"
-            group_color_counts: dict[str, int] = {}
+            group_slot_counts: dict[int, int] = {}
 
             for member in grp["members"]:
                 obj_name = member["name"]
@@ -1664,22 +1779,12 @@ class OrcaExporter(BaseExporter):
                 if blender_object is None:
                     continue
 
-                # Determine per-part extruder.
-                # FullSpectrum parts mode: use the stored 1-based extruder index directly
-                # so virtual filament slots (5-44) are preserved in the output.
+                # Per-part extruder: stored paint default, else dominant material slot.
                 extruder_value = "1"
-                mesh_data = blender_object.data if blender_object else None
-                if mesh_data and mesh_data.get("3mf_paint_default_extruder"):
-                    extruder_value = str(int(mesh_data["3mf_paint_default_extruder"]))
-                elif ctx.vertex_colors:
-                    dominant_color = self._get_dominant_color(blender_object)
-                    if dominant_color:
-                        # Track for group-level dominant
-                        group_color_counts[dominant_color] = (
-                            group_color_counts.get(dominant_color, 0) + 1
-                        )
-                        if dominant_color in ctx.vertex_colors:
-                            extruder_value = str(ctx.vertex_colors[dominant_color])
+                slot = self._object_extruder(blender_object)
+                if slot:
+                    extruder_value = str(slot)
+                    group_slot_counts[slot] = group_slot_counts.get(slot, 0) + 1
 
                 part_subtype = "normal_part"
                 if blender_object is not None:
@@ -1703,11 +1808,9 @@ class OrcaExporter(BaseExporter):
                 if blender_object is not None:
                     _write_stashed_settings(part_elem, blender_object)
 
-            # Set group-level extruder to most common color among its parts
-            if group_color_counts and ctx.vertex_colors:
-                most_common_color = max(group_color_counts, key=group_color_counts.get)
-                if most_common_color in ctx.vertex_colors:
-                    group_dominant_extruder = str(ctx.vertex_colors[most_common_color])
+            # Set group-level extruder to the most common slot among its parts
+            if group_slot_counts:
+                group_dominant_extruder = str(max(group_slot_counts, key=group_slot_counts.get))
 
             xml.etree.ElementTree.SubElement(
                 object_elem, "metadata", key="extruder", value=group_dominant_extruder
@@ -1721,17 +1824,12 @@ class OrcaExporter(BaseExporter):
             wrapper_id = od["wrapper_id"]
             mesh_id = od["mesh_id"]
 
-            # Determine the dominant extruder for this object.
-            # FullSpectrum parts mode: use the stored 1-based extruder index directly
-            # so virtual filament slots (5-44) are preserved in the output.
+            # Object extruder: stored paint default, else dominant material slot.
             extruder_value = "1"
-            _mesh_data = blender_object.data if blender_object else None
-            if _mesh_data and _mesh_data.get("3mf_paint_default_extruder"):
-                extruder_value = str(int(_mesh_data["3mf_paint_default_extruder"]))
-            elif blender_object and ctx.vertex_colors:
-                dominant_color = self._get_dominant_color(blender_object)
-                if dominant_color and dominant_color in ctx.vertex_colors:
-                    extruder_value = str(ctx.vertex_colors[dominant_color])
+            if blender_object is not None:
+                slot = self._object_extruder(blender_object)
+                if slot:
+                    extruder_value = str(slot)
 
             object_elem = xml.etree.ElementTree.SubElement(
                 root, "object", id=str(wrapper_id)
@@ -1777,6 +1875,8 @@ class OrcaExporter(BaseExporter):
             xml.etree.ElementTree.SubElement(
                 part_elem, "metadata", key="matrix", value=matrix_value
             )
+            if blender_object is not None:
+                _write_stashed_settings(part_elem, blender_object)
 
         # Plate entries with model_instance lists.  Default layout is a single
         # plate holding everything; other strategies only change this list.

@@ -28,6 +28,7 @@ import numpy as np
 from typing import Tuple, List, Dict
 
 from ..common.logging import debug, DEBUG_MODE
+from ..common.segmentation import append_leaf_nibbles
 
 # Maximum subdivision depth (7 gives 4^7 = 16384 potential leaf nodes per triangle)
 MAX_SUBDIVISION_DEPTH = 7
@@ -206,11 +207,7 @@ def _build_state_map(
 
 
 def _emit_nibble_leaf(nibbles: list, state: int) -> None:
-    if state >= 3:
-        nibbles.append(0b1100)
-        nibbles.append(state - 3)
-    else:
-        nibbles.append((state << 2) | 0)
+    append_leaf_nibbles(nibbles, state)
 
 
 def _analyze_and_encode_direct(

@@ -31,7 +31,7 @@ and ``src/libslic3r/filament_mixer.cpp``.
 
 from __future__ import annotations
 
-from typing import List, Tuple
+from typing import List, Sequence, Tuple
 
 import numpy as np
 
@@ -39,6 +39,7 @@ __all__ = [
     "filament_mixer_lerp",
     "blend_two",
     "blend_multi",
+    "blend_color_multi",
 ]
 
 
@@ -84,6 +85,7 @@ def filament_mixer_lerp(
     :param t: Blend factor — 0.0 = 100% first color, 1.0 = 100% second color.
     :return: Blended color as ``(r, g, b)`` sRGB 0-255 tuple.
     """
+    t = float(np.float32(t))
     if t <= 0.0:
         return (r1, g1, b1)
     if t >= 1.0:
@@ -109,13 +111,16 @@ def filament_mixer_lerp(
 
 
 def _parse_hex(hex_color: str) -> Tuple[int, int, int]:
-    """Parse a ``"#RRGGBB"`` string to sRGB (0-255) ints."""
-    h = hex_color.lstrip("#")
-    if len(h) == 6:
-        return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
-    if len(h) == 3:
-        return (int(h[0] * 2, 16), int(h[1] * 2, 16), int(h[2] * 2, 16))
-    return (0, 0, 0)
+    """Parse a hex color to sRGB bytes; invalid values match Orca's gray fallback."""
+    try:
+        h = hex_color.lstrip("#")
+        if len(h) == 6:
+            return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+        if len(h) == 3:
+            return (int(h[0] * 2, 16), int(h[1] * 2, 16), int(h[2] * 2, 16))
+    except (AttributeError, ValueError):
+        pass
+    return (128, 128, 128)
 
 
 def _to_hex(r: int, g: int, b: int) -> str:
@@ -187,3 +192,42 @@ def blend_multi(color_percents: List[Tuple[str, int]]) -> str:
         accumulated = new_total
 
     return _to_hex(r, g, b)
+
+
+def blend_color_multi(hex_colors: Sequence[str], weights: Sequence[int]) -> str:
+    """Match OrcaSlicer's measured-recipe lookup and polynomial color blend."""
+    # Recipe dispatch is ported from OrcaSlicer FilamentMixer.cpp and is
+    # covered by AGPL-3.0-or-later; the polynomial fallback remains unchanged.
+    if len(hex_colors) != len(weights):
+        raise ValueError("hex_colors and weights must have the same length")
+
+    if len(hex_colors) >= 2:
+        from .color_recipes import lookup_measured_blend_color
+
+        measured = lookup_measured_blend_color(hex_colors, weights)
+        if measured:
+            return measured
+
+    if not hex_colors:
+        return "#000000"
+    if len(hex_colors) == 1:
+        return _to_hex(*_parse_hex(hex_colors[0]))
+
+    red, green, blue = 128, 128, 128
+    accumulated = 0
+    for hex_color, raw_weight in zip(hex_colors, weights):
+        weight = int(raw_weight)
+        if weight <= 0:
+            continue
+        next_rgb = _parse_hex(hex_color)
+        if accumulated == 0:
+            red, green, blue = next_rgb
+            accumulated = weight
+            continue
+        total = accumulated + weight
+        red, green, blue = filament_mixer_lerp(
+            red, green, blue, *next_rgb, float(weight) / float(total)
+        )
+        accumulated = total
+
+    return _to_hex(red, green, blue) if accumulated else "#000000"

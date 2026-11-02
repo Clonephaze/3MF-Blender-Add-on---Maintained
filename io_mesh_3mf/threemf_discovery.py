@@ -203,7 +203,8 @@ def has_threemf_capability(capability: str) -> bool:
     - ``"target_collection"``, ``"orca_format"``, ``"prusa_format"``
     - ``"paint_mode"``, ``"project_template"``, ``"object_settings"``
     - ``"building_blocks"``, ``"global_scale"``, ``"compression"``
-    - ``"thumbnail"``, ``"use_components"``, ``"auto_smooth"``
+    - ``"thumbnail"``, ``"use_components"``, ``"auto_smooth"``,
+      ``"normal_shading"``
     - ``"subdivision_depth"``, ``"assemblies"``, ``"multi_plate"``
     - ``"plate_per_material"``
 

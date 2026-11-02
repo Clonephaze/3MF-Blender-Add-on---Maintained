@@ -226,7 +226,11 @@ def must_preserve(
     for files in files_by_content_type.values():
         for file in files:
             file_name = str(file.name)
-            if file_name in preserved_files:
+            if (
+                file_name in preserved_files
+                or file_name in _ORCA_PASSTHROUGH_FILES
+                or file_name.startswith(_ORCA_PASSTHROUGH_PREFIXES)
+            ):
                 filename = f".3mf_preserved/{file_name}"
                 if filename in bpy.data.texts:
                     if bpy.data.texts[filename].as_string() == conflicting_mustpreserve_contents:
@@ -257,6 +261,8 @@ _SLICER_CONFIG_FILES = (
 )
 
 _CONFIG_STASH_PREFIX = ".3mf_config/"
+_ORCA_PASSTHROUGH_FILES = {"Metadata/filament_sequence.json"}
+_ORCA_PASSTHROUGH_PREFIXES = ("Metadata/texture_displacement/",)
 
 
 def stash_slicer_configs(ctx: "ImportContext", archive_path: str) -> None:

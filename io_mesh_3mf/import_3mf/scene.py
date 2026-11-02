@@ -22,6 +22,7 @@ mesh or object.
 
 from typing import Dict, List, Optional, TYPE_CHECKING
 
+import json
 import bpy
 import bpy_extras.node_shader_utils
 import mathutils
@@ -89,6 +90,17 @@ def create_mesh_from_data(
 
     # calc_edges=True is required because edges are not set explicitly above.
     mesh.update(calc_edges=True)
+    if resource_object.triangle_attributes:
+        mesh["3mf_triangle_metadata"] = json.dumps(
+            {
+                "source_face_count": n_tris,
+                "faces": {
+                    str(index): attributes
+                    for index, attributes in resource_object.triangle_attributes.items()
+                },
+            },
+            separators=(",", ":"),
+        )
     resource_object.metadata.store(mesh)
     return mesh
 
@@ -120,6 +132,7 @@ def render_paint_texture(
     if not extruder_colors_hex:
         warn("No extruder colors found — cannot render MMU paint texture")
         return False
+    render_colors_hex = _render_color_table(ctx, extruder_colors_hex)
 
     from .segmentation import render_segmentation_to_texture
 
@@ -130,7 +143,7 @@ def render_paint_texture(
     try:
         # Convert hex colors to RGBA lists
         extruder_colors: Dict[int, list] = {}
-        for idx, hex_color in extruder_colors_hex.items():
+        for idx, hex_color in render_colors_hex.items():
             if hex_color.startswith("#") and len(hex_color) == 7:
                 r = int(hex_color[1:3], 16) / 255.0
                 g = int(hex_color[3:5], 16) / 255.0
@@ -191,11 +204,10 @@ def render_paint_texture(
         mesh.polygons.foreach_set("material_index", [0] * num_faces)
 
         # Store custom properties for round-trip export
-        mesh["3mf_paint_extruder_colors"] = str(extruder_colors_hex)
-        mesh["3mf_paint_default_extruder"] = resource_object.default_extruder
-        mesh["3mf_is_paint_texture"] = True
-        if ctx.num_physical_filaments > 0:
-            mesh["3mf_num_physical_filaments"] = ctx.num_physical_filaments
+        _tag_paint_mesh(
+            ctx, mesh, extruder_colors_hex, resource_object.default_extruder,
+            render_colors_hex,
+        )
 
         ctx._paint_object_names.append(mesh.name)
         debug("Successfully rendered MMU paint data to UV texture")
@@ -203,6 +215,44 @@ def render_paint_texture(
 
     finally:
         bpy.data.objects.remove(temp_obj, do_unlink=True)
+
+
+def _render_color_table(ctx: "ImportContext", colors_hex: Dict[int, str]) -> Dict[int, str]:
+    """Colour per 0-based state index for texture rendering.
+
+    Paint states beyond the file's slot table (e.g. FullSpectrum virtual
+    filaments) render with slot 1's colour, which is what export maps them to.
+    """
+    from ..paint.roundtrip import collision_safe_palette
+
+    table = collision_safe_palette(colors_hex)
+    if ctx.filament_slot_count > 0:
+        from ..common.mixed_slots import MAX_FILAMENT_SLOTS
+        fallback = table.get(0, "#808080")
+        for idx in range(ctx.filament_slot_count, MAX_FILAMENT_SLOTS):
+            table.setdefault(idx, fallback)
+    return table
+
+
+def _tag_paint_mesh(
+    ctx: "ImportContext",
+    mesh: bpy.types.Mesh,
+    colors_hex: Dict[int, str],
+    default_extruder: int,
+    render_colors_hex: Dict[int, str],
+) -> None:
+    """Store true filament colors, unique paint codes, and mixed-slot flags."""
+    mesh["3mf_paint_extruder_colors"] = str(colors_hex)
+    mesh["3mf_paint_internal_colors"] = str({
+        index: render_colors_hex[index] for index in colors_hex
+    })
+    mesh["3mf_paint_default_extruder"] = default_extruder
+    mesh["3mf_is_paint_texture"] = True
+    mixed = [int(s.slot) for s in ctx.mixed_slots]
+    if mixed:
+        mesh["3mf_paint_mixed_slots"] = mixed
+    elif "3mf_paint_mixed_slots" in mesh:
+        del mesh["3mf_paint_mixed_slots"]
 
 
 # ---------------------------------------------------------------------------
@@ -231,20 +281,10 @@ def create_solid_paint_texture(
 
     extruder_colors_hex = dict(ctx.orca_filament_colors) if ctx.orca_filament_colors else {0: "#808080"}
 
-    # For PARTS-type files (e.g. PeggyPalette) all virtual filaments may be
-    # marked deleted, so orca_filament_colors only contains physical entries.
-    # Re-populate virtual slots positionally from ctx.mixed_filament_entries so
-    # that extruder=N assignments resolve to the correct display color.
-    num_physical = ctx.num_physical_filaments or len(extruder_colors_hex)
-    if ctx.mixed_filament_entries:
-        for pos_idx, mf in enumerate(ctx.mixed_filament_entries):
-            slot_idx = num_physical + pos_idx
-            if slot_idx not in extruder_colors_hex:
-                extruder_colors_hex[slot_idx] = mf.display_color
-
     # Convert hex colors → RGBA float lists for the renderer.
     extruder_colors: Dict[int, list] = {}
-    for idx, hex_color in extruder_colors_hex.items():
+    render_colors_hex = _render_color_table(ctx, extruder_colors_hex)
+    for idx, hex_color in render_colors_hex.items():
         if isinstance(hex_color, str) and hex_color.startswith("#") and len(hex_color) == 7:
             r = int(hex_color[1:3], 16) / 255.0
             g = int(hex_color[3:5], 16) / 255.0
@@ -308,11 +348,9 @@ def create_solid_paint_texture(
         num_faces = len(mesh.polygons)
         mesh.polygons.foreach_set("material_index", [0] * num_faces)
 
-        mesh["3mf_paint_extruder_colors"] = str(extruder_colors_hex)
-        mesh["3mf_paint_default_extruder"] = extruder_1based
-        mesh["3mf_is_paint_texture"] = True
-        if ctx.num_physical_filaments > 0:
-            mesh["3mf_num_physical_filaments"] = ctx.num_physical_filaments
+        _tag_paint_mesh(
+            ctx, mesh, extruder_colors_hex, extruder_1based, render_colors_hex,
+        )
 
         ctx._paint_object_names.append(mesh.name)
         return True
@@ -346,7 +384,6 @@ def finalize_shared_solid_texture(ctx: "ImportContext") -> None:
     If there is only one part fall back to ``create_solid_paint_texture``
     (no sharing overhead).
     """
-    import math
     import numpy as np
     from .segmentation import render_triangle_to_image, close_gaps_in_texture
 
@@ -363,12 +400,7 @@ def finalize_shared_solid_texture(ctx: "ImportContext") -> None:
 
     # --- Build color lookup -------------------------------------------------
     extruder_colors_hex = dict(ctx.orca_filament_colors) if ctx.orca_filament_colors else {0: "#808080"}
-    num_physical = ctx.num_physical_filaments or len(extruder_colors_hex)
-    if ctx.mixed_filament_entries:
-        for pos_idx, mf in enumerate(ctx.mixed_filament_entries):
-            slot_idx = num_physical + pos_idx
-            if slot_idx not in extruder_colors_hex:
-                extruder_colors_hex[slot_idx] = mf.display_color
+    render_colors_hex = _render_color_table(ctx, extruder_colors_hex)
 
     def _hex_to_rgba(h: str):
         if isinstance(h, str) and h.startswith("#") and len(h) == 7:
@@ -441,7 +473,7 @@ def finalize_shared_solid_texture(ctx: "ImportContext") -> None:
         buf[:, :, 3] = 0.0
 
         for obj, (mesh, extruder_1based) in zip(temp_objs, parts):
-            rgba = _hex_to_rgba(extruder_colors_hex.get(extruder_1based - 1, "#808080"))
+            rgba = _hex_to_rgba(render_colors_hex.get(extruder_1based - 1, "#808080"))
 
             uv_data = mesh.uv_layers.active.data
             num_loops = len(uv_data)
@@ -505,11 +537,9 @@ def finalize_shared_solid_texture(ctx: "ImportContext") -> None:
         mesh.materials.append(mat)
         mesh.polygons.foreach_set("material_index", [0] * len(mesh.polygons))
 
-        mesh["3mf_paint_extruder_colors"] = str(extruder_colors_hex)
-        mesh["3mf_paint_default_extruder"] = extruder_1based
-        mesh["3mf_is_paint_texture"] = True
-        if ctx.num_physical_filaments > 0:
-            mesh["3mf_num_physical_filaments"] = ctx.num_physical_filaments
+        _tag_paint_mesh(
+            ctx, mesh, extruder_colors_hex, extruder_1based, render_colors_hex,
+        )
 
         ctx._paint_object_names.append(mesh.name)
 
@@ -691,7 +721,10 @@ def assign_materials_to_mesh(
                     and triangle_material.texture_id is None
                     and not has_pbr_textures
                 ):
-                    material = find_existing_material(ctx, material_name, triangle_material.color)
+                    material = find_existing_material(
+                        ctx, material_name, triangle_material.color,
+                        filament_slot=triangle_material.filament_slot,
+                    )
 
                 # Create new material if not found
                 if material is None:
@@ -715,6 +748,8 @@ def assign_materials_to_mesh(
                         apply_pbr_textures_to_material(ctx, material, triangle_material)
 
                 ctx.resource_to_material[triangle_material] = material
+                if triangle_material.filament_slot is not None:
+                    material["3mf_filament_slot"] = int(triangle_material.filament_slot)
 
                 # Cache textured material under original basematerial key
                 if triangle_material in ctx.textured_to_basematerial_map:

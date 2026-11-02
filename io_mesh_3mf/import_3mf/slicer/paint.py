@@ -61,14 +61,6 @@ ORCA_PAINT_TO_INDEX: Dict[str, int] = {
     "0FC": 18, "1FC": 19, "2FC": 20, "3FC": 21, "4FC": 22,
     "5FC": 23, "6FC": 24, "7FC": 25, "8FC": 26, "9FC": 27,
     "AFC": 28, "BFC": 29, "CFC": 30, "DFC": 31, "EFC": 32,
-    # Tier 4: 0FFC–EFFC (indices 33–47)
-    "0FFC": 33, "1FFC": 34, "2FFC": 35, "3FFC": 36, "4FFC": 37,
-    "5FFC": 38, "6FFC": 39, "7FFC": 40, "8FFC": 41, "9FFC": 42,
-    "AFFC": 43, "BFFC": 44, "CFFC": 45, "DFFC": 46, "EFFC": 47,
-    # Tier 5: 0FFFC–EFFFC (indices 48–62)
-    "0FFFC": 48, "1FFFC": 49, "2FFFC": 50, "3FFFC": 51, "4FFFC": 52,
-    "5FFFC": 53, "6FFFC": 54, "7FFFC": 55, "8FFFC": 56, "9FFFC": 57,
-    "AFFFC": 58, "BFFFC": 59, "CFFFC": 60, "DFFFC": 61, "EFFFC": 62,
 }
 
 
@@ -117,7 +109,8 @@ def get_or_create_paint_material(
     :return: A :class:`ResourceMaterial` for this paint colour.
     """
     # Unique material key for paint colours
-    material_id = f"paint_{filament_index}_{paint_code}"
+    filament_index = ctx.resolve_filament_slot(filament_index)
+    material_id = f"paint_slot_{filament_index}"
 
     if material_id not in ctx.resource_materials:
         # Try actual colour from orca_filament_colors.
@@ -130,7 +123,7 @@ def get_or_create_paint_material(
             from ..materials.base import parse_hex_color
             hex_color = ctx.orca_filament_colors[array_index]
             color = parse_hex_color(hex_color)
-            color_name = f"Color {hex_color}"
+            color_name = f"Filament {filament_index} {hex_color}"
             debug(
                 f"Using Orca filament color {filament_index} "
                 f"(array index {array_index}): {hex_color}"
@@ -147,6 +140,7 @@ def get_or_create_paint_material(
             0: ResourceMaterial(
                 name=color_name,
                 color=color,
+                filament_slot=filament_index,
             ),
         }
         debug(f"Created paint material for filament {filament_index} (code: {paint_code})")
@@ -180,7 +174,8 @@ def subdivide_prusa_segmentation(
         midpoint vertices).
     :param state_materials: Dict mapping state → material (extended in-place).
     :param source_triangle_index: Index of the source triangle (for tracking).
-    :param default_extruder: Object's default extruder (1-based) for state 0.
+    :param default_extruder: Unused; state-0 leaves get a ``None`` material
+        that the builder resolves to the object's extruder.
     :return: ``(sub_triangles, sub_materials)`` — new triangle index tuples
         and corresponding materials.
     """
@@ -221,16 +216,17 @@ def subdivide_prusa_segmentation(
     for tri in sub_tris:
         result_triangles.append((_remap_idx(tri.v0), _remap_idx(tri.v1), _remap_idx(tri.v2)))
 
-        # State 0 → object's default extruder;  State N → extruder N directly
+        # State 0 is the object's own extruder.  It stays unresolved (None)
+        # here because Orca keys object extruders by wrapper id, which only
+        # the builder knows; it fills these faces like unpainted triangles.
         state = int(tri.state)
         if state == 0:
-            extruder_num = default_extruder
-        else:
-            extruder_num = state  # state value IS the extruder number (1-based)
+            result_materials.append(None)
+            continue
 
         if state not in state_materials:
             material = get_or_create_paint_material(
-                ctx, extruder_num, f"prusa_extruder_{extruder_num}"
+                ctx, state, f"prusa_extruder_{state}"
             )
             state_materials[state] = material
         result_materials.append(state_materials[state])

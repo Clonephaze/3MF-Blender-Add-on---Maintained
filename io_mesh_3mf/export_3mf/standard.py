@@ -42,7 +42,7 @@ from .archive import write_core_properties
 from .components import collect_mesh_objects, detect_linked_duplicates, should_use_components
 from .geometry import (
     write_vertices, write_triangles, write_passthrough_triangles,
-    write_metadata, get_raw_geometry, clear_raw_geometry,
+    write_metadata, get_raw_geometry, clear_raw_geometry, get_triangle_metadata,
 )
 from .materials import (
     write_materials,
@@ -1011,6 +1011,9 @@ class StandardExporter(BaseExporter):
                 )
             else:
                 _t_tris = time.perf_counter()
+                triangle_attributes, triangle_attribute_face_count = get_triangle_metadata(
+                    original_object.data
+                )
                 write_triangles(
                     mesh_element,
                     mesh.loop_triangles,
@@ -1029,6 +1032,8 @@ class StandardExporter(BaseExporter):
                     segmentation_strings,
                     seam_strings=seam_strings,
                     support_strings=support_strings,
+                    triangle_attributes=triangle_attributes,
+                    triangle_attribute_face_count=triangle_attribute_face_count,
                 )
                 timing_debug(f"write_triangles caller overhead '{object_name}'", (time.perf_counter() - _t_tris) * 1000)
 
@@ -1115,10 +1120,14 @@ class StandardExporter(BaseExporter):
         debug(f"  Found paint texture flag, default_extruder={default_extruder}")
 
         # Get the stored extruder colors
-        if "3mf_paint_extruder_colors" in original_mesh_data:
+        paint_colors = original_mesh_data.get(
+            "3mf_paint_internal_colors",
+            original_mesh_data.get("3mf_paint_extruder_colors"),
+        )
+        if paint_colors:
             try:
                 extruder_colors_hex = ast.literal_eval(
-                    original_mesh_data["3mf_paint_extruder_colors"]
+                    paint_colors
                 )
                 for idx, hex_color in extruder_colors_hex.items():
                     extruder_colors[idx] = hex_to_rgb(hex_color)
@@ -1276,6 +1285,9 @@ class StandardExporter(BaseExporter):
                 global_scale,
             )
 
+            triangle_attributes, triangle_attribute_face_count = get_triangle_metadata(
+                blender_object.data
+            )
             write_triangles(
                 mesh_element,
                 mesh.loop_triangles,
@@ -1291,6 +1303,8 @@ class StandardExporter(BaseExporter):
                 str(ctx.material_resource_id)
                 if ctx.material_resource_id
                 else None,
+                triangle_attributes=triangle_attributes,
+                triangle_attribute_face_count=triangle_attribute_face_count,
             )
 
         eval_object.to_mesh_clear()

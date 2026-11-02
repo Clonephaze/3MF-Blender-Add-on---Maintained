@@ -173,10 +173,15 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
         ],
         default="KEEP",
     )
-    auto_smooth: bpy.props.BoolProperty(
-        name="Smooth by Angle",
-        description="Apply Smooth by Angle modifier to imported objects",
-        default=False,
+    normal_shading: bpy.props.EnumProperty(
+        name="Normal Shading",
+        description="Choose how imported mesh faces are shaded",
+        items=[
+            ("OFF", "Off", "Use flat shading on imported faces"),
+            ("SMOOTH", "Smooth", "Smooth shade all imported faces"),
+            ("AUTO_SMOOTH", "Auto Smooth", "Smooth faces by angle"),
+        ],
+        default="OFF",
     )
     auto_smooth_angle: bpy.props.FloatProperty(
         name="Angle",
@@ -264,9 +269,9 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
         layout.separator()
         smooth_box = layout.box()
-        smooth_box.label(text="Normals:", icon="MOD_SMOOTH")
-        smooth_box.prop(self, "auto_smooth")
-        if self.auto_smooth:
+        smooth_box.label(text="Normal Shading:", icon="MOD_SMOOTH")
+        smooth_box.prop(self, "normal_shading")
+        if self.normal_shading == "AUTO_SMOOTH":
             smooth_box.prop(self, "auto_smooth_angle")
 
         # --- Advanced settings (collapsible, only relevant for MMU Paint) ---
@@ -298,7 +303,9 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             if hasattr(prefs.preferences, "default_grid_spacing"):
                 self.grid_spacing = prefs.preferences.default_grid_spacing
             if hasattr(prefs.preferences, "default_auto_smooth"):
-                self.auto_smooth = prefs.preferences.default_auto_smooth
+                self.normal_shading = (
+                    "AUTO_SMOOTH" if prefs.preferences.default_auto_smooth else "OFF"
+                )
             if hasattr(prefs.preferences, "default_auto_smooth_angle"):
                 self.auto_smooth_angle = prefs.preferences.default_auto_smooth_angle
             if hasattr(prefs.preferences, "default_paint_uv_method"):
@@ -418,7 +425,7 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
             import_location=self.import_location,
             origin_to_geometry=self.origin_to_geometry,
             grid_spacing=self.grid_spacing,
-            auto_smooth=self.auto_smooth,
+            normal_shading=self.normal_shading,
             auto_smooth_angle=self.auto_smooth_angle,
             paint_uv_method=self.paint_uv_method,
             paint_texture_size=int(self.paint_texture_size),
@@ -477,44 +484,11 @@ class Import3MF(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
 
         self._progress_update(100, "Finalizing import...")
 
-        # Store FullSpectrum mixed filament definitions on the scene so they
-        # survive and can be round-tripped on export.
-        if ctx.mixed_filament_definitions_raw:
-            context.scene["3mf_mixed_filament_definitions"] = ctx.mixed_filament_definitions_raw
-            context.scene["3mf_has_mixed_filaments"] = True
-            debug("Stored mixed filament definitions on scene")
-
-            # Populate the UI collection for the Mix Colors panel.
-            settings = context.scene.mmu_paint
-            settings.has_mixed_filaments = True
-            settings.mixed_filaments.clear()
-            from ..common.colors import hex_to_rgb
-            for mf in ctx.mixed_filament_entries:
-                item = settings.mixed_filaments.add()
-                item.component_a = mf.component_a
-                item.component_b = mf.component_b
-                item.mix_b_percent = mf.mix_b_percent
-                item.distribution_mode = str(mf.distribution_mode)
-                item.manual_pattern = mf.manual_pattern or ""
-                # Set UI type from mode + pattern presence
-                if mf.distribution_mode == 1:
-                    item.ui_type = "pointillism"
-                elif mf.distribution_mode == 0:
-                    item.ui_type = "layer_cycle"
-                elif mf.manual_pattern:
-                    item.ui_type = "pattern"
-                else:
-                    item.ui_type = "gradient"
-                item.stable_id = mf.stable_id
-                item.enabled = mf.enabled
-                item.deleted = mf.deleted
-                if mf.display_color:
-                    try:
-                        r, g, b = hex_to_rgb(mf.display_color)
-                        item.display_color = (r, g, b)
-                    except Exception:
-                        pass
-            debug(f"Populated {len(settings.mixed_filaments)} mixed filament UI entries")
+        # Legacy FullSpectrum scene state is no longer used; clear leftovers
+        # so they can't leak into a later export.
+        for legacy_key in ("3mf_mixed_filament_definitions", "3mf_has_mixed_filaments"):
+            if legacy_key in context.scene:
+                del context.scene[legacy_key]
 
         # Force-sync the filament palette.  For deferred solid-paint textures
         # (e.g. PeggyPalette shared-texture mode) the mesh custom properties

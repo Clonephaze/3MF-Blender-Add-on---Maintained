@@ -223,6 +223,43 @@ class ImportMaterialModeTests(Blender3mfTestCase):
         self.assertEqual(len(obj.data.materials), 0)
 
 
+class ImportNormalShadingTests(Blender3mfTestCase):
+    """Test normal shading options via the import operator."""
+
+    def _create_and_export(self):
+        bpy.ops.mesh.primitive_cube_add(location=(0, 0, 0))
+        bpy.ops.export_mesh.threemf(filepath=str(self.temp_file))
+        self.clean_scene()
+
+    def test_smooth_shades_all_faces(self):
+        self._create_and_export()
+        bpy.ops.import_mesh.threemf(
+            filepath=str(self.temp_file), normal_shading="SMOOTH"
+        )
+        obj = next(obj for obj in bpy.data.objects if obj.type == "MESH")
+        self.assertTrue(all(polygon.use_smooth for polygon in obj.data.polygons))
+
+    def test_auto_smooth_adds_angle_modifier(self):
+        self._create_and_export()
+        bpy.ops.import_mesh.threemf(
+            filepath=str(self.temp_file),
+            normal_shading="AUTO_SMOOTH",
+            auto_smooth_angle=0.4,
+        )
+        obj = next(obj for obj in bpy.data.objects if obj.type == "MESH")
+        self.assertTrue(any(modifier.type == "NODES" for modifier in obj.modifiers))
+
+    def test_off_uses_flat_shading(self):
+        self._create_and_export()
+        bpy.ops.import_mesh.threemf(
+            filepath=str(self.temp_file), normal_shading="OFF"
+        )
+        obj = next(obj for obj in bpy.data.objects if obj.type == "MESH")
+        self.assertTrue(
+            all(not polygon.use_smooth for polygon in obj.data.polygons),
+        )
+
+
 class ImportOriginModeTests(Blender3mfTestCase):
     """Test origin_to_geometry option."""
 

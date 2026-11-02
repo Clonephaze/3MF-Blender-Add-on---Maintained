@@ -70,6 +70,7 @@ class APICapabilitiesTests(unittest.TestCase):
             "thumbnail",
             "use_components",
             "auto_smooth",
+            "normal_shading",
             "subdivision_depth",
             "assemblies",
             "multi_plate",

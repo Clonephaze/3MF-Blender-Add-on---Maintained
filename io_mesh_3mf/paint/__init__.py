@@ -29,6 +29,7 @@ from . import vertex_colors  # noqa: F401
 from . import operators      # noqa: F401
 from . import mmu_panel      # noqa: F401
 from . import bake           # noqa: F401
+from . import mixed_filament_editor  # noqa: F401
 
 # Re-export key helpers used by other packages (bake, import, export).
 # These maintain backward-compatible import paths for external consumers.
@@ -76,9 +77,9 @@ from .mmu_panel import (
     MMU_UL_filaments,
     MMU_UL_mixed_filaments,
     VIEW3D_PT_mmu_paint,
-    VIEW3D_PT_mmu_mix_colors,
     _on_depsgraph_update,
 )
+from .mixed_filament_editor import _EDITOR_CLASSES
 
 
 # All classes to register, in dependency order (PropertyGroups first).
@@ -115,7 +116,7 @@ _paint_classes = (
     MMU_UL_filaments,
     MMU_UL_mixed_filaments,
     VIEW3D_PT_mmu_paint,
-    VIEW3D_PT_mmu_mix_colors,
+    *_EDITOR_CLASSES,
 )
 
 

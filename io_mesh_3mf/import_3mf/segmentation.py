@@ -51,11 +51,16 @@ def _get_leaf_state(hex_string: str) -> "Optional[int]":
     if first_nibble & 0b11:          # split_sides != 0 → internal node
         return None
     special_side = (first_nibble >> 2) & 0b11
-    if special_side == 0b11:         # state ≥ 3 encoded in next nibble
+    if special_side == 0b11:         # state ≥ 3 encoded in next nibble(s)
         if len(hex_string) < 2:
             return None
         try:
-            return int(hex_string[-2], 16) + 3
+            nibble = int(hex_string[-2], 16)
+            if nibble == 0b1111:     # state ≥ 18: escape + (state - 18)
+                if len(hex_string) < 3:
+                    return None
+                return int(hex_string[-3], 16) + 18
+            return nibble + 3
         except ValueError:
             return None
     return special_side

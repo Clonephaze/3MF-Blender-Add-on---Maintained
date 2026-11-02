@@ -13,6 +13,7 @@ the :doc:`api` for the full auto‑generated parameter reference.  The
    :caption: Contents
 
    guide
+   mixed-filaments
    recipes
    api
    discovery

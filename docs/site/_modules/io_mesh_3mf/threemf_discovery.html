@@ -198,6 +198,7 @@
   <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../guide.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../mixed-filaments.html">Orca / Bambu Mixed-Filament Authoring</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../recipes.html">Recipes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">Core API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../discovery.html">API Discovery</a></li>
@@ -237,10 +238,10 @@
           <h1>Source code for io_mesh_3mf.threemf_discovery</h1><div class="highlight"><pre>
 <span></span><span class="c1"># SPDX-License-Identifier: GPL-3.0-or-later</span>
 <span class="c1"># SPDX-FileCopyrightText: 2025 Jack</span>
-<span class="sd">"""</span>
+<span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">3MF API Discovery Helper — Copy this file into your addon.</span>
 
-<span class="sd">Provides a single, reliable way to access the 3MF Import/Export addon's</span>
+<span class="sd">Provides a single, reliable way to access the 3MF Import/Export addon&#39;s</span>
 <span class="sd">public API from another Blender addon.  Works across Blender restarts and</span>
 <span class="sd">regardless of addon load order.</span>
 
@@ -251,13 +252,13 @@
 <span class="sd">    def my_operator_execute(self, context):</span>
 <span class="sd">        api = get_threemf_api()</span>
 <span class="sd">        if api is None:</span>
-<span class="sd">            self.report({'ERROR'}, "3MF Format addon not installed/enabled")</span>
-<span class="sd">            return {'CANCELLED'}</span>
+<span class="sd">            self.report({&#39;ERROR&#39;}, &quot;3MF Format addon not installed/enabled&quot;)</span>
+<span class="sd">            return {&#39;CANCELLED&#39;}</span>
 
-<span class="sd">        result = api.import_3mf("/path/to/model.3mf")</span>
-<span class="sd">        if result.status == "FINISHED":</span>
-<span class="sd">            self.report({'INFO'}, f"Imported {result.num_loaded} objects")</span>
-<span class="sd">        return {'FINISHED'}</span>
+<span class="sd">        result = api.import_3mf(&quot;/path/to/model.3mf&quot;)</span>
+<span class="sd">        if result.status == &quot;FINISHED&quot;:</span>
+<span class="sd">            self.report({&#39;INFO&#39;}, f&quot;Imported {result.num_loaded} objects&quot;)</span>
+<span class="sd">        return {&#39;FINISHED&#39;}</span>
 
 <span class="sd">**Alternative — direct try/except** (no helper needed)::</span>
 
@@ -267,9 +268,9 @@
 <span class="sd">        import_3mf = export_3mf = None</span>
 
 <span class="sd">Both approaches survive Blender restarts.  The helper adds automatic</span>
-<span class="sd">addon-path resolution via ``addon_utils`` when a direct import isn't</span>
+<span class="sd">addon-path resolution via ``addon_utils`` when a direct import isn&#39;t</span>
 <span class="sd">possible (e.g. the extension repo prefix varies between installs).</span>
-<span class="sd">"""</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">contextlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">suppress</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
@@ -282,21 +283,21 @@
     <span class="n">ThreeMFAPI</span> <span class="o">=</span> <span class="kc">None</span>
 
 <span class="c1"># ── Internal constants ────────────────────────────────────────────────────</span>
-<span class="n">_REGISTRY_KEY</span> <span class="o">=</span> <span class="s2">"io_mesh_3mf"</span>
+<span class="n">_REGISTRY_KEY</span> <span class="o">=</span> <span class="s2">&quot;io_mesh_3mf&quot;</span>
 
 <span class="c1"># Module-level cache so discovery only runs once per session.</span>
-<span class="n">_cached_api</span><span class="p">:</span> <span class="s2">"ThreeMFAPI | None"</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="n">_cached_api</span><span class="p">:</span> <span class="s2">&quot;ThreeMFAPI | None&quot;</span> <span class="o">=</span> <span class="kc">None</span>
 
 
 <span class="c1"># ── Core discovery ────────────────────────────────────────────────────────</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">_discover_api</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="s2">"ThreeMFAPI | None"</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Locate the 3MF API module using a layered fallback strategy.</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_discover_api</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="s2">&quot;ThreeMFAPI | None&quot;</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Locate the 3MF API module using a layered fallback strategy.</span>
 
-<span class="sd">    1. ``bpy.app.driver_namespace`` (instant, set by the addon's register())</span>
+<span class="sd">    1. ``bpy.app.driver_namespace`` (instant, set by the addon&#39;s register())</span>
 <span class="sd">    2. Direct ``importlib`` import (works when the extension is on sys.path)</span>
 <span class="sd">    3. ``addon_utils`` scan (handles any extension repo prefix)</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">global</span> <span class="n">_cached_api</span>
 
     <span class="c1"># Strategy 1: driver_namespace cache (fastest).</span>
@@ -309,11 +310,11 @@
 
     <span class="c1"># Strategy 2: Direct import — covers the common case where the</span>
     <span class="c1"># extension directory is already on sys.path.</span>
-    <span class="k">for</span> <span class="n">mod_name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"io_mesh_3mf.api"</span><span class="p">,):</span>
+    <span class="k">for</span> <span class="n">mod_name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;io_mesh_3mf.api&quot;</span><span class="p">,):</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">api</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">import_module</span><span class="p">(</span><span class="n">mod_name</span><span class="p">)</span>
             <span class="c1"># Module is in memory but the addon may have been disabled.</span>
-            <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">api</span><span class="p">,</span> <span class="s2">"_explicitly_disabled"</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">api</span><span class="p">,</span> <span class="s2">&quot;_explicitly_disabled&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
                 <span class="k">return</span> <span class="kc">None</span>
             <span class="n">_ensure_registered</span><span class="p">(</span><span class="n">api</span><span class="p">)</span>
             <span class="n">_cached_api</span> <span class="o">=</span> <span class="n">api</span>
@@ -327,12 +328,12 @@
         <span class="kn">import</span><span class="w"> </span><span class="nn">addon_utils</span>  <span class="c1"># type: ignore</span>
         <span class="k">for</span> <span class="n">mod</span> <span class="ow">in</span> <span class="n">addon_utils</span><span class="o">.</span><span class="n">modules</span><span class="p">():</span>
             <span class="n">mod_name</span> <span class="o">=</span> <span class="n">mod</span><span class="o">.</span><span class="vm">__name__</span>
-            <span class="k">if</span> <span class="n">mod_name</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">"ThreeMF_io"</span><span class="p">)</span> <span class="ow">or</span> <span class="n">mod_name</span> <span class="o">==</span> <span class="s2">"io_mesh_3mf"</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">mod_name</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;ThreeMF_io&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">mod_name</span> <span class="o">==</span> <span class="s2">&quot;io_mesh_3mf&quot;</span><span class="p">:</span>
                 <span class="n">_</span><span class="p">,</span> <span class="n">is_enabled</span> <span class="o">=</span> <span class="n">addon_utils</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">mod_name</span><span class="p">)</span>
                 <span class="k">if</span> <span class="ow">not</span> <span class="n">is_enabled</span><span class="p">:</span>
                     <span class="k">continue</span>
                 <span class="k">try</span><span class="p">:</span>
-                    <span class="n">api</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">import_module</span><span class="p">(</span><span class="n">mod_name</span> <span class="o">+</span> <span class="s2">".api"</span><span class="p">)</span>
+                    <span class="n">api</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">import_module</span><span class="p">(</span><span class="n">mod_name</span> <span class="o">+</span> <span class="s2">&quot;.api&quot;</span><span class="p">)</span>
                     <span class="n">_ensure_registered</span><span class="p">(</span><span class="n">api</span><span class="p">)</span>
                     <span class="n">_cached_api</span> <span class="o">=</span> <span class="n">api</span>
                     <span class="k">return</span> <span class="n">api</span>
@@ -343,15 +344,15 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_ensure_registered</span><span class="p">(</span><span class="n">api_module</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Make sure the API module is in driver_namespace for fast future lookups.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Make sure the API module is in driver_namespace for fast future lookups.</span>
 
-<span class="sd">    Respects ``_explicitly_disabled`` — won't re-register an addon that</span>
+<span class="sd">    Respects ``_explicitly_disabled`` — won&#39;t re-register an addon that</span>
 <span class="sd">    the user intentionally disabled in Preferences.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">_REGISTRY_KEY</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">bpy</span><span class="o">.</span><span class="n">app</span><span class="o">.</span><span class="n">driver_namespace</span><span class="p">:</span>
-        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">api_module</span><span class="p">,</span> <span class="s2">"_explicitly_disabled"</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">api_module</span><span class="p">,</span> <span class="s2">&quot;_explicitly_disabled&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
             <span class="k">return</span>
-        <span class="n">register_fn</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">api_module</span><span class="p">,</span> <span class="s2">"_register_api"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">register_fn</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">api_module</span><span class="p">,</span> <span class="s2">&quot;_register_api&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">register_fn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">with</span> <span class="n">suppress</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
                 <span class="n">register_fn</span><span class="p">()</span>
@@ -361,11 +362,11 @@
 
 <div class="viewcode-block" id="get_threemf_api">
 <a class="viewcode-back" href="../../discovery.html#io_mesh_3mf.threemf_discovery.get_threemf_api">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">get_threemf_api</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="s2">"ThreeMFAPI | None"</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Return the 3MF API module, or *None* if the addon isn't available.</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_threemf_api</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="s2">&quot;ThreeMFAPI | None&quot;</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the 3MF API module, or *None* if the addon isn&#39;t available.</span>
 
 <span class="sd">    This is the **recommended single entry point**.  It resolves the</span>
-<span class="sd">    addon's import path automatically, caches the result, and ensures</span>
+<span class="sd">    addon&#39;s import path automatically, caches the result, and ensures</span>
 <span class="sd">    the module is registered for fast subsequent lookups.</span>
 
 <span class="sd">    :return: The ``io_mesh_3mf.api`` module, or ``None``.</span>
@@ -374,11 +375,11 @@
 
 <span class="sd">        api = get_threemf_api()</span>
 <span class="sd">        if api:</span>
-<span class="sd">            result = api.import_3mf("/model.3mf")</span>
-<span class="sd">    """</span>
+<span class="sd">            result = api.import_3mf(&quot;/model.3mf&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">global</span> <span class="n">_cached_api</span>
     <span class="c1"># driver_namespace is authoritative — always check it first.</span>
-    <span class="c1"># It's cleared by _unregister_api() when the addon is disabled.</span>
+    <span class="c1"># It&#39;s cleared by _unregister_api() when the addon is disabled.</span>
     <span class="n">api</span> <span class="o">=</span> <span class="n">bpy</span><span class="o">.</span><span class="n">app</span><span class="o">.</span><span class="n">driver_namespace</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">_REGISTRY_KEY</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">api</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">_cached_api</span> <span class="o">=</span> <span class="n">api</span>
@@ -393,13 +394,13 @@
 <div class="viewcode-block" id="is_threemf_available">
 <a class="viewcode-back" href="../../discovery.html#io_mesh_3mf.threemf_discovery.is_threemf_available">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">is_threemf_available</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Check whether the 3MF addon is installed and enabled.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check whether the 3MF addon is installed and enabled.</span>
 
 <span class="sd">    Equivalent to ``get_threemf_api() is not None`` but reads better</span>
 <span class="sd">    in boolean contexts.</span>
 
 <span class="sd">    :return: True if the 3MF API can be used.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="n">get_threemf_api</span><span class="p">()</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span></div>
 
 
@@ -407,13 +408,13 @@
 <div class="viewcode-block" id="get_threemf_version">
 <a class="viewcode-back" href="../../discovery.html#io_mesh_3mf.threemf_discovery.get_threemf_version">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">get_threemf_version</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Return the 3MF API version tuple ``(major, minor, patch)``, or *None*.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the 3MF API version tuple ``(major, minor, patch)``, or *None*.</span>
 
 <span class="sd">    :return: Version tuple like ``(1, 0, 0)``, or ``None`` if unavailable.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">api</span> <span class="o">=</span> <span class="n">get_threemf_api</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">api</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">api</span><span class="p">,</span> <span class="s2">"API_VERSION"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">api</span><span class="p">,</span> <span class="s2">&quot;API_VERSION&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
     <span class="k">return</span> <span class="kc">None</span></div>
 
 
@@ -421,7 +422,7 @@
 <div class="viewcode-block" id="check_threemf_version">
 <a class="viewcode-back" href="../../discovery.html#io_mesh_3mf.threemf_discovery.check_threemf_version">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">check_threemf_version</span><span class="p">(</span><span class="n">minimum</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Check if the installed 3MF API meets a minimum version requirement.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if the installed 3MF API meets a minimum version requirement.</span>
 
 <span class="sd">    :param minimum: Tuple of ``(major, minor, patch)`` minimum version.</span>
 <span class="sd">    :return: True if the API version &gt;= *minimum*, False otherwise.</span>
@@ -431,7 +432,7 @@
 <span class="sd">        if check_threemf_version((1, 2, 0)):</span>
 <span class="sd">            # Safe to use features added in v1.2.0</span>
 <span class="sd">            ...</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">version</span> <span class="o">=</span> <span class="n">get_threemf_version</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">version</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">False</span>
@@ -442,42 +443,43 @@
 <div class="viewcode-block" id="has_threemf_capability">
 <a class="viewcode-back" href="../../discovery.html#io_mesh_3mf.threemf_discovery.has_threemf_capability">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">has_threemf_capability</span><span class="p">(</span><span class="n">capability</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Check if a specific API capability is supported.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if a specific API capability is supported.</span>
 
 <span class="sd">    Use this for forward-compatible feature detection instead of version</span>
 <span class="sd">    checks.  New capabilities may be added in minor versions.</span>
 
 <span class="sd">    Capabilities include:</span>
 
-<span class="sd">    - ``"import"``, ``"export"``, ``"inspect"``, ``"batch"``</span>
-<span class="sd">    - ``"callbacks"`` (on_progress, on_warning, on_object_created)</span>
-<span class="sd">    - ``"target_collection"``, ``"orca_format"``, ``"prusa_format"``</span>
-<span class="sd">    - ``"paint_mode"``, ``"project_template"``, ``"object_settings"``</span>
-<span class="sd">    - ``"building_blocks"``, ``"global_scale"``, ``"compression"``</span>
-<span class="sd">    - ``"thumbnail"``, ``"use_components"``, ``"auto_smooth"``</span>
-<span class="sd">    - ``"subdivision_depth"``, ``"assemblies"``, ``"multi_plate"``</span>
-<span class="sd">    - ``"plate_per_material"``</span>
+<span class="sd">    - ``&quot;import&quot;``, ``&quot;export&quot;``, ``&quot;inspect&quot;``, ``&quot;batch&quot;``</span>
+<span class="sd">    - ``&quot;callbacks&quot;`` (on_progress, on_warning, on_object_created)</span>
+<span class="sd">    - ``&quot;target_collection&quot;``, ``&quot;orca_format&quot;``, ``&quot;prusa_format&quot;``</span>
+<span class="sd">    - ``&quot;paint_mode&quot;``, ``&quot;project_template&quot;``, ``&quot;object_settings&quot;``</span>
+<span class="sd">    - ``&quot;building_blocks&quot;``, ``&quot;global_scale&quot;``, ``&quot;compression&quot;``</span>
+<span class="sd">    - ``&quot;thumbnail&quot;``, ``&quot;use_components&quot;``, ``&quot;auto_smooth&quot;``,</span>
+<span class="sd">      ``&quot;normal_shading&quot;``</span>
+<span class="sd">    - ``&quot;subdivision_depth&quot;``, ``&quot;assemblies&quot;``, ``&quot;multi_plate&quot;``</span>
+<span class="sd">    - ``&quot;plate_per_material&quot;``</span>
 
 <span class="sd">    :param capability: Capability name string.</span>
 <span class="sd">    :return: True if the capability is supported.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">api</span> <span class="o">=</span> <span class="n">get_threemf_api</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">api</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">False</span>
-    <span class="n">capabilities</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">api</span><span class="p">,</span> <span class="s2">"API_CAPABILITIES"</span><span class="p">,</span> <span class="nb">frozenset</span><span class="p">())</span>
+    <span class="n">capabilities</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">api</span><span class="p">,</span> <span class="s2">&quot;API_CAPABILITIES&quot;</span><span class="p">,</span> <span class="nb">frozenset</span><span class="p">())</span>
     <span class="k">return</span> <span class="n">capability</span> <span class="ow">in</span> <span class="n">capabilities</span></div>
 
 
 
 <span class="c1"># ── Convenience wrappers ──────────────────────────────────────────────────</span>
 <span class="c1"># These let you call import/export/inspect without touching get_threemf_api()</span>
-<span class="c1"># directly.  They return None when the addon isn't installed.</span>
+<span class="c1"># directly.  They return None when the addon isn&#39;t installed.</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">import_3mf</span><span class="p">(</span><span class="n">filepath</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Import a 3MF file.  Returns :class:`ImportResult` or *None*.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Import a 3MF file.  Returns :class:`ImportResult` or *None*.</span>
 
 <span class="sd">    See ``io_mesh_3mf.api.import_3mf`` for full parameter docs.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">api</span> <span class="o">=</span> <span class="n">get_threemf_api</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">api</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">None</span>
@@ -485,10 +487,10 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">export_3mf</span><span class="p">(</span><span class="n">filepath</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Export to a 3MF file.  Returns :class:`ExportResult` or *None*.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Export to a 3MF file.  Returns :class:`ExportResult` or *None*.</span>
 
 <span class="sd">    See ``io_mesh_3mf.api.export_3mf`` for full parameter docs.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">api</span> <span class="o">=</span> <span class="n">get_threemf_api</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">api</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">None</span>
@@ -496,10 +498,10 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">inspect_3mf</span><span class="p">(</span><span class="n">filepath</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Inspect a 3MF file without importing.  Returns :class:`InspectResult` or *None*.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Inspect a 3MF file without importing.  Returns :class:`InspectResult` or *None*.</span>
 
 <span class="sd">    See ``io_mesh_3mf.api.inspect_3mf`` for full parameter docs.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">api</span> <span class="o">=</span> <span class="n">get_threemf_api</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">api</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">None</span>
