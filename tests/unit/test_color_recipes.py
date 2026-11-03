@@ -102,6 +102,18 @@ class TestFilamentMixerCompatibility(unittest.TestCase):
     def test_invalid_hex_uses_orca_gray_fallback(self):
         self.assertEqual(blend_color_multi(["not-a-color"], [1]), "#808080")
 
+    def test_rgba_hex_ignores_alpha(self):
+        # Orca writes physical filament colors as #RRGGBBAA; the FullSpectrum
+        # reference file stores #7C356C for the 50/50 blend of these two.
+        self.assertEqual(
+            blend_color_multi(["#DE1619FF", "#0F80FF"], [5000, 5000]),
+            "#7C356C",
+        )
+        self.assertEqual(
+            blend_color_multi(["#DE1619FF", "#0F80FF"], [5000, 5000]),
+            blend_color_multi(["#DE1619", "#0F80FF"], [5000, 5000]),
+        )
+
 
 class TestRecipeSolvers(unittest.TestCase):
     def setUp(self):

@@ -50,9 +50,16 @@ def collision_safe_palette(colors: Mapping[int, str]) -> Dict[int, str]:
     return result
 
 
-def paint_source_signature(mesh, image) -> str:
-    """Hash the mesh geometry, active UVs, and image pixels used by paint export."""
-    digest = hashlib.sha256()
+_SIGNATURE_PREFIX = "b2:"
+
+
+def paint_source_signature(mesh, image, legacy: bool = False) -> str:
+    """Hash the mesh geometry, active UVs, and image pixels used by paint export.
+
+    New signatures use blake2b (``b2:`` prefix); ``legacy=True`` reproduces the
+    older chunked SHA-256 digest so blend files saved earlier still match.
+    """
+    digest = hashlib.sha256() if legacy else hashlib.blake2b(digest_size=32)
     mesh.calc_loop_triangles()
     digest.update(len(mesh.vertices).to_bytes(8, "little"))
     digest.update(len(mesh.polygons).to_bytes(8, "little"))
@@ -83,15 +90,17 @@ def paint_source_signature(mesh, image) -> str:
     width, height = image.size
     digest.update(width.to_bytes(8, "little"))
     digest.update(height.to_bytes(8, "little"))
-    pixel_count = width * height * 4
-    chunk_size = 1_048_576
-    for start in range(0, pixel_count, chunk_size):
-        pixels = np.asarray(
-            image.pixels[start:min(start + chunk_size, pixel_count)],
-            dtype=np.float32,
-        )
-        digest.update(pixels.tobytes())
-    return digest.hexdigest()
+    # Slicing image.pixels re-reads the buffer per call and is far too slow
+    # on 8192x8192 textures; foreach_get reads it once.
+    pixels = np.empty(width * height * 4, dtype=np.float32)
+    image.pixels.foreach_get(pixels)
+    digest.update(pixels.tobytes())
+    return digest.hexdigest() if legacy else _SIGNATURE_PREFIX + digest.hexdigest()
+
+
+def _signature_matches(mesh, image, signature: str) -> bool:
+    legacy = not str(signature).startswith(_SIGNATURE_PREFIX)
+    return paint_source_signature(mesh, image, legacy=legacy) == signature
 
 
 def store_original_segmentation(mesh, segmentation_strings) -> None:
@@ -125,7 +134,7 @@ def unchanged_original_segmentation(mesh, image, source_mesh=None):
     text = bpy.data.texts.get(text_name)
     if text is None:
         return None
-    if paint_source_signature(mesh, image) != signature:
+    if not _signature_matches(mesh, image, str(signature)):
         return None
     try:
         source = json.loads(text.as_string())

@@ -208,15 +208,15 @@ def render_triangle_to_image(
             buf[cy, cx] = color
         return
 
-    # Build pixel-center grid over the bounding box.
+    # Pixel-center coordinates over the bounding box; the edge functions
+    # broadcast (ny, 1) against (1, nx) instead of allocating a meshgrid.
     xs = np.arange(min_x, max_x + 1, dtype=np.float64) + 0.5
-    ys = np.arange(min_y, max_y + 1, dtype=np.float64) + 0.5
-    px, py = np.meshgrid(xs, ys)  # shape (ny, nx)
+    ys = (np.arange(min_y, max_y + 1, dtype=np.float64) + 0.5)[:, np.newaxis]
 
     # Vectorized edge functions: all pixels evaluated at once.
-    e0 = (px - x0) * (y1 - y0) - (py - y0) * (x1 - x0)
-    e1 = (px - x1) * (y2 - y1) - (py - y1) * (x2 - x1)
-    e2 = (px - x2) * (y0 - y2) - (py - y2) * (x0 - x2)
+    e0 = (xs - x0) * (y1 - y0) - (ys - y0) * (x1 - x0)
+    e1 = (xs - x1) * (y2 - y1) - (ys - y1) * (x2 - x1)
+    e2 = (xs - x2) * (y0 - y2) - (ys - y2) * (x0 - x2)
 
     if expand_px > 0.0:
         # Per-edge normalized threshold: the edge function value at
@@ -255,45 +255,44 @@ def _dilate_pass(buf: np.ndarray, min_neighbors: int) -> np.ndarray:
     if not np.any(transparent):
         return buf
 
-    # Shift arrays to get 4-connected neighbors. Zero edges to prevent wrapping.
-    left = np.roll(buf, 1, axis=1)
-    left[:, 0] = 0
-    right = np.roll(buf, -1, axis=1)
-    right[:, -1] = 0
-    up = np.roll(buf, 1, axis=0)
-    up[0, :] = 0
-    down = np.roll(buf, -1, axis=0)
-    down[-1, :] = 0
+    # 4-connected opaque-neighbour masks (edges don't wrap).
+    opaque = alpha > 0.5
+    left_opaque = np.zeros_like(opaque)
+    left_opaque[:, 1:] = opaque[:, :-1]
+    right_opaque = np.zeros_like(opaque)
+    right_opaque[:, :-1] = opaque[:, 1:]
+    up_opaque = np.zeros_like(opaque)
+    up_opaque[1:, :] = opaque[:-1, :]
+    down_opaque = np.zeros_like(opaque)
+    down_opaque[:-1, :] = opaque[1:, :]
 
-    left_opaque = left[:, :, 3] > 0.5
-    right_opaque = right[:, :, 3] > 0.5
-    up_opaque = up[:, :, 3] > 0.5
-    down_opaque = down[:, :, 3] > 0.5
     count = (
-        left_opaque.astype(np.int8)
-        + right_opaque.astype(np.int8)
-        + up_opaque.astype(np.int8)
-        + down_opaque.astype(np.int8)
+        left_opaque.view(np.int8)
+        + right_opaque.view(np.int8)
+        + up_opaque.view(np.int8)
+        + down_opaque.view(np.int8)
     )
 
     fill_mask = transparent & (count >= min_neighbors)
-    if not np.any(fill_mask):
+    ys, xs = np.nonzero(fill_mask)
+    if ys.size == 0:
         return buf
 
     # Take color from any opaque neighbor (last writer wins; order is arbitrary
-    # but consistent — down, up, right, left priority).
-    fill_color = np.zeros_like(buf)
-    for neighbor, opaque in [
-        (down, down_opaque),
-        (up, up_opaque),
-        (right, right_opaque),
-        (left, left_opaque),
-    ]:
-        opaque_3d = opaque[:, :, np.newaxis]
-        fill_color = np.where(opaque_3d, neighbor, fill_color)
+    # but consistent — down, up, right, left priority).  Colors are gathered
+    # only for the pixels being filled, from the unmodified buffer, then
+    # written back in one step.
+    fill_color = np.zeros((ys.size, 4), dtype=buf.dtype)
+    for dy, dx, neighbor_opaque in (
+        (1, 0, down_opaque),
+        (-1, 0, up_opaque),
+        (0, 1, right_opaque),
+        (0, -1, left_opaque),
+    ):
+        selected = neighbor_opaque[ys, xs]
+        fill_color[selected] = buf[ys[selected] + dy, xs[selected] + dx]
 
-    fill_3d = fill_mask[:, :, np.newaxis]
-    buf = np.where(fill_3d, fill_color, buf)
+    buf[ys, xs] = fill_color
     return buf
 
 

@@ -23,7 +23,7 @@ first argument instead of ``op``.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+from typing import Callable, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 from ..common.extensions import ExtensionManager
 from ..common.types import (
@@ -153,6 +153,10 @@ class ImportContext:
     # Cache of external model paths already loaded — prevents re-opening the ZIP
     # and re-parsing the same file when multiple components share one path.
     loaded_external_paths: Set[str] = field(default_factory=set)
+
+    # Optional ``(parts_done, parts_total)`` callback so objects with many
+    # components (e.g. hundreds of painted parts) keep reporting progress.
+    part_progress: Optional[Callable[[int, int], None]] = None
 
     # --- Helpers ------------------------------------------------------------
 

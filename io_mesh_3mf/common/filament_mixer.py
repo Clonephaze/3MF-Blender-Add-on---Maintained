@@ -114,7 +114,8 @@ def _parse_hex(hex_color: str) -> Tuple[int, int, int]:
     """Parse a hex color to sRGB bytes; invalid values match Orca's gray fallback."""
     try:
         h = hex_color.lstrip("#")
-        if len(h) == 6:
+        # Orca writes physical filament colors as #RRGGBBAA; alpha is ignored.
+        if len(h) in (6, 8):
             return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
         if len(h) == 3:
             return (int(h[0] * 2, 16), int(h[1] * 2, 16), int(h[2] * 2, 16))

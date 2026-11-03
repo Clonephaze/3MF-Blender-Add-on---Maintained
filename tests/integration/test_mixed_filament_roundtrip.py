@@ -43,6 +43,7 @@ from io_mesh_3mf.paint.mixed_filament_editor import (
 )
 from io_mesh_3mf.paint.roundtrip import (
     collision_safe_palette,
+    paint_source_signature,
     store_original_segmentation,
     unchanged_original_segmentation,
 )
@@ -706,6 +707,15 @@ class TestPaintRoundTripHelpers(Blender3mfTestCase):
 
         try:
             store_original_segmentation(mesh, {0: "4"})
+            self.assertEqual(
+                unchanged_original_segmentation(mesh, image),
+                {0: "4"},
+            )
+            self.assertTrue(mesh["3mf_paint_source_signature"].startswith("b2:"))
+            # Signatures stored by earlier versions (plain SHA-256) still match.
+            mesh["3mf_paint_source_signature"] = paint_source_signature(
+                mesh, image, legacy=True,
+            )
             self.assertEqual(
                 unchanged_original_segmentation(mesh, image),
                 {0: "4"},

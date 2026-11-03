@@ -12,8 +12,8 @@ Features
 
 Bug Fixes
 ----
+* **Large MMU-paint imports would stick at 95%** — Files with hundreds of painted parts could take a long time with no update.Progress now advances per part, giving visible feedback of how long is left. Gap-closing dilation and triangle rasterization are now vectorized with identical output, paint-source signatures hash the texture in one read with BLAKE2b instead of chunked SHA-256 (older saved signatures still validate), and results are consistent.
 * **Assembly round trips** — Preserve assembled frames separately from print placement, including rotated and off-origin parts, linked import instances, and import origin adjustments. Warn about invalid or conflicting plate and assembly metadata.
-* **Plate layout and explode offsets** — Avoid unintended collisions between automatic and explicitly assigned material plates, keep same-named mixed assemblies separate, place multi-plate exports inside custom beds, and account for rotation and scale when calculating single-part explode offsets.
 
 ----
 

@@ -127,7 +127,21 @@ def build_items(
 
         _t_obj = _time.perf_counter()
         first_new_object = len(ctx.imported_objects)
-        build_object(ctx, resource_object, transform, metadata, [objectid])
+        if progress_callback:
+            item_start = 60 + int((idx / total_items) * 35)
+            item_end = 60 + int(((idx + 1) / total_items) * 35)
+
+            def _report_part(done, total, _start=item_start, _end=item_end):
+                progress_callback(
+                    _start + (_end - _start) * done // max(total, 1),
+                    f"Building part {done}/{total}...",
+                )
+
+            ctx.part_progress = _report_part
+        try:
+            build_object(ctx, resource_object, transform, metadata, [objectid])
+        finally:
+            ctx.part_progress = None
         if plate is not None:
             new_objects = ctx.imported_objects[first_new_object:]
             # A lone plate 1 is the default layout: tagging it with 3mf_plate
@@ -433,7 +447,8 @@ def build_object(
 
     # --- Recurse for components ---
     if not is_component_instance:
-        for component in resource_object.components:
+        total_components = len(resource_object.components)
+        for part_index, component in enumerate(resource_object.components):
             if component.resource_object in objectid_stack_trace:
                 warn(f"Recursive components in object ID: {component.resource_object}")
                 continue
@@ -449,6 +464,8 @@ def build_object(
                 objectid_stack_trace, parent=blender_object,
             )
             objectid_stack_trace.pop()
+            if ctx.part_progress is not None and len(objectid_stack_trace) == 1:
+                ctx.part_progress(part_index + 1, total_components)
 
     return blender_object
 
