@@ -880,6 +880,7 @@ class MMU_OT_bake_to_mmu(bpy.types.Operator):
         try:
             bake_kwargs = {
                 "type": bake_type,
+                "target": "IMAGE_TEXTURES",
                 "use_clear": True,
                 "margin": 2,
                 "margin_type": "EXTEND",
